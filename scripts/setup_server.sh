@@ -18,22 +18,25 @@ ufw --force enable
 git config --global --add safe.directory '*'
 
 echo -e "${RED}ADD USER${NC}"
+mkdir /var/www/data
 chown www-data /var/www/
 su - www-data -s /bin/bash
 cd /var/www/
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
-cd tiles.versatiles.org
 exit
 
 echo -e "${RED}ADD MAP DAT${NC}"
-mkdir /var/www/data
-wget "https://download.versatiles.org/planet-latest.versatiles" -O /var/www/data/osm.versatiles
+wget -q "https://download.versatiles.org/planet-latest.versatiles" -O /var/www/data/osm.versatiles
+wget -q "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O /var/www/data/frontend.br.tar
 
 echo -e "${RED}ADD VERSATILES${NC}"
 curl -sL "https://github.com/versatiles-org/versatiles-rs/releases/latest/download/versatiles-linux-gnu-aarch64.tar.gz" | gzip -d | tar -xOf - versatiles > /usr/local/bin/versatiles
 chown root:root /usr/local/bin/versatiles
 chmod +x /usr/local/bin/versatiles
 
+echo -e "${RED}CONFIG VERSATILES${NC}"
+ln -s /var/www/tiles.versatiles.org/config/versatiles/versatiles.conf /etc/supervisor/conf.d/versatiles.conf
+supervisorctl reload
 
 echo -e "${RED}CONFIG NGINX${NC}"
 mkdir /etc/nginx/sites
