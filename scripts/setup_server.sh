@@ -10,7 +10,7 @@ echo -e "${RED}SETUP SYSTEM${NC}"
 curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - # for node js
 apt-get -qq -y update
 apt-get -qq -y upgrade
-apt-get -qq -y install curl git libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static nginx supervisor ufw webhook
+apt-get -qq -y install curl git libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static nginx-full supervisor ufw webhook
 ufw allow OpenSSH
 ufw allow 8080/tcp
 ufw allow 9000/tcp
