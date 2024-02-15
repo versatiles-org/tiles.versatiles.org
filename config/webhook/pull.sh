@@ -1,4 +1,4 @@
 #!/bin/sh
-git pull -f
+git pull -fq
 nginx -s reload
 supervisorctl reload
