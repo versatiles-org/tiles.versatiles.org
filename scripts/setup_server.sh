@@ -25,8 +25,10 @@ cd /var/www/
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
 exit
 
-echo -e "${RED}ADD MAP DAT${NC}"
-wget -q "https://download.versatiles.org/planet-latest.versatiles" -O /var/www/data/osm.versatiles
+echo -e "${RED}ADD MAP DATA${NC}"
+wget "https://download.versatiles.org/planet-latest.versatiles" -O /var/www/data/osm.versatiles
+
+echo -e "${RED}ADD FRONTEND${NC}"
 wget -q "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O /var/www/data/frontend.br.tar
 
 echo -e "${RED}ADD VERSATILES${NC}"
