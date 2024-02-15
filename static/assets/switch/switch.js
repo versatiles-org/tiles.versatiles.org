@@ -88,14 +88,14 @@ MapLibreStyleSwitcherControl.DEFAULT_STYLE = "Colorful";
 MapLibreStyleSwitcherControl.DEFAULT_STYLES = [
 	{
 		title: "Colorful",
-		uri: new URL('/assets/styles/colorful.json', location.href),
+		uri: new URL('/assets/styles/colorful.json', location.href).pathname,
 	},
 	{
 		title: "Greybeard",
-		uri: new URL('/assets/styles/greybeard.json', location.href),
+		uri: new URL('/assets/styles/greybeard.json', location.href).pathname,
 	},
 	{
 		title: "Neutrino",
-		uri: new URL('/assets/styles/neutrino.json', location.href),
+		uri: new URL('/assets/styles/neutrino.json', location.href).pathname,
 	},
 ];

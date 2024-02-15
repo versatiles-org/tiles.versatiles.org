@@ -42,11 +42,10 @@
 	<a href="https://versatiles.org" id="logo"><img src="https://versatiles.org/assets/logo/versatiles.svg" alt="versatiles.org"></a>
 	<div id="map" class="maplibregl-compact"></div>
 	<script>
-
 		let map = new maplibregl.Map({
 			container: 'map',
 			bounds: [-180, -80, 180, 80],
-			style: new URL('/assets/styles/colorful.json', location.href),
+			style: new URL('/assets/styles/colorful.json', location.href).pathname,
 			zoom: 5,
 			maxZoom: 20,
 			hash: true,
