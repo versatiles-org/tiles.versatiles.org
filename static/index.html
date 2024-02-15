@@ -45,7 +45,7 @@
 		let map = new maplibregl.Map({
 			container: 'map',
 			bounds: [-180, -80, 180, 80],
-			style: new URL('/assets/styles/colorful.json', location.href).pathname,
+			style: new URL('/assets/styles/colorful.json', location.href).href,
 			zoom: 5,
 			maxZoom: 20,
 			hash: true,
