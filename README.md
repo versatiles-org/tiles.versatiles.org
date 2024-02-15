@@ -35,11 +35,3 @@ To create the server, execute the setup script:
 ### Updating
 
 Updates are managed automatically using webhooks.
-
-### Deleting the Server
-
-When no longer needed, the server can be removed with:
-
-```bash
-./delete_server.sh
-```
