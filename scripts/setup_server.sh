@@ -38,7 +38,6 @@ chmod +x /usr/local/bin/versatiles
 
 echo -e "${RED}CONFIG VERSATILES${NC}"
 ln -s /var/www/tiles.versatiles.org/config/supervisor/versatiles.conf /etc/supervisor/conf.d/versatiles.conf
-supervisorctl reload
 
 echo -e "${RED}CONFIG NGINX${NC}"
 mkdir /etc/nginx/sites
@@ -52,7 +51,11 @@ nginx -s reload
 
 echo -e "${RED}CONFIG WEBHOOK${NC}"
 ln -s /var/www/tiles.versatiles.org/config/supervisor/webhooks.conf /etc/supervisor/conf.d/webhooks.conf
-cat /var/www/tiles.versatiles.org/config/webhook/webhook.yaml | sed "s/%SECRET%/$SECRET/g" > /var/www/webhook.yaml
+cat /var/www/tiles.versatiles.org/config/webhook/webhooks.yaml | sed "s/%SECRET%/$SECRET/g" > /var/www/webhooks.yaml
+
+echo -e "${RED}CONFIG SUPERVISOR${NC}"
+rm /etc/supervisor/supervisord.conf
+ln -s /var/www/tiles.versatiles.org/config/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 supervisorctl reload
 
 # reboot
