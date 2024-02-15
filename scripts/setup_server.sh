@@ -15,15 +15,13 @@ ufw allow OpenSSH
 ufw allow 8080/tcp
 ufw allow 9000/tcp
 ufw --force enable
-git config --global --add safe.directory '*'
 
 echo -e "${RED}ADD USER${NC}"
 mkdir /var/www/data
 chown www-data /var/www/
-su - www-data -s /bin/bash
 cd /var/www/
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
-exit
+git config --global --add safe.directory '*'
 
 echo -e "${RED}CREATE RAMDISK${NC}"
 mkdir /var/www/ramdisk/
