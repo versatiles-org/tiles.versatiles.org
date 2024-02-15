@@ -1,6 +1,6 @@
 - id: pull
-  execute-command: /var/www/download.versatiles.org/config/webhook/pull.sh
-  command-working-directory: /var/www/download.versatiles.org/
+  execute-command: /var/www/tiles.versatiles.org/config/webhook/pull.sh
+  command-working-directory: /var/www/tiles.versatiles.org/
   trigger-rule:
     and:
     - match:
