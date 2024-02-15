@@ -1,5 +1,5 @@
 #!/bin/sh
 cd /var/www/tiles.versatiles.org/
-git pull -fq
+git pull -f
 nginx -s reload
 supervisorctl reload
