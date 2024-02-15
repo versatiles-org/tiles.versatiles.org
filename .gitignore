@@ -1,4 +1,5 @@
 
-html/docs/*.html
-node_modules
-secret.txt
+/frontend*
+/html/docs/*.html
+/node_modules
+/secret.txt
