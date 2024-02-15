@@ -9,8 +9,8 @@
 	<link href="assets/maplibre/maplibre-gl.css" rel="stylesheet">
 	<script src="assets/switch/switch.js"></script>
 	<link href="assets/switch/switch.css" rel="stylesheet">
-	<script src="assets/inspect/maplibre-gl-inspect.min.js"></script>
-	<link href="assets/inspect/maplibre-gl-inspect.css" rel="stylesheet">
+	<script src="assets/maplibre-inspect/maplibre-gl-inspect.min.js"></script>
+	<link href="assets/maplibre-inspect/maplibre-gl-inspect.css" rel="stylesheet">
 
 	<style>
 		body {
@@ -46,7 +46,7 @@
 		let map = new maplibregl.Map({
 			container: 'map',
 			bounds: [-180, -80, 180, 80],
-			style: "https://tiles.versatiles.org/assets/styles/colorful.json",
+			style: new URL('/assets/styles/colorful.json', location.href),
 			zoom: 5,
 			maxZoom: 20,
 			hash: true,
