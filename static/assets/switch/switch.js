@@ -6,53 +6,53 @@ class MapLibreStyleSwitcherControl {
 		this.onDocumentClick = this.onDocumentClick.bind(this);
 	}
 	getDefaultPosition() {
-		const defaultPosition = "top-right";
+		const defaultPosition = 'top-right';
 		return defaultPosition;
 	}
 	onAdd(map) {
 		this.map = map;
-		this.controlContainer = document.createElement("div");
-		this.controlContainer.classList.add("maplibregl-ctrl");
-		this.controlContainer.classList.add("maplibregl-ctrl-group");
-		this.mapStyleContainer = document.createElement("div");
-		this.styleButton = document.createElement("button");
-		this.styleButton.type = "button";
-		this.mapStyleContainer.classList.add("maplibregl-style-list");
+		this.controlContainer = document.createElement('div');
+		this.controlContainer.classList.add('maplibregl-ctrl');
+		this.controlContainer.classList.add('maplibregl-ctrl-group');
+		this.mapStyleContainer = document.createElement('div');
+		this.styleButton = document.createElement('button');
+		this.styleButton.type = 'button';
+		this.mapStyleContainer.classList.add('maplibregl-style-list');
 		for (const style of this.styles) {
-			const styleElement = document.createElement("button");
-			styleElement.type = "button";
+			const styleElement = document.createElement('button');
+			styleElement.type = 'button';
 			styleElement.innerText = style.title;
 			styleElement.classList.add(
-				style.title.replace(/[^a-z0-9-]/gi, "_")
+				style.title.replace(/[^a-z0-9-]/gi, '_')
 			);
 			styleElement.dataset.uri = JSON.stringify(style.uri);
-			styleElement.addEventListener("click", (event) => {
+			styleElement.addEventListener('click', (event) => {
 				const srcElement = event.srcElement;
-				if (srcElement.classList.contains("active")) {
+				if (srcElement.classList.contains('active')) {
 					return;
 				}
 				this.map.setStyle(JSON.parse(srcElement.dataset.uri));
-				this.mapStyleContainer.style.display = "none";
-				this.styleButton.style.display = "block";
+				this.mapStyleContainer.style.display = 'none';
+				this.styleButton.style.display = 'block';
 				const elms =
-					this.mapStyleContainer.getElementsByClassName("active");
+					this.mapStyleContainer.getElementsByClassName('active');
 				while (elms[0]) {
-					elms[0].classList.remove("active");
+					elms[0].classList.remove('active');
 				}
-				srcElement.classList.add("active");
+				srcElement.classList.add('active');
 			});
 			if (style.title === this.defaultStyle) {
-				styleElement.classList.add("active");
+				styleElement.classList.add('active');
 			}
 			this.mapStyleContainer.appendChild(styleElement);
 		}
-		this.styleButton.classList.add("maplibregl-ctrl-icon");
-		this.styleButton.classList.add("maplibregl-style-switcher");
-		this.styleButton.addEventListener("click", () => {
-			this.styleButton.style.display = "none";
-			this.mapStyleContainer.style.display = "block";
+		this.styleButton.classList.add('maplibregl-ctrl-icon');
+		this.styleButton.classList.add('maplibregl-style-switcher');
+		this.styleButton.addEventListener('click', () => {
+			this.styleButton.style.display = 'none';
+			this.mapStyleContainer.style.display = 'block';
 		});
-		document.addEventListener("click", this.onDocumentClick);
+		document.addEventListener('click', this.onDocumentClick);
 		this.controlContainer.appendChild(this.styleButton);
 		this.controlContainer.appendChild(this.mapStyleContainer);
 		return this.controlContainer;
@@ -66,9 +66,9 @@ class MapLibreStyleSwitcherControl {
 		) {
 			return;
 		}
-		this.styleButton.removeEventListener("click", this.onDocumentClick);
+		this.styleButton.removeEventListener('click', this.onDocumentClick);
 		this.controlContainer.parentNode.removeChild(this.controlContainer);
-		document.removeEventListener("click", this.onDocumentClick);
+		document.removeEventListener('click', this.onDocumentClick);
 		this.map = undefined;
 	}
 	onDocumentClick(event) {
@@ -78,24 +78,8 @@ class MapLibreStyleSwitcherControl {
 			this.mapStyleContainer &&
 			this.styleButton
 		) {
-			this.mapStyleContainer.style.display = "none";
-			this.styleButton.style.display = "block";
+			this.mapStyleContainer.style.display = 'none';
+			this.styleButton.style.display = 'block';
 		}
 	}
 }
-
-MapLibreStyleSwitcherControl.DEFAULT_STYLE = "Colorful";
-MapLibreStyleSwitcherControl.DEFAULT_STYLES = [
-	{
-		title: "Colorful",
-		uri: new URL('/assets/styles/colorful.json', location.href).href,
-	},
-	{
-		title: "Greybeard",
-		uri: new URL('/assets/styles/greybeard.json', location.href).href,
-	},
-	{
-		title: "Neutrino",
-		uri: new URL('/assets/styles/neutrino.json', location.href).href,
-	},
-];
