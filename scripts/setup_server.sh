@@ -8,9 +8,9 @@ set -x
 
 echo -e "${RED}SETUP SYSTEM${NC}"
 curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - # for node js
-apt-get -qq -y update
-apt-get -qq -y upgrade
-apt-get -qq -y install curl git libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static nginx-full supervisor ufw 
+apt-get -qqqy update
+apt-get -qqqy upgrade
+apt-get -qqqy install curl git libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static nginx-full supervisor ufw 
 ufw allow OpenSSH
 ufw allow 8080/tcp
 ufw --force enable
@@ -29,7 +29,7 @@ systemctl daemon-reload
 mount /var/www/ramdisk/
 
 echo -e "${RED}ADD MAP DATA${NC}"
-wget "https://download.versatiles.org/osm.20240325.versatiles" -O /var/www/data/osm.versatiles
+wget --progress=dot:giga "https://download.versatiles.org/osm.20240325.versatiles" -O /var/www/data/osm.versatiles
 
 echo -e "${RED}ADD FRONTEND${NC}"
 wget -q "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O /var/www/data/frontend.br.tar

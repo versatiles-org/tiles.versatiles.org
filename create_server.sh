@@ -14,4 +14,4 @@ hcloud server create \
 --ssh-key 9919841
 sleep 30
 cat secret.txt scripts/setup_server.sh | hcloud server ssh $NAME # -oStrictHostKeyChecking=no
-hcloud load-balancer add-target tiles.versatiles.org --server $NAME --use-private-ip
+#hcloud load-balancer add-target tiles.versatiles.org --server $NAME --use-private-ip
