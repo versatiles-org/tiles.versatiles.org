@@ -29,7 +29,7 @@ systemctl daemon-reload
 mount /var/www/ramdisk/
 
 echo -e "${RED}ADD MAP DATA${NC}"
-wget -q "https://download.versatiles.org/planet-latest.versatiles" -O /var/www/data/osm.versatiles
+wget "https://download.versatiles.org/osm.20240325.versatiles" -O /var/www/data/osm.versatiles
 
 echo -e "${RED}ADD FRONTEND${NC}"
 wget -q "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O /var/www/data/frontend.br.tar
@@ -61,6 +61,6 @@ rm /etc/supervisor/supervisord.conf
 ln -s /var/www/tiles.versatiles.org/config/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 supervisorctl reload
 
-# 5GB RAM Disk for caching
+# 5GB RAM Disk for caching ?
 
-# reboot
+# reboot ?
