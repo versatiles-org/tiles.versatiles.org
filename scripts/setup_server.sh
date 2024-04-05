@@ -22,11 +22,11 @@ cd /var/www/
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
 git config --global --add safe.directory '*'
 
-echo -e "${RED}CREATE RAMDISK${NC}"
-mkdir /var/www/ramdisk/
-echo "ramdisk  /var/www/ramdisk/  tmpfs  defaults,size=5G,x-gvfs-show  0  0" >> /etc/fstab
-systemctl daemon-reload
-mount /var/www/ramdisk/
+# echo -e "${RED}CREATE RAMDISK${NC}"
+# mkdir /var/www/ramdisk/
+# echo "ramdisk  /var/www/ramdisk/  tmpfs  defaults,size=5G,x-gvfs-show  0  0" >> /etc/fstab
+# systemctl daemon-reload
+# mount /var/www/ramdisk/
 
 echo -e "${RED}ADD MAP DATA${NC}"
 wget --progress=dot:giga "https://download.versatiles.org/osm.20240325.versatiles" -O /var/www/data/osm.versatiles
@@ -60,7 +60,3 @@ echo -e "${RED}CONFIG SUPERVISOR${NC}"
 rm /etc/supervisor/supervisord.conf
 ln -s /var/www/tiles.versatiles.org/config/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 supervisorctl reload
-
-# 5GB RAM Disk for caching ?
-
-# reboot ?
