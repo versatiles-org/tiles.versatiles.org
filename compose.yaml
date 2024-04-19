@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+
+  versatiles:
+    image: versatiles/versatiles:latest-alpine
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    depends_on: [versatiles]
+    ports: [80:80, 443:443]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./certbot/www/:/var/www/certbot/:ro
+
+  certbot:
+    image: certbot/certbot:latest
+    depends_on: [nginx]
+    command: >-
+            certonly --reinstall --webroot --webroot-path=/var/www/certbot
+            --email ${EMAIL} --agree-tos --no-eff-email
+            -d ${DOMAIN_NAME}
+    environment:
+      - EMAIL=${EMAIL}
+      - DOMAIN_NAME=${DOMAIN_NAME}
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw

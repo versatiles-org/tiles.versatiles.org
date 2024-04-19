@@ -1,5 +1,5 @@
 
+/volumes
 /frontend*
-/html/docs/*.html
-/node_modules
-/secret.txt
+/.env
+/certbot/conf/
