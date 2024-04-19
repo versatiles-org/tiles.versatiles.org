@@ -23,13 +23,14 @@ upstream versatiles_backend {
 
 server {
    listen 443;
-   listen [::]:443 ssl http2;
+   listen [::]:443 ssl;
+   http2 on;
 
    server_name ${DOMAIN_NAME};
    server_tokens off;
 
-   ssl_certificate /etc/nginx/ssl/live/${DOMAIN_NAME}/fullchain.pem;
-   ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN_NAME}/privkey.pem;
+   ssl_certificate /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem;
+   ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_NAME}/privkey.pem;
                     
    set $accept_encoding "";
    if ($http_accept_encoding ~* gzip) {
@@ -46,8 +47,6 @@ server {
    error_log /var/www/logs/nginx_error.log;
 
    etag off;
-   gzip_static off;
-   brotli_static off;
 
    autoindex off;
    charset utf-8;

@@ -1,5 +1,3 @@
 
-/volumes
-/frontend*
 /.env
-/certbot/conf/
+/volumes

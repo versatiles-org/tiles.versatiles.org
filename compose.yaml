@@ -5,6 +5,9 @@ services:
   versatiles:
     image: versatiles/versatiles:latest-alpine
     restart: always
+    command: versatiles server -i 0.0.0.0 -p 8080 -s /data/static/ -s /data/frontend.br.tar --disable-api "[osm]/data/osm.versatiles"
+    volumes:
+      - ./volumes/versatiles/:/data/:ro
 
   nginx:
     image: nginx:alpine
@@ -14,18 +17,23 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/templates:/etc/nginx/templates:ro
-      - ./certbot/www/:/var/www/certbot/:ro
+      - ./volumes/letsencrypt/www://var/www/certbot/:ro
+      - ./volumes/letsencrypt/live/:/etc/letsencrypt/live/:ro 
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - RAM_DISK_GB=${RAM_DISK_GB}
 
   certbot:
     image: certbot/certbot:latest
     depends_on: [nginx]
+    profiles: [donotstart]
     command: >-
             certonly --reinstall --webroot --webroot-path=/var/www/certbot
             --email ${EMAIL} --agree-tos --no-eff-email
             -d ${DOMAIN_NAME}
     environment:
-      - EMAIL=${EMAIL}
       - DOMAIN_NAME=${DOMAIN_NAME}
+      - EMAIL=${EMAIL}
     volumes:
-      - ./certbot/www/:/var/www/certbot/:rw
-      - ./certbot/conf/:/etc/letsencrypt/:rw
+      - ./volumes/letsencrypt/live/:/etc/letsencrypt/live/:rw
+      - ./volumes/letsencrypt/www/:/var/www/certbot/:rw
