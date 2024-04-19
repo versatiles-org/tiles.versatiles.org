@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 cd $(dirname "$0")/..
 
-. .env
-
 mkdir -p volumes
 # init letsencrypt
 ./bin/cert/init.sh
-# add cronjob for renewal
-# init ramdisk
+# TODO: add cronjob for renewal
+# TODO: init ramdisk
 
 mkdir -p volumes/versatiles
 # download planet
