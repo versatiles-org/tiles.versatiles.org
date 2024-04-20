@@ -2,20 +2,18 @@
 cd $(dirname "$0")/..
 
 mkdir -p volumes
-# init letsencrypt
+
+echo "init letsencrypt"
 ./bin/cert/init.sh
-# TODO: add cronjob for renewal
-# TODO: init ramdisk
 
-mkdir -p volumes/versatiles
-# download planet
-wget --progress=dot:giga "https://download.versatiles.org/osm.versatiles" -O volumes/versatiles/osm.versatiles
-# download frontend
-wget --progress=dot:giga "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O volumes/versatiles/frontend.br.tar
-# copy frontend patch
-cp -R static volumes/versatiles/
+echo "init ramdisk"
+./bin/ramdisk/init.sh
 
-# start docker compose
+echo "fetch data"
+./bin/data/update.sh
+
+echo "start docker compose"
 docker compose up --force-recreate
 
+echo "generate a new key"
 ./bin/cert/renewal.sh

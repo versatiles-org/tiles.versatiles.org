@@ -19,6 +19,7 @@ services:
       - ./nginx/templates:/etc/nginx/templates:ro
       - ./volumes/letsencrypt/www://var/www/certbot/:ro
       - ./volumes/letsencrypt/live/:/etc/letsencrypt/live/:ro 
+      - ./volumes/cache/:/data/nginx/cache/:rw
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
       - RAM_DISK_GB=${RAM_DISK_GB}

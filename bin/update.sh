@@ -3,7 +3,11 @@ cd $(dirname "$0")/..
 
 git pull
 
-# TODO: check if planet has changed
-# TODO: get new frontend
-# TODO: delete ramdisk
-# TODO: restart docker compose
+echo "fetch data"
+./bin/data/update.sh
+
+echo "clear cache data"
+./bin/ramdisk/clear.sh
+
+echo "restart docker compose"
+docker compose up --force-recreate
