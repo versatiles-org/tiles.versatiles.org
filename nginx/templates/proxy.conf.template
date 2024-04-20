@@ -42,10 +42,6 @@ server {
    
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
-   log_not_found off;
-   access_log off;
-   error_log /var/www/logs/nginx_error.log;
-
    etag off;
 
    autoindex off;

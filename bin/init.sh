@@ -13,7 +13,7 @@ echo "fetch data"
 ./bin/data/update.sh
 
 echo "start docker compose"
-docker compose up --force-recreate
+docker compose up --detach --force-recreate
 
 echo "generate a new key"
 ./bin/cert/renewal.sh
