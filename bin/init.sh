@@ -3,8 +3,8 @@ cd $(dirname "$0")/..
 
 mkdir -p volumes
 
-echo "init letsencrypt"
-./bin/cert/init.sh
+echo "prepare cert"
+./bin/cert/create_dummy.sh
 
 echo "init ramdisk"
 ./bin/ramdisk/init.sh
@@ -15,5 +15,5 @@ echo "fetch data"
 echo "start docker compose"
 docker compose up --detach --force-recreate
 
-echo "generate a new key"
-./bin/cert/renewal.sh
+echo "init letsencrypt"
+./bin/cert/create_valid.sh
