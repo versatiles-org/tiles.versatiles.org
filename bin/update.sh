@@ -10,4 +10,4 @@ echo "clear cache data"
 ./bin/ramdisk/clear.sh
 
 echo "restart docker compose"
-docker compose up --force-recreate
+docker compose up --detach --force-recreate

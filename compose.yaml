@@ -1,16 +1,22 @@
 services:
-
+  
   versatiles:
-    image: versatiles/versatiles:latest-alpine
+    container_name: versatiles
+    image: versatiles/versatiles:latest-scratch
     restart: always
+    networks: [docker_network]
+    expose: [8080]
+    ports: [8080:8080]
     command: versatiles server -i 0.0.0.0 -p 8080 -s /data/static/ -s /data/frontend.br.tar --disable-api "[osm]/data/osm.versatiles"
     volumes:
       - ./volumes/versatiles/:/data/:ro
 
   nginx:
+    container_name: nginx
     image: nginx:alpine
     restart: always
     depends_on: [versatiles]
+    networks: [docker_network]
     ports: [80:80, 443:443]
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -18,14 +24,20 @@ services:
       - ./volumes/cache/:/data/nginx/cache/:rw
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
+      - ./volumes/nginx-log/:/var/log/nginx/:rw
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
       - RAM_DISK_GB=${RAM_DISK_GB}
 
   certbot:
+    container_name: certbot
     image: certbot/certbot:latest
     depends_on: [nginx]
     profiles: [donotstart]
     volumes:
       - ./volumes/certbot-cert/:/etc/letsencrypt/:rw
       - ./volumes/certbot-www/:/var/www/certbot/:rw
+
+networks:
+  docker_network:
+    driver: bridge

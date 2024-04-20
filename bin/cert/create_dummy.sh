@@ -9,4 +9,4 @@ openssl req -nodes -new -x509 -subj "/CN=localhost" \
 	-out ./volumes/nginx-cert/live/${DOMAIN_NAME}/fullchain.pem
 
 # add cronjob for renewal
-crontab -l | { cat; echo "0 5 * * 1 $(pwd)/bin/cert/renewal.sh"; } | crontab -
+echo "23 5 * * 1 $(pwd)/bin/cert/renewal.sh" | crontab -

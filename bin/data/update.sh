@@ -8,11 +8,11 @@ mkdir -p volumes/versatiles
 
 # download planet
 if [ -z $BBOX ]; then
-	wget --progress=dot:giga "https://download.versatiles.org/osm.versatiles" -O osm.versatiles
+	wget --progress=dot:giga "https://download.versatiles.org/osm.versatiles" -O volumes/osm.versatiles
 else
-	versatiles convert --bbox "$BBOX" --bbox-border 3 "https://download.versatiles.org/osm.versatiles" osm.versatiles
+	versatiles convert --bbox "$BBOX" --bbox-border 3 "https://download.versatiles.org/osm.versatiles" volumes/osm.versatiles
 fi
-cp -f osm.versatiles volumes/versatiles/
+mv -f volumes/osm.versatiles volumes/versatiles/
 
 
 

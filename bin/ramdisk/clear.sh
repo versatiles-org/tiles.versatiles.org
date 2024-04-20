@@ -2,5 +2,5 @@
 cd $(dirname "$0")/../..
 . .env
 
-rm -r volumes/cache/*
-docker-compose -f compose.yaml exec nginx nginx -s reload
+rm -rf ./volumes/cache/*
+docker compose exec nginx nginx -s reload
