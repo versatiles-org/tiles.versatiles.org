@@ -8,11 +8,10 @@ mkdir -p volumes/versatiles
 
 # download planet
 if [ -z $BBOX ]; then
-	wget --progress=dot:giga "https://download.versatiles.org/osm.versatiles" -O volumes/osm.versatiles
+	docker compose exec versatiles bash -c "wget --progress=dot:giga 'https://download.versatiles.org/osm.versatiles' -O /data/temp.versatiles; mv /data/temp.versatiles /data/osm.versatiles"
 else
-	versatiles convert --bbox "$BBOX" --bbox-border 3 "https://download.versatiles.org/osm.versatiles" volumes/osm.versatiles
+	docker compose exec versatiles bash -c "versatiles convert --bbox '$BBOX' --bbox-border 3 'https://download.versatiles.org/osm.versatiles' /data/temp.versatiles; mv /data/temp.versatiles /data/osm.versatiles"
 fi
-mv -f volumes/osm.versatiles volumes/versatiles/
 
 
 
