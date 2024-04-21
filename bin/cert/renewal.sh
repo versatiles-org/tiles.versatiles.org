@@ -12,8 +12,8 @@ source .env
 # Use Docker Compose to execute the Certbot 'renew' command in the 'certbot' service container
 docker compose exec certbot renew
 if [ $? -ne 0 ]; then
-  echo "Failed to renew certificates with Certbot."
-  exit 1
+    echo "Failed to renew certificates with Certbot."
+    exit 1
 fi
 
 # Ensure that the nginx certificate directory exists before copying
@@ -22,15 +22,15 @@ mkdir -p ./volumes/nginx-cert/live/"${DOMAIN_NAME}"
 # Copy the newly renewed certificates to the nginx directory
 cp -LfR ./volumes/certbot-cert/live/"${DOMAIN_NAME}" ./volumes/nginx-cert/live/
 if [ $? -ne 0 ]; then
-  echo "Failed to copy new certificates to nginx directory."
-  exit 1
+    echo "Failed to copy new certificates to nginx directory."
+    exit 1
 fi
 
 # Reload nginx to apply the new certificates
 docker compose exec nginx nginx -s reload
 if [ $? -ne 0 ]; then
-  echo "Failed to reload nginx. Please check the configuration."
-  exit 1
+    echo "Failed to reload nginx. Please check the configuration."
+    exit 1
 fi
 
 echo "Certificate renewal and nginx reload completed successfully."

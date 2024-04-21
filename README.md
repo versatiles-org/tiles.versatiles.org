@@ -14,12 +14,13 @@ chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 apt -ys install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 shutdown -r now
-````
+```
 
+Then clone the repo and run `bin/init.sh`
 ```bash
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
 cd tiles.versatiles.org
-./init.sh
+./bin/init.sh
 ```
 
 
