@@ -1,5 +1,20 @@
-
 proxy_cache_path /data/nginx/cache levels=1:2 keys_zone=STATIC:10m inactive=24h max_size=${RAM_DISK_GB}g;
+
+map $http_accept_encoding $accept_encoding {
+   default "";
+   "~*gzip" "gzip";
+   "~*br" "${accept_encoding} br";
+}
+
+map $status $loggable { 
+   ~^[2] 0; 
+   default 1; 
+} 
+
+upstream versatiles_backend {
+   server versatiles:8080;
+   keepalive 16;
+}
 
 server {
    listen 80;
@@ -16,11 +31,6 @@ server {
    }
 }
 
-upstream versatiles_backend {
-   server versatiles:8080;
-   keepalive 16;
-}
-
 server {
    listen 443 ssl;
    listen [::]:443 ssl;
@@ -31,19 +41,16 @@ server {
 
    ssl_certificate /etc/nginx/ssl/live/${DOMAIN_NAME}/fullchain.pem;
    ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN_NAME}/privkey.pem;
-                    
-   set $accept_encoding "";
-   if ($http_accept_encoding ~* gzip) {
-      set $accept_encoding "gzip";
-   }
-   if ($http_accept_encoding ~* br) {
-      set $accept_encoding "${accept_encoding}br";
-   }
+   ssl_protocols TLSv1.2 TLSv1.3;
+   ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM';
+   ssl_session_cache shared:SSL:10m;
+   ssl_stapling on;
+   ssl_stapling_verify on;
    
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
    etag off;
-   access_log off;
+   access_log /var/log/nginx/access.log combined gzip if=$loggable;
    error_log  /var/log/nginx/error.log;
 
    autoindex off;

@@ -6,6 +6,9 @@
 # Move to the project's root directory relative to the script's location
 cd "$(dirname "$0")/.."
 
+# Increase maximum socket connections
+sysctl -w vm.max_map_count=262144
+
 # Create a necessary directory for storing volumes
 mkdir -p volumes
 
