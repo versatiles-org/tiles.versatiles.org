@@ -20,8 +20,13 @@ Then clone the repo and run `bin/init.sh`
 ```bash
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
 cd tiles.versatiles.org
+cp template.env .env
+nano .env
 ./bin/init.sh
 ```
 
+## Update repo/frontend/data
 
-## 
+```bash
+./bin/update.sh
+```
