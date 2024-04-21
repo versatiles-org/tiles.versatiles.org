@@ -5,7 +5,7 @@
 	<meta charset="utf-8">
 	<title>Versatiles</title>
 	<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-	<script src="assets/styles/versatiles-style.js"></script>
+	<!--<script src="assets/styles/versatiles-style.js"></script>-->
 	<script src="assets/maplibre-gl/maplibre-gl.js"></script>
 	<link href="assets/maplibre-gl/maplibre-gl.css" rel="stylesheet">
 	<script src="assets/switch/switch.js"></script>
@@ -43,18 +43,18 @@
 	<a href="https://versatiles.org" id="logo"><img src="https://versatiles.org/assets/logo/versatiles.svg" alt="versatiles.org"></a>
 	<div id="map" class="maplibregl-compact"></div>
 	<script>
-		const style = VersaTilesStyle.styles.colorful({});
+		//const style = VersaTilesStyle.styles.colorful({});
 		const map = new maplibregl.Map({
 			container: 'map',
 			bounds: [-180, -80, 180, 80],
-			style,//: new URL('/assets/styles/colorful.json', location.href).href,
+			style: new URL('/assets/styles/colorful.json', location.href).href,
 			zoom: 5,
 			maxZoom: 20,
 			hash: true,
 		});
 
 		// add style switcher
-		//map.addControl(new MapLibreStyleSwitcherControl());
+		map.addControl(new MapLibreStyleSwitcherControl());
 
 		// add inspection
 		map.addControl(new MaplibreInspect());
