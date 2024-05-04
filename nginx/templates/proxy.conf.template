@@ -6,10 +6,10 @@ map $http_accept_encoding $accept_encoding {
    "~*br" "${accept_encoding} br";
 }
 
-map $status $loggable { 
-   ~^[2] 0; 
-   default 1; 
-} 
+map $status $loggable {
+   ~^[2] 0;
+   default 1;
+}
 
 upstream versatiles_backend {
    server versatiles:8080;
@@ -46,7 +46,7 @@ server {
    ssl_session_cache shared:SSL:10m;
    ssl_stapling on;
    ssl_stapling_verify on;
-   
+
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
    etag off;
@@ -59,6 +59,57 @@ server {
    location /.well-known/acme-challenge/ {
       root /var/www/certbot;
    }
+
+	# redirect legacy paths
+
+	location /editor {
+		return 301 https://versatiles.org/editor;
+	}
+
+	location ~ ^/maplibre/(.*)$ {
+		return 301 /assets/maplibre-gl/$1;
+	}
+
+	location ~ ^/assets/maplibre/(.*)$ {
+		return 301 /assets/maplibre-gl/$1;
+	}
+
+	location ~ ^/(styles|fonts|sprites)/(.*)$ {
+		return 301 /assets/$1/$2;
+	}
+
+	location /fonts.json {
+		return 301 /assets/fonts/fonts.json;
+	}
+
+	location /assets/fonts.json {
+
+		# add cors header so redirect works from maputnik
+		add_header 'Vary' 'Origin';
+		add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+		add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+		add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-None-Match,If-Modified-Since,Cache-Control,Content-Type,Range,Accept-Encoding' always;
+		add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range,Etag,Last-Modified,Content-Encoding' always;
+
+		if ($request_method = 'OPTIONS') {
+			add_header 'Vary' 'Origin';
+			add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+			add_header 'Access-Control-Allow-Methods' 'GET, OPTIONS' always;
+			add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-None-Match,If-Modified-Since,Cache-Control,Content-Type,Range,Accept-Encoding' always;
+			add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range,Etag,Last-Modified,Content-Encoding' always;
+
+			add_header 'Access-Control-Max-Age' 1728000 always;
+			add_header 'Content-Type' 'text/plain; charset=utf-8' always;
+			add_header 'Content-Length' 0 always;
+			return 204;
+		}
+
+		return 301 /assets/fonts/fonts.json;
+	}
+
+	location /sprites.json {
+		return 301 /assets/sprites/sprites.json;
+	}
 
    location / {
       proxy_pass            http://versatiles_backend;
