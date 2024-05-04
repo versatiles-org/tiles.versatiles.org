@@ -18,7 +18,7 @@ function download {
     local URL=$1
     local FILENAME=$2
     
-    if [ ! -f volumes/versatiles/osm.versatiles ]; then
+    if [ ! -f "volumes/versatiles/$FILENAME" ]; then
         # Download OpenStreetMap data in Versatiles format.
         if [ -z "$BBOX" ]; then
             # Download the complete dataset if BBOX is not specified.
