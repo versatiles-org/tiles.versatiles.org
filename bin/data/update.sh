@@ -11,33 +11,30 @@ source .env
 # Ensure the directory for Versatiles data exists.
 mkdir -p volumes/versatiles
 
-mkdir -p volumes/temp
-rm -rf volumes/temp/*
-
 function download {
-    local URL=$1
-    local FILENAME=$2
+    local URL="https://download.versatiles.org/${1}.versatiles"
+    local FILENAME="volumes/versatiles/${1}.versatiles"
+
+    mkdir -p volumes/temp
+    rm -rf volumes/temp/*
     
-    if [ ! -f "volumes/versatiles/$FILENAME" ]; then
+    if [ ! -f "$FILENAME" ]; then
         # Download OpenStreetMap data in Versatiles format.
         if [ -z "$BBOX" ]; then
             # Download the complete dataset if BBOX is not specified.
             echo "Downloading the complete planet data..."
-            wget --progress=dot:giga "$URL" -O "volumes/versatiles/$FILENAME"
-            mv "volumes/versatiles/$FILENAME" "volumes/versatiles/$FILENAME"
+            wget --progress=dot:giga "$URL" -O "volumes/temp/temp.versatiles"
         else
             # Download only the specified BBOX area.
-            echo "Downloading data for specified BBOX..."
-            mkdir -p volumes/temp
-            rm -rf volumes/temp/*
-            docker run -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch versatiles convert --bbox "$BBOX" --bbox-border 3 "$URL" "/data/$FILENAME"
-            mv "volumes/temp/$FILENAME" "volumes/versatiles/$FILENAME"
+            echo "Downloading data for specified bbox..."
+            docker run -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch versatiles convert --bbox "$BBOX" --bbox-border 3 "$URL" "/data/temp.versatiles"
         fi
+        mv "volumes/temp/temp.versatiles" "$FILENAME"
     fi
 }
 
-download https://download.versatiles.org/osm.versatiles osm.versatiles
-download https://download.versatiles.org/hillshade-vectors.versatiles hillshade-vectors.versatiles
+download osm
+download hillshade-vectors
 
 # Check for successful download and setup.
 if [ ! -f volumes/versatiles/osm.versatiles ]; then
