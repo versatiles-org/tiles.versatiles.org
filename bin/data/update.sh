@@ -48,9 +48,4 @@ if [ ! -f volumes/versatiles/frontend.br.tar ]; then
     wget --no-verbose --progress=dot:giga "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O volumes/versatiles/frontend.br.tar
 fi
 
-# Setup the frontend: Extract and apply necessary patches.
-echo "Setting up the frontend..."
-rm -rf volumes/versatiles/static
-cp -r static volumes/versatiles/
-
 echo "Setup completed successfully."
