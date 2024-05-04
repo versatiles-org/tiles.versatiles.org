@@ -25,6 +25,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# test NGINX
+docker exec -it nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t"
+if [ $? -ne 0 ]; then
+    echo "NGINX conf test failed. Exiting."
+    exit 1
+fi
+
 # Clear cache data using a custom script
 echo "Clearing cache data..."
 ./bin/ramdisk/clear.sh
