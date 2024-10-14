@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 source .env
 
 # Use Docker Compose to execute the Certbot 'renew' command in the 'certbot' service container
-docker compose exec certbot renew
+docker compose exec certbot certbot renew
 if [ $? -ne 0 ]; then
     echo "Failed to renew certificates with Certbot."
     exit 1
