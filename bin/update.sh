@@ -42,7 +42,8 @@ fi
 
 # Restart Docker Compose services with force recreation to ensure a clean state
 echo "Restarting Docker Compose services..."
-docker compose up --detach --force-recreate
+docker compose pull
+docker compose up --detach --force-recreate --build
 if [ $? -ne 0 ]; then
     echo "Failed to restart Docker Compose services. Exiting."
     exit 1
