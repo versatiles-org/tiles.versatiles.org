@@ -7,7 +7,7 @@ services:
     networks: [docker_network]
     expose: [8080]
     ports: [8080:8080]
-    command: versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar --disable-api "[osm]/data/osm.versatiles" "[hillshade-vectors]/data/hillshade-vectors.versatiles"
+    command: versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar "[osm]/data/osm.versatiles" "[hillshade-vectors]/data/hillshade-vectors.versatiles"
     stop_signal: SIGKILL
     volumes:
       - ./volumes/versatiles/:/data/:ro
