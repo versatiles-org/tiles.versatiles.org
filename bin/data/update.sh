@@ -45,7 +45,7 @@ fi
 if [ ! -f volumes/versatiles/frontend.br.tar ]; then
     # Download the frontend for the Versatiles application.
     echo "Downloading the frontend..."
-    wget --no-verbose --progress=dot:giga "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar" -O volumes/versatiles/frontend.br.tar
+    curl -Ls "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar.gz" | gzip -d > volumes/versatiles/frontend.br.tar
 fi
 
 echo "Setup completed successfully."
