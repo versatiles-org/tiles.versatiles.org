@@ -1,5 +1,4 @@
 services:
-  
   versatiles:
     container_name: versatiles
     image: versatiles/versatiles:latest-scratch

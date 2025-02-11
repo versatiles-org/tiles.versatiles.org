@@ -28,6 +28,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Update frontend
+echo "Fetching frontend..."
+./bin/frontend/update.sh
+if [ $? -ne 0 ]; then
+    echo "Failed to fetch frontend. Exiting."
+    exit 1
+fi
+
 # Fetch or update necessary data
 echo "Fetching data..."
 ./bin/data/update.sh

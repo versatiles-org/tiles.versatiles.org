@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script downloads necessary tile data and frontend for VersaTiles.
+# This script downloads necessary tile data for VersaTiles.
 
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
@@ -17,7 +17,7 @@ function download {
 
     mkdir -p volumes/temp
     rm -rf volumes/temp/*
-    
+
     if [ ! -f "$FILENAME" ]; then
         # Download OpenStreetMap data in Versatiles format.
         if [ -z "$BBOX" ]; then
@@ -38,14 +38,8 @@ download hillshade-vectors
 
 # Check for successful download and setup.
 if [ ! -f volumes/versatiles/osm.versatiles ]; then
-    echo "Failed to download or convert Versatiles data."
+    echo "Failed to download or convert VersaTiles data."
     exit 1
-fi
-
-if [ ! -f volumes/versatiles/frontend.br.tar ]; then
-    # Download the frontend for the Versatiles application.
-    echo "Downloading the frontend..."
-    curl -Ls "https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar.gz" | gzip -d > volumes/versatiles/frontend.br.tar
 fi
 
 echo "Setup completed successfully."

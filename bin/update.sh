@@ -17,6 +17,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Update frontend
+echo "Fetching frontend..."
+./bin/frontend/update.sh
+if [ $? -ne 0 ]; then
+    echo "Failed to update frontend. Exiting."
+    exit 1
+fi
+
 # Update data using a custom script
 echo "Fetching data..."
 ./bin/data/update.sh
