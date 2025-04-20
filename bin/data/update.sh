@@ -35,6 +35,8 @@ function download {
 
 download osm
 download hillshade-vectors
+download landcover-vectors
+download bathymetry-vectors
 
 # Check for successful download and setup.
 if [ ! -f volumes/versatiles/osm.versatiles ]; then
