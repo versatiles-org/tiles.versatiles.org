@@ -5,7 +5,7 @@
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
 
-# Ensure the directory for Versatiles data exists.
+# Ensure the directory for VersaTiles data exists.
 mkdir -p volumes/versatiles
 
 # Download frontend
