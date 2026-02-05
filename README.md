@@ -133,14 +133,6 @@ You can also trigger this via webhook:
 curl "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}"
 ```
 
-### Update Tile Data Only
-
-When you only need to refresh the local tile data (without rebuilding containers):
-
-```bash
-./bin/data/update.sh
-```
-
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:

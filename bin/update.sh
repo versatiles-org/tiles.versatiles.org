@@ -3,8 +3,8 @@ set -euo pipefail
 
 # This script performs a series of setup operations for a project:
 # - Pulls latest updates from Git
-# - Updates data using a custom script
-# - Updates download pipeline
+# - Updates frontend
+# - Runs download pipeline to fetch latest data
 # - Clears cached data
 # - Restarts Docker Compose services
 
@@ -19,24 +19,30 @@ git pull
 echo "Fetching frontend..."
 ./bin/frontend/update.sh
 
-# Update data using a custom script
-echo "Fetching data..."
-./bin/data/update.sh
+# Pull latest images
+echo "Pulling latest Docker images..."
+docker compose pull
 
-# test NGINX
-docker exec nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t"
+# Build and start download-updater first to download data
+echo "Starting download-updater and fetching data..."
+docker compose up --detach --build download-updater
+docker compose exec download-updater npx tsx src/run_once.ts
 
-# Clear cache data using a custom script
+# Test NGINX config if nginx is running
+if docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
+    docker exec nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t"
+fi
+
+# Clear cache data
 echo "Clearing cache data..."
 ./bin/ramdisk/clear.sh
 
-# Restart Docker Compose services with force recreation to ensure a clean state
-echo "Restarting Docker Compose services..."
-docker compose pull
+# Start all Docker Compose services
+echo "Starting Docker Compose services..."
 docker compose up --detach --force-recreate --build
 
-# Update download pipeline
-echo "Updating download pipeline..."
-./bin/download-updater/update.sh
+# Reload nginx to pick up new configuration
+echo "Reloading nginx..."
+docker compose exec nginx nginx -s reload
 
 echo "Operations completed successfully."

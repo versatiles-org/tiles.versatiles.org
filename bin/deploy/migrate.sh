@@ -86,18 +86,26 @@ else
     ./bin/ramdisk/init.sh
 fi
 
-# Phase 5: Download frontend and data
-next_phase "Downloading Frontend and Tile Data"
+# Phase 5: Download frontend
+next_phase "Downloading Frontend"
 
 echo "Downloading frontend..."
 ./bin/frontend/update.sh
 
-echo "Downloading tile data (this may take a while)..."
-./bin/data/update.sh
+echo "✓ Frontend downloaded"
 
-echo "✓ Frontend and tile data downloaded"
+# Phase 6: Start download-updater and fetch tile data
+next_phase "Downloading Tile Data"
 
-# Phase 6: Start Docker
+echo "Starting download-updater container..."
+docker compose up --detach --build download-updater
+
+echo "Running download pipeline (this may take a while)..."
+docker compose exec download-updater npx tsx src/run_once.ts
+
+echo "✓ Tile data downloaded"
+
+# Phase 7: Start Docker
 next_phase "Starting Docker Services"
 
 docker compose up --detach --build
@@ -116,12 +124,11 @@ for service in versatiles download-updater nginx; do
     fi
 done
 
-# Phase 7: Generate download config
-next_phase "Generating Download Configuration"
+# Reload nginx to pick up configuration
+echo "Reloading nginx..."
+docker compose exec nginx nginx -s reload
 
-./bin/download-updater/update.sh
-
-echo "✓ Download pipeline completed"
+echo "✓ All services running"
 
 # Phase 8: Instructions for SSL
 next_phase "Final Steps (Manual)"
