@@ -8,6 +8,12 @@ services:
     command: versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar "[osm]/data/osm.versatiles" "[hillshade-vectors]/data/hillshade-vectors.versatiles" "[landcover-vectors]/data/landcover-vectors.versatiles" "[bathymetry-vectors]/data/bathymetry-vectors.versatiles"
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     volumes:
       - ./volumes/versatiles/:/data/:ro
 
