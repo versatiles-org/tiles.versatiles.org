@@ -1,7 +1,7 @@
 services:
   versatiles:
     container_name: versatiles
-    image: versatiles/versatiles:latest-scratch
+    image: versatiles/versatiles:latest
     restart: always
     networks: [docker_network]
     expose: [8080]
