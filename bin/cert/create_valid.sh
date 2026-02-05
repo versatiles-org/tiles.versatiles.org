@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # This script initiates the generation of SSL certificates using Certbot within a Docker environment,
 # copies the generated certificates to the nginx directory, and then reloads nginx to apply changes.
