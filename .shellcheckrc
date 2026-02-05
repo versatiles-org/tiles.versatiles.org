@@ -1,0 +1,2 @@
+# Exclude SC1091: Not following sourced file (.env is not in repo)
+disable=SC1091
