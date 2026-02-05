@@ -130,8 +130,8 @@ export class FileRef {
  * Scans remote storage via SSH and returns a list of FileRef instances
  * for all .versatiles files found.
  *
- * Uses SSH to run `find` and `ls` on the remote storage and parses the output.
- * Compatible with BusyBox/limited shells (doesn't use find -printf).
+ * Uses SSH to run `ls -lR` on the remote storage and parses the output.
+ * Compatible with Hetzner storage box restricted shell.
  */
 export function getRemoteFilesViaSSH(): FileRef[] {
 	const storageUrl = process.env['STORAGE_URL'];
@@ -141,9 +141,8 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 
 	console.log('Scanning remote storage via SSH...');
 
-	// Use find with ls -l for compatibility with BusyBox
-	// Output format: -rw-r--r-- 1 user group SIZE date time path
-	const cmd = `ssh -i ${sshKeyPath} -p 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${storageUrl} "find /home -name '*.versatiles' -exec ls -l {} +"`;
+	// Use ls -lR for compatibility with restricted shells (Hetzner storage box)
+	const cmd = `ssh -i ${sshKeyPath} -p 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${storageUrl} "ls -lR /home"`;
 
 	let output: string;
 	try {
@@ -153,22 +152,35 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 	}
 
 	const files: FileRef[] = [];
-	const lines = output.trim().split('\n').filter(line => line.length > 0);
+	const lines = output.trim().split('\n');
+
+	let currentDir = '/home';
 
 	for (const line of lines) {
-		// Parse ls -l output: -rw-r--r-- 1 user group SIZE month day time/year path
-		// Fields: perms, links, user, group, size, month, day, time, path
+		// Directory header: "/home/dirname:" or just directory listing
+		if (line.endsWith(':')) {
+			currentDir = line.slice(0, -1);
+			continue;
+		}
+
+		// Skip empty lines and total lines
+		if (!line.trim() || line.startsWith('total ')) continue;
+
+		// Skip directory entries (start with 'd')
+		if (line.startsWith('d')) continue;
+
+		// Parse ls -l output: -rw-r--r-- 1 user group SIZE month day time/year filename
 		const parts = line.trim().split(/\s+/);
 		if (parts.length < 9) continue;
 
 		const size = parseInt(parts[4], 10);
 		if (isNaN(size)) continue;
 
-		// Path is everything from field 8 onwards (in case path has spaces)
-		const remotePath = parts.slice(8).join(' ');
-		if (!remotePath.endsWith('.versatiles')) continue;
+		// Filename is everything from field 8 onwards (in case filename has spaces)
+		const filename = parts.slice(8).join(' ');
+		if (!filename.endsWith('.versatiles')) continue;
 
-		const filename = basename(remotePath);
+		const remotePath = `${currentDir}/${filename}`;
 
 		// Create FileRef with remote path info
 		const file = new FileRef(remotePath, size, remotePath);
