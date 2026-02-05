@@ -48,6 +48,8 @@ services:
     image: certbot/certbot:latest
     depends_on: [nginx]
     profiles: [donotstart]
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./volumes/certbot-cert/:/etc/letsencrypt/:rw
       - ./volumes/certbot-www/:/var/www/certbot/:rw
