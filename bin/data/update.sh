@@ -18,10 +18,10 @@ function download {
 
     local MD5_LOCAL
     MD5_LOCAL=$(cat "volumes/versatiles/${NAME}.md5" 2>/dev/null || echo "")
-    local MD5_REMOTE_URL
-    MD5_REMOTE_URL=$(curl -sf "${URL}.md5" || { echo "Failed to fetch MD5 for ${NAME}" >&2; exit 1; })
+    local MD5_REMOTE
+    MD5_REMOTE=$(curl -sf "${URL}.md5" | tr -d ' \n\r' || { echo "Failed to fetch MD5 for ${NAME}" >&2; exit 1; })
 
-    if [ ! -f "volumes/versatiles/${NAME}" ] || [ "$MD5_LOCAL" != "$MD5_REMOTE_URL" ]; then
+    if [ ! -f "volumes/versatiles/${NAME}" ] || [ "$MD5_LOCAL" != "$MD5_REMOTE" ]; then
         # Download OpenStreetMap data in VersaTiles format.
         if [ -z "${BBOX:-}" ]; then
             # Download the complete dataset if BBOX is not specified.
