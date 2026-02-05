@@ -14,5 +14,6 @@ mkdir -p "./volumes/nginx-cert/live/${DOMAIN_NAME}/"
 # Generate a new self-signed SSL certificate and private key for the domain
 openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout "./volumes/nginx-cert/live/${DOMAIN_NAME}/privkey.pem" -out "./volumes/nginx-cert/live/${DOMAIN_NAME}/fullchain.pem"
 
-# Schedule a weekly cron job for automatic certificate renewal
-echo "23 5 * * 1 $(pwd)/bin/cert/renewal.sh" | crontab -
+# Schedule a weekly cron job for automatic certificate renewal (preserving existing jobs)
+CRON_JOB="23 5 * * 1 $(pwd)/bin/cert/renewal.sh"
+( crontab -l 2>/dev/null | grep -v "bin/cert/renewal.sh"; echo "$CRON_JOB" ) | crontab -
