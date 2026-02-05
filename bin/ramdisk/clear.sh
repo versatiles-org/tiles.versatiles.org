@@ -16,4 +16,4 @@ else
     echo "Cache directory not found."
 fi
 
-echo "Nginx has been reloaded successfully."
+echo "Cache cleared successfully."
