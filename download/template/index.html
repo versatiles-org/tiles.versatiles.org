@@ -123,8 +123,8 @@
 			<dd class="small">{{{desc}}}</dd>
 
 			{{#with latestFile}}
-			<a class="row" href="{{url}}" title="{{url}}">
-				<span>{{url}}</span>
+			<a class="row" href="{{url}}" title="{{filename}}">
+				<span>{{filename}}</span>
 				<span>{{sizeString}}</span>
 			</a>
 			{{/with}}
@@ -134,7 +134,7 @@
 				<summary class="small">Show all versions</summary>
 				{{#each olderFiles}}
 				<div class="row">
-					<a href="{{url}}">{{url}}</a>
+					<a href="{{url}}">{{filename}}</a>
 					<a href="{{url}}.md5" class="small">md5</a>
 					<a href="{{url}}.sha256" class="small">sha256</a>
 					<a href="{{url}}">{{sizeString}}</a>
