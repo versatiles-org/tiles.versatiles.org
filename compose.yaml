@@ -17,11 +17,32 @@ services:
     volumes:
       - ./volumes/versatiles/:/data/:ro
 
+  download-updater:
+    container_name: download-updater
+    build:
+      context: ./download
+      dockerfile: Dockerfile
+    restart: always
+    networks: [docker_network]
+    expose: [8081]
+    environment:
+      - DOMAIN=${DOWNLOAD_DOMAIN}
+      - STORAGE_URL=${STORAGE_URL}
+      - WEBHOOK=${WEBHOOK}
+      - PORT=8081
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./volumes/download/remote_files:/volumes/remote_files:ro
+      - ./volumes/download/local_files:/volumes/local_files:rw
+      - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
+      - ./.ssh:/app/.ssh:ro
+
   nginx:
     container_name: nginx
     image: nginx:alpine
     restart: always
-    depends_on: [versatiles]
+    depends_on: [versatiles, download-updater]
     networks: [docker_network]
     ports: [80:80, 443:443]
     volumes:
@@ -31,6 +52,9 @@ services:
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
+      - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
+      - ./volumes/download/local_files/:/volumes/local_files/:ro
+      - ./volumes/download/remote_files/:/volumes/remote_files/:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:
