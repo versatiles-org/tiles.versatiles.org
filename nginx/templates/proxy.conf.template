@@ -52,7 +52,7 @@ server {
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
    etag off;
-   access_log /var/log/nginx/access.log.gz combined gzip if=$loggable;
+   access_log /var/log/nginx/access.log.gz anonymized gzip if=$loggable;
    error_log  /var/log/nginx/error.log;
 
    autoindex off;
