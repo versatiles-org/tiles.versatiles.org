@@ -93,7 +93,6 @@ Edit `.env` to configure:
 | `DOWNLOAD_DOMAIN` | Downloads domain               | download.versatiles.org |
 | `RAM_DISK_GB`     | RAM disk size for caching      | 4                       |
 | `EMAIL`           | Email for Let's Encrypt        | mail@versatiles.org     |
-| `BBOX`            | Bounding box filter (optional) | -9,36,-6,42             |
 | `STORAGE_URL`     | Storage box SSH URL            | user@host.de            |
 | `STORAGE_PASS`    | Storage box password (WebDAV)  | (password)              |
 | `WEBHOOK`         | Update webhook secret          | (random string)         |

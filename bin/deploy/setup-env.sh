@@ -46,13 +46,6 @@ read -p "Email for Let's Encrypt [mail@versatiles.org]: " EMAIL
 EMAIL=${EMAIL:-mail@versatiles.org}
 sed -i "s/^EMAIL=.*/EMAIL=${EMAIL}/" .env
 
-# BBOX
-echo ""
-echo "Bounding box for tile data (leave empty for full planet)"
-echo "Format: west,south,east,north (e.g., -9,36,-6,42 for Portugal)"
-read -p "BBOX []: " BBOX
-sed -i "s/^BBOX=.*/BBOX=${BBOX}/" .env
-
 # Storage URL
 echo ""
 echo "Storage box SSH URL (e.g., user@host.your-storagebox.de)"

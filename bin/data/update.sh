@@ -13,10 +13,6 @@ source .env
 mkdir -p volumes/versatiles
 mkdir -p volumes/temp
 
-# Extract WebDAV credentials from STORAGE_URL
-WEBDAV_USER=$(echo "${STORAGE_URL}" | cut -d@ -f1)
-WEBDAV_HOST=$(echo "${STORAGE_URL}" | cut -d@ -f2)
-
 echo "Updating VersaTiles data from storage box..."
 
 function get_latest_file {
@@ -60,17 +56,9 @@ function download {
 
     echo "  Downloading ${REMOTE_FILENAME}..."
 
-    if [ -z "${BBOX:-}" ]; then
-        # Download full file via SCP
-        scp -i .ssh/storage -P 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
-            "${STORAGE_URL}:${REMOTE_PATH}" "volumes/temp/${NAME}"
-    else
-        # Download with bbox filter via VersaTiles using WebDAV URL
-        local WEBDAV_URL="https://${WEBDAV_USER}:${STORAGE_PASS}@${WEBDAV_HOST}${REMOTE_PATH#/home}"
-        echo "  Applying bbox filter: ${BBOX}"
-        docker run --rm -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch \
-            versatiles convert --bbox "$BBOX" --bbox-border 3 "$WEBDAV_URL" "/data/${NAME}"
-    fi
+    # Download full file via SCP
+    scp -i .ssh/storage -P 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+        "${STORAGE_URL}:${REMOTE_PATH}" "volumes/temp/${NAME}"
 
     # Save MD5
     echo "${MD5_REMOTE} ${NAME}" > "volumes/temp/${NAME}.md5"
