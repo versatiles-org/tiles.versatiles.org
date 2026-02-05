@@ -86,6 +86,11 @@ export class FileRef {
 		}
 	}
 
+	/** Returns the path for WebDAV URL (without /home prefix). */
+	get webdavPath(): string {
+		return this.remotePath.replace(/^\/home/, '');
+	}
+
 	/** Returns the MD5 hash of the file. Throws if not set. */
 	get md5(): string {
 		if (!this.hashes) throw Error(`MD5 hash is missing for file "${this.filename}"`);
