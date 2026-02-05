@@ -63,7 +63,7 @@ if [ -f "./volumes/download/nginx_conf/download.conf" ]; then
         WARNINGS=$((WARNINGS + 1))
     fi
 else
-    echo "   ✗ download.conf not found - run: ./bin/download/update.sh"
+    echo "   ✗ download.conf not found - run: ./bin/download-updater/update.sh"
     ERRORS=$((ERRORS + 1))
 fi
 
@@ -208,9 +208,9 @@ fi
 # Check cron job
 echo ""
 echo "11. Checking certificate renewal cron job..."
-if crontab -l 2>/dev/null | grep -q "bin/cert/renewal.sh"; then
+if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     echo "   ✓ Certificate renewal cron job is configured"
-    crontab -l | grep "bin/cert/renewal.sh"
+    crontab -l | grep "bin/cert/renew.sh"
 else
     echo "   ⚠ Certificate renewal cron job not found"
     echo "     → Cron job will be added when running cert scripts"

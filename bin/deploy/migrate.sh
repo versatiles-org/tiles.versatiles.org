@@ -119,7 +119,7 @@ done
 # Phase 7: Generate download config
 next_phase "Generating Download Configuration"
 
-./bin/download/update.sh
+./bin/download-updater/update.sh
 
 echo "✓ Download pipeline completed"
 

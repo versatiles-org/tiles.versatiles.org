@@ -109,14 +109,14 @@ Edit `.env` to configure:
 ### Update Download Pipeline Only
 
 ```bash
-./bin/download/update.sh
+./bin/download-updater/update.sh
 ```
 
 ### Certificate Renewal
 
 Automatic via weekly cron job. Manual renewal:
 ```bash
-./bin/cert/renewal.sh
+./bin/cert/renew.sh
 ```
 
 ### View Logs

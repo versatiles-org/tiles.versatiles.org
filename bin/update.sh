@@ -37,6 +37,6 @@ docker compose up --detach --force-recreate --build
 
 # Update download pipeline
 echo "Updating download pipeline..."
-./bin/download/update.sh
+./bin/download-updater/update.sh
 
 echo "Operations completed successfully."
