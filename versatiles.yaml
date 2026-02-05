@@ -14,3 +14,5 @@ tiles:
     src: /data/landcover-vectors.versatiles
   - name: bathymetry-vectors
     src: /data/bathymetry-vectors.versatiles
+  - name: satellite
+    src: /data/satellite.versatiles

@@ -177,6 +177,7 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 						'Satellite imagery from various sources.'
 					];
 					order = 40;
+					local = true;
 					break;
 				default:
 					console.error(`Unknown group "${slug}"`);
