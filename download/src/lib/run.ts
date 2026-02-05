@@ -28,7 +28,7 @@ import { FileResponse } from './file/file_response.js';
  * - `domain`: public domain name used to construct absolute URLs
  *   (falls back to the `DOMAIN` environment variable when omitted).
  * - `volumeFolder`: root folder containing the expected subdirectories:
- *   - `local_files/` — local mirror used for high-speed download
+ *   - `data/` — shared data folder (tiles + download files)
  *   - `nginx_conf/` — output location for the generated NGINX config
  *
  * When `volumeFolder` is not provided, a default `/volumes/` folder is used
@@ -62,7 +62,7 @@ export interface Options {
 export async function run(options: Options = {}) {
 	// Define key folder paths
 	const volumeFolder = options.volumeFolder ?? '/volumes';
-	const localFolder = resolve(volumeFolder, 'local_files');
+	const dataFolder = resolve(volumeFolder, 'data');
 	const nginxFolder = resolve(volumeFolder, 'nginx_conf');
 
 	// Get the domain from environment variables
@@ -82,15 +82,15 @@ export async function run(options: Options = {}) {
 	const fileGroups = groupFiles(files);
 
 	// Download "local" files (latest versions of local groups like OSM)
-	await downloadLocalFiles(fileGroups, localFolder);
+	await downloadLocalFiles(fileGroups, dataFolder);
 
 	// Collect all files for nginx configuration
-	// - Local files (synced to local_files/) use alias
+	// - Local files (synced to data/) use alias
 	// - Remote files use WebDAV proxy
 	const publicFiles = collectFiles(
 		fileGroups,
-		generateHTML(fileGroups, resolve(localFolder, 'index.html')),
-		generateRSSFeeds(fileGroups, resolve(localFolder)),
+		generateHTML(fileGroups, resolve(dataFolder, 'index.html')),
+		generateRSSFeeds(fileGroups, resolve(dataFolder)),
 	).map(f => {
 		const cloned = f.clone();
 		// Update fullname for local files to container path

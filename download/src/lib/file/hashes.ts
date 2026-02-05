@@ -11,7 +11,7 @@ import { FileRef } from './file_ref.js';
 import { spawnSync } from 'child_process';
 
 /** Local cache directory for hash files */
-const HASH_CACHE_DIR = '/volumes/local_files/.hash_cache';
+const HASH_CACHE_DIR = '/volumes/hash_cache';
 
 /**
  * Gets the local cache path for a hash file.

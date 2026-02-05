@@ -34,8 +34,9 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./volumes/download/local_files:/volumes/local_files:rw
+      - ./volumes/versatiles:/volumes/data:rw
       - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
+      - ./volumes/download/hash_cache:/volumes/hash_cache:rw
       - ./.ssh:/app/.ssh:ro
 
   nginx:
@@ -53,7 +54,7 @@ services:
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
       - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
-      - ./volumes/download/local_files/:/volumes/local_files/:ro
+      - ./volumes/versatiles/:/volumes/data/:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:

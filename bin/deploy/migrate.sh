@@ -58,8 +58,8 @@ echo "✓ System settings configured"
 # Phase 2: Create directories
 next_phase "Creating Volume Directories"
 
-mkdir -p volumes/download/local_files
 mkdir -p volumes/download/nginx_conf
+mkdir -p volumes/download/hash_cache
 mkdir -p volumes/versatiles
 mkdir -p volumes/cache
 mkdir -p volumes/certbot-cert
