@@ -90,25 +90,6 @@ function calculateHashRemote(remotePath: string, hashType: string): string | nul
 }
 
 /**
- * Gets hash for a file - tries to download existing, falls back to calculating.
- */
-function getHash(remotePath: string, hashType: string): string {
-	// First try to download existing hash file
-	let hash = downloadHashFile(remotePath, hashType);
-
-	// If not found, calculate on remote
-	if (!hash) {
-		hash = calculateHashRemote(remotePath, hashType);
-	}
-
-	if (!hash) {
-		throw new Error(`Failed to get ${hashType} hash for ${remotePath}`);
-	}
-
-	return hash;
-}
-
-/**
  * Downloads and caches hashes for all files from remote storage.
  * Uses existing .md5 and .sha256 files on the remote, or calculates if missing.
  */
