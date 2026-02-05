@@ -10,21 +10,28 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  shellcheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: ShellCheck
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./bin
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
       - name: Validate docker compose
         run: |
           cp template.env .env
           docker compose config --quiet
 
+  yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
       - name: YAML lint
         uses: ibiqlik/action-yamllint@v3
         with:
@@ -33,3 +40,30 @@ jobs:
             extends: relaxed
             rules:
               line-length: disable
+
+  typescript:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./download
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: download/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
