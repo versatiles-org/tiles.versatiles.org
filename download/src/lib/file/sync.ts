@@ -126,13 +126,16 @@ export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], loca
 		const existingFile = existingMap.get(filename);
 		const localPath = resolve(localFolder, filename);
 
-		if (existingFile && existingFile.size === wantedFile.size) {
+		// Always verify file actually exists on disk before deciding to keep it
+		const fileExistsOnDisk = existingFile && existsSync(localPath);
+
+		if (fileExistsOnDisk && existingFile.size === wantedFile.size) {
 			// File already exists with correct size, reuse it
 			console.log(` - Keeping ${filename} (already up to date)`);
 			wantedFile.fullname = localPath;
 			wantedFile.isRemote = false;
 		} else {
-			// Need to download
+			// Need to download (file missing, size mismatch, or doesn't exist on disk)
 			downloadViaSCP(wantedFile.remotePath, localPath);
 			wantedFile.fullname = localPath;
 			wantedFile.isRemote = false;
