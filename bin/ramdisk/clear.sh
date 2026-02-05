@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# This script clears the cache directory and reloads the nginx server using Docker Compose.
+# This script clears the cache directory.
 
 # Navigate to the project's root directory relative to this script
 cd "$(dirname "$0")/../.."
