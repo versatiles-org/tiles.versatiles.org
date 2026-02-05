@@ -5,7 +5,9 @@ services:
     restart: always
     networks: [docker_network]
     expose: [8080]
-    command: versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar "[osm]/data/osm.versatiles" "[hillshade-vectors]/data/hillshade-vectors.versatiles" "[landcover-vectors]/data/landcover-vectors.versatiles" "[bathymetry-vectors]/data/bathymetry-vectors.versatiles"
+    command: sh -c 'versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar ${TILE_SOURCES}'
+    environment:
+      - TILE_SOURCES=${TILE_SOURCES}
     security_opt:
       - no-new-privileges:true
     healthcheck:
