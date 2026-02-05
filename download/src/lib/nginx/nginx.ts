@@ -4,14 +4,12 @@
  *
  * The configuration is produced from a Handlebars template (`template/nginx.conf`)
  * and populated with:
- * - `files`: the list of all public `FileRef`s (real and generated)
+ * - `localFiles`: files served from local storage (alias)
+ * - `remoteFiles`: files served via WebDAV proxy
  * - `responses`: virtual inline responses such as checksum files or URL lists
- * - `webhook`: optional webhook endpoint injected via the `WEBHOOK` env variable
- *
- * The result is a complete NGINX config that defines:
- * - static file locations
- * - small synthetic endpoints (from `FileResponse`)
- * - optional `/update` endpoint when running inside the update container
+ * - `webhook`: optional webhook endpoint for triggering updates
+ * - `webdavAuth`: Base64-encoded credentials for WebDAV proxy
+ * - `webdavHost`: WebDAV server hostname
  */
 import { readFileSync, writeFileSync } from 'fs';
 import Handlebars from 'handlebars';
@@ -20,13 +18,6 @@ import { FileResponse } from '../file/file_response.js';
 
 /**
  * Builds the full NGINX configuration as a string.
- *
- * Steps:
- * - Loads and compiles the Handlebars template `template/nginx.conf`.
- * - Sorts `files` and `responses` by URL to ensure deterministic output.
- * - Injects environment variable `WEBHOOK` into the template if present.
- *
- * Returns the rendered NGINX configuration.
  */
 export function buildNginxConf(files: FileRef[], responses: FileResponse[]): string {
 	const templateFilename = new URL('../../../template/nginx.conf', import.meta.url).pathname;
@@ -36,25 +27,49 @@ export function buildNginxConf(files: FileRef[], responses: FileResponse[]): str
 	const webhook = process.env['WEBHOOK'];
 	const domain = process.env['DOMAIN'];
 
-	files.sort((a, b) => a.url.localeCompare(b.url));
+	// Parse STORAGE_URL to get WebDAV host and user
+	const storageUrl = process.env['STORAGE_URL'] ?? '';
+	const storagePass = process.env['STORAGE_PASS'] ?? '';
+
+	let webdavHost = '';
+	let webdavAuth = '';
+
+	if (storageUrl && storagePass) {
+		// STORAGE_URL format: user@host
+		const match = storageUrl.match(/^([^@]+)@(.+)$/);
+		if (match) {
+			const [, user, host] = match;
+			webdavHost = host;
+			// Create Base64-encoded Basic Auth header
+			webdavAuth = Buffer.from(`${user}:${storagePass}`).toString('base64');
+		}
+	}
+
+	// Separate local and remote files
+	const localFiles = files.filter(f => !f.isRemote);
+	const remoteFiles = files.filter(f => f.isRemote);
+
+	// Sort for deterministic output
+	localFiles.sort((a, b) => a.url.localeCompare(b.url));
+	remoteFiles.sort((a, b) => a.url.localeCompare(b.url));
 	responses.sort((a, b) => a.url.localeCompare(b.url));
 
-	// Compile the NGINX configuration using Handlebars and the provided files
-	return template({ files, responses, webhook, domain });
+	return template({
+		localFiles,
+		remoteFiles,
+		responses,
+		webhook,
+		domain,
+		webdavHost,
+		webdavAuth,
+	});
 }
 
 /**
  * Generates the NGINX configuration and writes it to disk.
- *
- * This function is a thin wrapper around `buildNginxConf()`. It renders the
- * configuration and writes it to `filename`, overwriting any existing file.
- *
- * Logs progress to stdout for visibility during build steps.
  */
 export function generateNginxConf(files: FileRef[], responses: FileResponse[], filename: string) {
 	console.log('Generating NGINX configuration...');
-
-	// Write the generated configuration to the specified filename
 	writeFileSync(filename, buildNginxConf(files, responses));
 	console.log(' - Configuration successfully written');
 }

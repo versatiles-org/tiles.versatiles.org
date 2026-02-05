@@ -2,20 +2,19 @@
  * Orchestrates the full update pipeline for download.versatiles.org.
  *
  * The `run()` function:
- * - locates the volume folders (remote files, local files, nginx config)
- * - discovers all `.versatiles` files in remote storage
+ * - discovers all `.versatiles` files in remote storage via SSH
  * - generates or loads checksum hashes for each file
  * - groups files into logical `FileGroup`s with metadata
- * - mirrors selected "local" files into the local high-speed folder
+ * - mirrors selected "local" files for high-speed download
  * - renders HTML (`index.html`) and RSS feeds for all groups
  * - prepares the list of public files and inline responses
- * - writes the final NGINX configuration
+ * - writes the final NGINX configuration with WebDAV proxy for remote files
  *
  * This module is the single entry point for both one-shot updates (`run_once.ts`)
  * and the HTTP-triggered update endpoint (`server.ts`).
  */
 import { resolve } from 'path';
-import { getAllFilesRecursive } from './file/file_ref.js';
+import { getRemoteFilesViaSSH } from './file/file_ref.js';
 import { collectFiles, groupFiles } from './file/file_group.js';
 import { generateHashes } from './file/hashes.js';
 import { downloadLocalFiles } from './file/sync.js';
@@ -29,7 +28,6 @@ import { FileResponse } from './file/file_response.js';
  * - `domain`: public domain name used to construct absolute URLs
  *   (falls back to the `DOMAIN` environment variable when omitted).
  * - `volumeFolder`: root folder containing the expected subdirectories:
- *   - `remote_files/` — remote storage mount with `.versatiles` files
  *   - `local_files/` — local mirror used for high-speed download
  *   - `nginx_conf/` — output location for the generated NGINX config
  *
@@ -45,61 +43,66 @@ export interface Options {
  * Executes the full site update pipeline.
  *
  * Steps:
- * 1. Resolve `volumeFolder`, `remoteFolder`, `localFolder`, and `nginxFolder`.
+ * 1. Resolve `volumeFolder`, `localFolder`, and `nginxFolder`.
  * 2. Resolve `domain` from `options.domain` or the `DOMAIN` environment variable.
- * 3. Recursively discover all `.versatiles` files in `remoteFolder`.
- * 4. Generate or load MD5/SHA256 hashes for each file.
+ * 3. Discover all `.versatiles` files in remote storage via SSH.
+ * 4. Generate or load MD5/SHA256 hashes for each file (cached locally).
  * 5. Group files into `FileGroup`s and derive metadata.
- * 6. Mirror "local" files into `localFolder`.
+ * 6. Mirror "local" files (latest OSM) into `localFolder`.
  * 7. Generate `index.html` and per-group RSS feeds into `localFolder`.
- * 8. Build the list of public `FileRef`s (with container-relative paths).
+ * 8. Build the list of public `FileRef`s (local files + remote files).
  * 9. Derive all `FileResponse`s for synthetic endpoints.
- * 10. Render and write the NGINX configuration into `nginxFolder`.
+ * 10. Render and write the NGINX configuration with WebDAV proxy.
  *
  * Throws:
  * - If `domain` is missing (no `DOMAIN` env and no `options.domain` provided).
- * - If no remote files are found in `remoteFolder`.
- * - If any downstream step fails (hashing, grouping, syncing, templating, nginx).
+ * - If no remote files are found.
+ * - If any downstream step fails.
  */
 export async function run(options: Options = {}) {
-	// Define key folder paths for the volumes, remote, local files, and Nginx configuration.
+	// Define key folder paths
 	const volumeFolder = options.volumeFolder ?? '/volumes';
-	const remoteFolder = resolve(volumeFolder, 'remote_files'); // Folder containing remote files.
-	const localFolder = resolve(volumeFolder, 'local_files'); // Folder for downloaded local files.
-	const nginxFolder = resolve(volumeFolder, 'nginx_conf'); // Folder for the generated Nginx config.
+	const localFolder = resolve(volumeFolder, 'local_files');
+	const nginxFolder = resolve(volumeFolder, 'nginx_conf');
 
-	// Get the domain from environment variables. Throw an error if it's not set.
+	// Get the domain from environment variables
 	const domain = options.domain ?? process.env['DOMAIN'];
 	if (domain == null) throw Error('missing $DOMAIN');
 	const baseURL = `https://${domain}/`;
 
-	// Get a list of all files in the remote folder recursively.
-	const files = getAllFilesRecursive(remoteFolder);
+	// Scan remote storage via SSH to get list of all .versatiles files
+	const files = getRemoteFilesViaSSH();
 
-	// If no remote files are found, throw an error.
 	if (files.length === 0) throw Error('no remote files found');
 
-	// Generate hashes for the files located in the remote folder.
-	await generateHashes(files, remoteFolder);
+	// Generate hashes for the files (computed via SSH, cached locally)
+	await generateHashes(files);
 
-	// Group files based on their names.
+	// Group files based on their names
 	const fileGroups = groupFiles(files);
 
-	// Download remote files to the local folder if needed.
+	// Download "local" files (latest versions of local groups like OSM)
 	await downloadLocalFiles(fileGroups, localFolder);
 
-	// Collect files to generate public-facing resources, like HTML and file lists.
+	// Collect all files for nginx configuration
+	// - Local files (synced to local_files/) use alias
+	// - Remote files use WebDAV proxy
 	const publicFiles = collectFiles(
 		fileGroups,
-		// `generateHTML` creates index.html and returns a FileRef
 		generateHTML(fileGroups, resolve(localFolder, 'index.html')),
 		generateRSSFeeds(fileGroups, resolve(localFolder)),
-	).map(f => f.cloneMoved(volumeFolder, '/volumes/'));
-	// FileRefs are cloned and their paths "moved" so they have to correct paths in the Nginx configuration
+	).map(f => {
+		const cloned = f.clone();
+		// Update fullname for local files to container path
+		if (!cloned.isRemote) {
+			cloned.fullname = cloned.fullname.replace(volumeFolder, '/volumes');
+		}
+		return cloned;
+	});
 
 	const publicResponses: FileResponse[] = fileGroups.flatMap(f => f.getResponses(baseURL));
 
-	// Generate an Nginx configuration file and save it.
+	// Generate NGINX configuration with WebDAV proxy support
 	const confFilename = resolve(nginxFolder, 'download.conf');
 	generateNginxConf(publicFiles, publicResponses, confFilename);
 }

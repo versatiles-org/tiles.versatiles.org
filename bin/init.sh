@@ -16,7 +16,6 @@ sysctl -p /etc/sysctl.d/99-versatiles.conf
 
 # Create necessary directories for storing volumes
 echo "Creating volume directories..."
-mkdir -p volumes/download/remote_files
 mkdir -p volumes/download/local_files
 mkdir -p volumes/download/nginx_conf
 mkdir -p volumes/versatiles
@@ -25,10 +24,6 @@ mkdir -p volumes/certbot-cert
 mkdir -p volumes/certbot-www
 mkdir -p volumes/nginx-cert
 mkdir -p volumes/nginx-log
-
-# Mount remote storage via SSHFS
-echo "Mounting remote storage..."
-./bin/sshfs/mount.sh
 
 # Prepare SSL/TLS dummy certificates for both domains
 echo "Preparing dummy certificates..."

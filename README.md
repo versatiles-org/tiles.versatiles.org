@@ -7,7 +7,7 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 ## Features
 
 - **Tile Serving**: Fast tile delivery via VersaTiles server with nginx caching
-- **Download Service**: Versioned file downloads with SSHFS remote storage
+- **Download Service**: Versioned file downloads via WebDAV proxy to remote storage
 - **Caching**: RAM disk cache for fast tile serving
 - **SSL**: Automatic Let's Encrypt certificates with OCSP stapling
 - **Security**: Rate limiting, anonymized logging, no-new-privileges containers
@@ -17,8 +17,8 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 ## Architecture
 
 - **versatiles**: Tile server serving .versatiles files
-- **download-updater**: Generates nginx config for download.versatiles.org
-- **nginx**: Reverse proxy for both domains
+- **download-updater**: Scans remote storage via SSH, generates nginx config with WebDAV proxy
+- **nginx**: Reverse proxy for both domains (proxies to WebDAV for remote files)
 - **certbot**: SSL certificate management
 
 ## Quick Start
@@ -27,7 +27,7 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 
 ```bash
 apt-get update && apt-get -y upgrade
-apt-get -y install git wget ca-certificates curl sshfs fuse
+apt-get -y install git wget ca-certificates curl
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
@@ -95,6 +95,7 @@ Edit `.env` to configure:
 | `EMAIL`           | Email for Let's Encrypt        | mail@versatiles.org     |
 | `BBOX`            | Bounding box filter (optional) | -9,36,-6,42             |
 | `STORAGE_URL`     | Storage box SSH URL            | user@host.de            |
+| `STORAGE_PASS`    | Storage box password (WebDAV)  | (password)              |
 | `WEBHOOK`         | Update webhook secret          | (random string)         |
 
 ## Operations
@@ -116,13 +117,6 @@ Edit `.env` to configure:
 Automatic via weekly cron job. Manual renewal:
 ```bash
 ./bin/cert/renewal.sh
-```
-
-### SSHFS Management
-
-```bash
-./bin/sshfs/mount.sh    # Mount remote storage
-./bin/sshfs/unmount.sh  # Unmount remote storage
 ```
 
 ### View Logs

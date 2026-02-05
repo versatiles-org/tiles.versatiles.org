@@ -28,12 +28,12 @@ services:
     environment:
       - DOMAIN=${DOWNLOAD_DOMAIN}
       - STORAGE_URL=${STORAGE_URL}
+      - STORAGE_PASS=${STORAGE_PASS}
       - WEBHOOK=${WEBHOOK}
       - PORT=8081
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./volumes/download/remote_files:/volumes/remote_files:ro
       - ./volumes/download/local_files:/volumes/local_files:rw
       - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
       - ./.ssh:/app/.ssh:ro
@@ -54,7 +54,6 @@ services:
       - ./volumes/nginx-log/:/var/log/nginx/:rw
       - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
       - ./volumes/download/local_files/:/volumes/local_files/:ro
-      - ./volumes/download/remote_files/:/volumes/remote_files/:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:

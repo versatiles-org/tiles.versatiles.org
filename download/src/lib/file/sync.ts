@@ -1,24 +1,71 @@
 /**
- * Utilities for synchronising `.versatiles` files between the remote storage
- * folder and the local high-speed download folder.
+ * Utilities for synchronising `.versatiles` files between remote storage
+ * and the local high-speed download folder.
  *
- * The `local` folder contains only a subset of files — typically the latest
+ * The local folder contains only a subset of files — typically the latest
  * file from each `FileGroup` that has `local: true`. This module ensures that:
  *
- * - Files that should be present locally but are missing are copied in.
+ * - Files that should be present locally but are missing are downloaded via SSH.
  * - Files that are no longer needed (outdated or no longer marked `local`)
  *   are removed.
- * - When a file with identical size already exists locally, the existing
- *   file is reused and the `FileRef.fullname` is updated accordingly.
- *
- * All operations here are synchronous (copy/delete) and intentionally simple,
- * because they run inside a container with predictable I/O behaviour.
+ * - When a file with identical size already exists locally, it is reused.
  */
-import { cpSync, rmSync } from 'fs';
-import { FileRef, getAllFilesRecursive } from './file_ref.js';
-import { resolve } from 'path';
+import { readdirSync, rmSync, statSync, existsSync, mkdirSync } from 'fs';
+import { spawnSync } from 'child_process';
+import { basename, resolve } from 'path';
+import { FileRef } from './file_ref.js';
 import { FileGroup } from './file_group.js';
 
+/**
+ * Scans a local directory for .versatiles files.
+ */
+function getLocalFiles(folderPath: string): FileRef[] {
+	if (!existsSync(folderPath)) {
+		mkdirSync(folderPath, { recursive: true });
+		return [];
+	}
+
+	const files: FileRef[] = [];
+	try {
+		const filenames = readdirSync(folderPath);
+		for (const filename of filenames) {
+			if (!filename.endsWith('.versatiles')) continue;
+			const fullPath = resolve(folderPath, filename);
+			const stat = statSync(fullPath);
+			if (stat.isFile()) {
+				const file = new FileRef(fullPath, '/' + filename);
+				files.push(file);
+			}
+		}
+	} catch {
+		// Directory doesn't exist or can't be read
+	}
+	return files;
+}
+
+/**
+ * Downloads a file from remote storage via SCP.
+ */
+function downloadViaSCP(remotePath: string, localPath: string): void {
+	const storageUrl = process.env['STORAGE_URL'];
+	if (!storageUrl) throw new Error('STORAGE_URL not set');
+
+	const args = [
+		'-i', '/app/.ssh/storage',
+		'-P', '23',
+		'-o', 'BatchMode=yes',
+		'-o', 'StrictHostKeyChecking=accept-new',
+		`${storageUrl}:${remotePath}`,
+		localPath
+	];
+
+	console.log(` - Downloading ${basename(remotePath)}...`);
+	const result = spawnSync('scp', args, { stdio: 'inherit' });
+
+	if (result.status !== 0) {
+		throw new Error(`SCP failed for ${remotePath}`);
+	}
+}
 
 /**
  * Mirrors the "latest local" files of all `FileGroup`s into the local folder.
@@ -26,67 +73,62 @@ import { FileGroup } from './file_group.js';
  * For every group:
  * - If `group.local === true` and a `latestFile` exists, that file is included.
  * - All other files are ignored.
- *
- * Delegates the actual copy/delete logic to `syncFiles()`.
  */
 export async function downloadLocalFiles(fileGroups: FileGroup[], localFolder: string) {
-	const localFiles = fileGroups.flatMap(group =>
+	const wantedFiles = fileGroups.flatMap(group =>
 		(group.local && group.latestFile) ? [group.latestFile] : []
 	);
-	syncFiles(localFiles, getAllFilesRecursive(localFolder), localFolder);
+
+	const existingFiles = getLocalFiles(localFolder);
+
+	syncFiles(wantedFiles, existingFiles, localFolder);
 }
 
 /**
- * Synchronises the `localFolder` to match the given list of `remoteFiles`.
+ * Synchronises the `localFolder` to match the given list of `wantedFiles`.
  *
  * Behaviour:
- * - Any file present locally but *not* in `remoteFiles` is deleted.
- * - Any file in `remoteFiles` that is missing or size-mismatched locally is copied in.
- * - If a matching local file exists with identical size, it is reused and
- *   the corresponding `remoteFile.fullname` is updated to point to the local copy.
- *
- * Notes:
- * - Files are matched by `filename` only — not by hash — because this is a
- *   lightweight mirroring step executed after hash verification already occurred.
- * - After copying, `remoteFile.fullname` is overwritten to reflect the new
- *   on-disk location in the local folder.
+ * - Any file present locally but *not* in `wantedFiles` is deleted.
+ * - Any file in `wantedFiles` that is missing or size-mismatched locally is downloaded.
+ * - If a matching local file exists with identical size, it is reused.
  */
-export function syncFiles(remoteFiles: FileRef[], localFiles: FileRef[], localFolder: string) {
-	console.log('Syncing files...');
+export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], localFolder: string) {
+	console.log('Syncing local files...');
 
-	/** Clone local files into a mutable map so we can remove retained entries. */
-	const deleteFiles = new Map(localFiles.map(f => [f.filename, f]));
-	/** Clone remote files into a mutable map; items removed from this set will not be copied. */
-	const copyFiles = new Map(remoteFiles.map(f => [f.filename, f]));
+	// Ensure local folder exists
+	if (!existsSync(localFolder)) {
+		mkdirSync(localFolder, { recursive: true });
+	}
 
-	/**
-	 * Detect matching local files (same filename + identical size) and mark them
-	 * as retained. Reuses the local file path by updating `remoteFile.fullname`.
-	 */
-	for (const remoteFile of remoteFiles) {
-		const { filename } = remoteFile;
-		const localFile = deleteFiles.get(filename);
-		if (localFile && localFile.size === remoteFile.size) {
-			copyFiles.delete(filename);
-			deleteFiles.delete(filename);
-			remoteFile.fullname = localFile.fullname;
+	/** Map of existing local files by filename */
+	const existingMap = new Map(existingFiles.map(f => [f.filename, f]));
+	/** Map of wanted files by filename */
+	const wantedMap = new Map(wantedFiles.map(f => [f.filename, f]));
+
+	// Delete files that are no longer wanted
+	for (const [filename, existingFile] of existingMap) {
+		const wantedFile = wantedMap.get(filename);
+		if (!wantedFile || wantedFile.size !== existingFile.size) {
+			console.log(` - Deleting ${filename}`);
+			rmSync(existingFile.fullname);
 		}
 	}
 
-	/** Delete all local files that were not matched to any remote file. */
-	for (const file of deleteFiles.values()) {
-		console.log(` - Deleting "${file.filename}"`);
-		rmSync(file.fullname);
-	}
+	// Download missing files
+	for (const [filename, wantedFile] of wantedMap) {
+		const existingFile = existingMap.get(filename);
+		const localPath = resolve(localFolder, filename);
 
-	/**
-	 * Copy in any remote files that were not matched locally.
-	 * After copying, update `file.fullname` to its new location.
-	 */
-	for (const file of copyFiles.values()) {
-		const fullname = resolve(localFolder, file.filename);
-		console.log(` - Copying "${file.filename}"`);
-		cpSync(file.fullname, fullname);
-		file.fullname = fullname; // Update the file's fullname to reflect its new location
+		if (existingFile && existingFile.size === wantedFile.size) {
+			// File already exists with correct size, reuse it
+			console.log(` - Keeping ${filename} (already up to date)`);
+			wantedFile.fullname = localPath;
+			wantedFile.isRemote = false;
+		} else {
+			// Need to download
+			downloadViaSCP(wantedFile.remotePath, localPath);
+			wantedFile.fullname = localPath;
+			wantedFile.isRemote = false;
+		}
 	}
 }
