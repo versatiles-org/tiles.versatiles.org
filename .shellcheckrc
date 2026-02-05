@@ -1,2 +1,7 @@
-# Exclude SC1091: Not following sourced file (.env is not in repo)
+# Disable info-level warnings for read without -r
+# In interactive prompts, backslash mangling is not a concern
+disable=SC2162
+
+# Disable warnings about not following sourced files
+# .env is generated at runtime and not available during linting
 disable=SC1091
