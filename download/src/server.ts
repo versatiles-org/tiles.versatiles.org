@@ -3,13 +3,14 @@ import { run } from './lib/run.js';
 
 const PORT = parseInt(process.env['PORT'] ?? '8081', 10);
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
 	if (req.url === '/update' && req.method === 'GET') {
-		res.writeHead(200, { 'Content-Type': 'text/plain' });
-		res.end('updating');
-		console.log('updating');
-		await run();
-		console.log('update complete');
+		res.writeHead(202, { 'Content-Type': 'text/plain' });
+		res.end('update started');
+		console.log('update started');
+		run()
+			.then(() => console.log('update complete'))
+			.catch(err => console.error('update failed:', err));
 		return;
 	}
 
