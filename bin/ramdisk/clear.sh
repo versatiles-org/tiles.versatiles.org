@@ -6,9 +6,6 @@ set -euo pipefail
 # Navigate to the project's root directory relative to this script
 cd "$(dirname "$0")/../.."
 
-# Load environment variables from the .env file
-source .env
-
 # Remove all files in the cache directory safely, ensuring the path is not empty to avoid dangerous deletions
 if [ -d "./volumes/cache" ]; then
     echo "Clearing cache..."
