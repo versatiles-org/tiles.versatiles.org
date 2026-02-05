@@ -107,8 +107,12 @@ export async function generateHashes(files: FileRef[]) {
 			const result = spawnSync('ssh', args);
 			if (result.stderr.length > 0) {
 				const stderr = result.stderr.toString();
-				// Ignore host key warnings
-				if (!stderr.includes('Warning:') && !stderr.includes('Permanently added')) {
+				// Ignore common SSH warnings (host key, post-quantum, etc.)
+				const isWarning = stderr.includes('Warning:') ||
+					stderr.includes('WARNING:') ||
+					stderr.includes('Permanently added') ||
+					stderr.includes('post-quantum');
+				if (!isWarning) {
 					throw Error(`SSH error for ${file.filename}: ${stderr}`);
 				}
 			}
