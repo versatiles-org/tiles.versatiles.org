@@ -10,7 +10,7 @@
  *   are removed.
  * - When a file with identical size already exists locally, it is reused.
  */
-import { readdirSync, rmSync, statSync, existsSync, mkdirSync } from 'fs';
+import { readdirSync, rmSync, statSync, existsSync, mkdirSync, renameSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { basename, resolve } from 'path';
 import { FileRef } from './file_ref.js';
@@ -45,10 +45,13 @@ function getLocalFiles(folderPath: string): FileRef[] {
 
 /**
  * Downloads a file from remote storage via SCP.
+ * Uses atomic download: writes to a temp file first, then renames on success.
  */
 function downloadViaSCP(remotePath: string, localPath: string): void {
 	const storageUrl = process.env['STORAGE_URL'];
 	if (!storageUrl) throw new Error('STORAGE_URL not set');
+
+	const tempPath = localPath + '.download.' + Date.now();
 
 	const args = [
 		'-i', '/app/.ssh/storage',
@@ -56,15 +59,19 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 		'-o', 'BatchMode=yes',
 		'-o', 'StrictHostKeyChecking=accept-new',
 		`${storageUrl}:${remotePath}`,
-		localPath
+		tempPath
 	];
 
 	console.log(` - Downloading ${basename(remotePath)}...`);
 	const result = spawnSync('scp', args, { stdio: 'inherit' });
 
 	if (result.status !== 0) {
+		try { rmSync(tempPath); } catch { /* ignore cleanup errors */ }
 		throw new Error(`SCP failed for ${remotePath}`);
 	}
+
+	// Atomic rename
+	renameSync(tempPath, localPath);
 }
 
 /**

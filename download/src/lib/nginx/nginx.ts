@@ -11,7 +11,7 @@
  * - `webdavAuth`: Base64-encoded credentials for WebDAV proxy
  * - `webdavHost`: WebDAV server hostname
  */
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync } from 'fs';
 import Handlebars from 'handlebars';
 import { FileRef } from '../file/file_ref.js';
 import { FileResponse } from '../file/file_response.js';
@@ -66,10 +66,13 @@ export function buildNginxConf(files: FileRef[], responses: FileResponse[]): str
 }
 
 /**
- * Generates the NGINX configuration and writes it to disk.
+ * Generates the NGINX configuration and writes it to disk atomically.
+ * Uses temp file + rename to prevent partial writes.
  */
 export function generateNginxConf(files: FileRef[], responses: FileResponse[], filename: string) {
 	console.log('Generating NGINX configuration...');
-	writeFileSync(filename, buildNginxConf(files, responses));
+	const tempFile = filename + '.tmp';
+	writeFileSync(tempFile, buildNginxConf(files, responses));
+	renameSync(tempFile, filename);
 	console.log(' - Configuration successfully written');
 }

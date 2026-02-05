@@ -11,7 +11,7 @@
  * These outputs are written to disk and wrapped in `FileRef` objects so they
  * can be included in the final NGINX configuration and file inventory.
  */
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync } from 'fs';
 import Handlebars from 'handlebars';
 import type { FileGroup } from '../file/file_group.js';
 import { FileRef } from '../file/file_ref.js';
@@ -41,7 +41,7 @@ export function renderTemplate(fileGroups: FileGroup[], templateFilename: string
  * Generates the main `index.html` file.
  *
  * - Uses the `index.html` Handlebars template.
- * - Writes the result to `filename`.
+ * - Writes the result to `filename` atomically (via temp file + rename).
  * - Wraps the output in a `FileRef` with URL `/index.html` so it becomes part
  *   of the public file set.
  *
@@ -49,7 +49,9 @@ export function renderTemplate(fileGroups: FileGroup[], templateFilename: string
  */
 export function generateHTML(fileGroups: FileGroup[], filename: string): FileRef {
 	console.log('Generating HTML...');
-	writeFileSync(filename, renderTemplate(fileGroups, "index.html"));
+	const tempFile = filename + '.tmp';
+	writeFileSync(tempFile, renderTemplate(fileGroups, "index.html"));
+	renameSync(tempFile, filename);
 
 	return new FileRef(filename, '/index.html');
 }
@@ -59,21 +61,23 @@ export function generateHTML(fileGroups: FileGroup[], filename: string): FileRef
  *
  * For each `FileGroup`:
  * - Renders the `feed.xml` template with a single-element array `[group]`
- * - Writes the output to `<outputDir>/feed-<slug>.xml`
+ * - Writes the output to `<outputDir>/feed-<slug>.xml` atomically (via temp file + rename)
  * - Creates a `FileRef` with URL `/feed-<slug>.xml`
  *
  * Returns the list of all generated `FileRef`s.
  */
 export function generateRSSFeeds(fileGroups: FileGroup[], outputDir: string): FileRef[] {
 	console.log('Generating RSS feeds...');
-	const refs: FileRef[] = []
+	const refs: FileRef[] = [];
 
 	fileGroups.forEach(g => {
-		const filename = `feed-${g.slug}.xml`
-		const outputPath = resolve(outputDir, filename)
-		writeFileSync(outputPath, renderTemplate([g], "feed.xml"));
-		refs.push(new FileRef(outputPath, '/'+filename))
-	})
+		const filename = `feed-${g.slug}.xml`;
+		const outputPath = resolve(outputDir, filename);
+		const tempPath = outputPath + '.tmp';
+		writeFileSync(tempPath, renderTemplate([g], "feed.xml"));
+		renameSync(tempPath, outputPath);
+		refs.push(new FileRef(outputPath, '/' + filename));
+	});
 
 	return refs;
 }
