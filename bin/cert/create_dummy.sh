@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # This script create a dummy SSL certificate using OpenSSL for nginx
 
