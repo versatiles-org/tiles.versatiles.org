@@ -21,7 +21,7 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 - **nginx**: Reverse proxy for both domains (proxies to WebDAV for remote files)
 - **certbot**: SSL certificate management
 
-## Quick Start
+## Server Installation
 
 ### 1. Install Dependencies (Debian/Ubuntu)
 
@@ -100,21 +100,51 @@ Edit `.env` to configure:
 
 ## Operations
 
-### Update All Services
+### Update After Code Changes
+
+When the repository code has been updated (e.g., new features, bug fixes):
 
 ```bash
 ./bin/update.sh
 ```
 
-### Update Download Pipeline Only
+This will:
+- Pull latest changes from Git
+- Update frontend assets
+- Download latest tile data
+- Rebuild and restart all Docker containers
+- Regenerate download nginx configuration
+
+### Update After Remote Storage Changes
+
+When new `.versatiles` files have been added to the remote storage:
 
 ```bash
 ./bin/download-updater/update.sh
 ```
 
+This will:
+- Scan remote storage for new/updated files
+- Regenerate the download page (HTML, RSS feeds)
+- Update nginx configuration for new files
+- Reload nginx to serve new files
+
+You can also trigger this via webhook:
+```bash
+curl "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}"
+```
+
+### Update Tile Data Only
+
+When you only need to refresh the local tile data (without rebuilding containers):
+
+```bash
+./bin/data/update.sh
+```
+
 ### Certificate Renewal
 
-Automatic via weekly cron job. Manual renewal:
+Certificates are renewed automatically via weekly cron job. Manual renewal:
 ```bash
 ./bin/cert/renew.sh
 ```
