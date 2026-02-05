@@ -32,7 +32,9 @@ import { resolve } from 'path';
 export function renderTemplate(fileGroups: FileGroup[], templateFilename: string): string {
 	const templateUrl = new URL(`../../../template/${templateFilename}`, import.meta.url);
 	const template = Handlebars.compile(readFileSync(templateUrl, 'utf-8'));
-	return template({ fileGroups });
+	// Convert class instances to plain objects for Handlebars
+	const data = JSON.parse(JSON.stringify({ fileGroups }));
+	return template(data);
 }
 
 /**
