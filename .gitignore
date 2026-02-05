@@ -1,3 +1,5 @@
 
 /.env
+/.ssh
+/download/node_modules
 /volumes
