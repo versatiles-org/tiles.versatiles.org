@@ -198,6 +198,7 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 			group.olderFiles.shift();
 		} else {
 			group.latestFile.url = newUrl;
+			group.latestFile.filename = newUrl.replace(/^\/+/, '');
 		}
 	});
 
