@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # This script downloads the frontend for VersaTiles.
 
@@ -9,4 +10,4 @@ cd "$(dirname "$0")/../.."
 mkdir -p volumes/versatiles
 
 # Download frontend
-curl -Ls https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar.gz | gzip -d >"volumes/versatiles/frontend.br.tar"
+curl -fLs https://github.com/versatiles-org/versatiles-frontend/releases/latest/download/frontend.br.tar.gz | gzip -d >"volumes/versatiles/frontend.br.tar"
