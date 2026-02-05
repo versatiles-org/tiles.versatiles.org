@@ -1,20 +1,33 @@
 # tiles.versatiles.org
 
-Production setup for serving VersaTiles map tiles with nginx reverse proxy, SSL via Let's Encrypt, and RAM disk caching.
+Production setup for serving VersaTiles map tiles and downloads with nginx reverse proxy, SSL via Let's Encrypt, and RAM disk caching.
+
+This repository serves both **tiles.versatiles.org** (tile serving) and **download.versatiles.org** (file downloads) from a single server.
 
 ## Features
 
+- **Tile Serving**: Fast tile delivery via VersaTiles server with nginx caching
+- **Download Service**: Versioned file downloads with SSHFS remote storage
 - **Caching**: RAM disk cache for fast tile serving
 - **SSL**: Automatic Let's Encrypt certificates with OCSP stapling
 - **Security**: Rate limiting, anonymized logging, no-new-privileges containers
-- **Health checks**: Container health monitoring for versatiles and nginx
+- **Health checks**: Container health monitoring for all services
+- **Webhooks**: Trigger updates via secure webhook endpoint
 
-## Install
+## Architecture
 
-Install dependencies (Debian/Ubuntu):
+- **versatiles**: Tile server serving .versatiles files
+- **download-updater**: Generates nginx config for download.versatiles.org
+- **nginx**: Reverse proxy for both domains
+- **certbot**: SSL certificate management
+
+## Quick Start
+
+### 1. Install Dependencies (Debian/Ubuntu)
+
 ```bash
 apt-get update && apt-get -y upgrade
-apt-get -y install git wget ca-certificates curl
+apt-get -y install git wget ca-certificates curl sshfs fuse
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
@@ -23,25 +36,108 @@ apt-get update && apt-get -y install docker-ce docker-ce-cli containerd.io docke
 shutdown -r now
 ```
 
-Clone and initialize:
+### 2. Clone Repository
+
 ```bash
 git clone https://github.com/versatiles-org/tiles.versatiles.org.git
 cd tiles.versatiles.org
-cp template.env .env
-nano .env  # Set DOMAIN_NAME, EMAIL, RAM_DISK_GB
-./bin/init.sh
 ```
 
-## Update
+### 3. Configure Environment
+
+Interactive setup:
+```bash
+./bin/deploy/setup-env.sh
+```
+
+Or manually:
+```bash
+cp template.env .env
+nano .env
+```
+
+### 4. Setup SSH Key for Storage Box
 
 ```bash
-./bin/update.sh
+mkdir -p .ssh
+# Copy your storage box SSH key
+cp /path/to/storage-key .ssh/storage
+chmod 600 .ssh/storage
+```
+
+### 5. Run Pre-flight Checks
+
+```bash
+./bin/deploy/preflight.sh
+```
+
+### 6. Deploy
+
+```bash
+./bin/deploy/migrate.sh
+```
+
+### 7. Verify Deployment
+
+```bash
+./bin/deploy/verify.sh
 ```
 
 ## Configuration
 
 Edit `.env` to configure:
-- `DOMAIN_NAME` - Your domain (e.g., tiles.versatiles.org)
-- `EMAIL` - Email for Let's Encrypt notifications
-- `RAM_DISK_GB` - RAM disk size for caching
-- `BBOX` - Optional bounding box to download only a region
+
+| Variable          | Description                    | Example                 |
+|-------------------|--------------------------------|-------------------------|
+| `DOMAIN_NAME`     | Tiles domain                   | tiles.versatiles.org    |
+| `DOWNLOAD_DOMAIN` | Downloads domain               | download.versatiles.org |
+| `RAM_DISK_GB`     | RAM disk size for caching      | 4                       |
+| `EMAIL`           | Email for Let's Encrypt        | mail@versatiles.org     |
+| `BBOX`            | Bounding box filter (optional) | -9,36,-6,42             |
+| `STORAGE_URL`     | Storage box SSH URL            | user@host.de            |
+| `WEBHOOK`         | Update webhook secret          | (random string)         |
+
+## Operations
+
+### Update All Services
+
+```bash
+./bin/update.sh
+```
+
+### Update Download Pipeline Only
+
+```bash
+./bin/download/update.sh
+```
+
+### Certificate Renewal
+
+Automatic via weekly cron job. Manual renewal:
+```bash
+./bin/cert/renewal.sh
+```
+
+### SSHFS Management
+
+```bash
+./bin/sshfs/mount.sh    # Mount remote storage
+./bin/sshfs/unmount.sh  # Unmount remote storage
+```
+
+### View Logs
+
+```bash
+docker compose logs -f           # All services
+docker compose logs -f nginx     # Nginx only
+docker compose logs -f download-updater  # Download service only
+```
+
+## Rollback
+
+If migration fails:
+```bash
+./bin/deploy/rollback.sh
+```
+
+Then update DNS to point download.versatiles.org back to the old server.
