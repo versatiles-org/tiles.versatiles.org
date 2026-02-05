@@ -20,8 +20,10 @@ WARNINGS=0
 echo "1. Checking Docker services..."
 SERVICES="versatiles download-updater nginx"
 for service in $SERVICES; do
-    STATUS=$(docker compose ps --format json "$service" 2>/dev/null | jq -r '.State // empty' 2>/dev/null || echo "")
-    if [ "$STATUS" = "running" ]; then
+    # Check if container is running using docker compose ps with grep
+    if docker compose ps --status running 2>/dev/null | grep -q "$service"; then
+        echo "   ✓ $service is running"
+    elif docker compose ps 2>/dev/null | grep -E "$service.*Up" > /dev/null; then
         echo "   ✓ $service is running"
     else
         echo "   ✗ $service is NOT running"
