@@ -33,6 +33,12 @@ services:
       - ./volumes/nginx-log/:/var/log/nginx/:rw
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
       - RAM_DISK_GB=${RAM_DISK_GB}
