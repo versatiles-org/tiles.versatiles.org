@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 # Persist maximum socket connections setting across reboots
 echo "vm.max_map_count=262144" > /etc/sysctl.d/99-versatiles.conf
-sysctl --system
+sysctl -p /etc/sysctl.d/99-versatiles.conf
 
 # Create a necessary directory for storing volumes
 mkdir -p volumes
