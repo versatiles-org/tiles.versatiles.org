@@ -41,8 +41,15 @@ echo "Clearing cache data..."
 echo "Starting Docker Compose services..."
 docker compose up --detach --force-recreate --build
 
-# Reload nginx to pick up new configuration
-echo "Reloading nginx..."
-docker compose exec nginx nginx -s reload
+# Wait for nginx to be healthy before reloading
+echo "Waiting for nginx to be ready..."
+for _ in {1..30}; do
+    if docker compose exec nginx nginx -t &>/dev/null; then
+        echo "Reloading nginx..."
+        docker compose exec nginx nginx -s reload
+        break
+    fi
+    sleep 1
+done
 
 echo "Operations completed successfully."
