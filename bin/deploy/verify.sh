@@ -130,7 +130,7 @@ fi
 # Test tile endpoint
 echo ""
 echo "6. Testing tile endpoint..."
-TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/osm/0/0/0" 2>/dev/null || echo "000")
+TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/tiles/osm/0/0/0" 2>/dev/null || echo "000")
 if [ "$TILE_CODE" = "200" ]; then
     echo "   ✓ Tile endpoint working"
 else
@@ -138,20 +138,59 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# Test download file (checksum via WebDAV proxy)
+# Test download file (local file)
 echo ""
-echo "7. Testing download endpoint..."
-DOWNLOAD_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/osm.versatiles.md5" 2>/dev/null || echo "000")
-if [ "$DOWNLOAD_CODE" = "200" ]; then
-    echo "   ✓ Download checksum endpoint working"
+echo "7. Testing download endpoints..."
+echo "   Testing local file (osm.versatiles)..."
+LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/osm.versatiles" 2>/dev/null || echo "000")
+if [ "$LOCAL_CODE" = "200" ]; then
+    echo "   ✓ Local file endpoint working"
 else
-    echo "   ⚠ Download endpoint returned $DOWNLOAD_CODE"
+    echo "   ⚠ Local file returned $LOCAL_CODE"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+echo "   Testing checksum file..."
+CHECKSUM_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/osm.versatiles.md5" 2>/dev/null || echo "000")
+if [ "$CHECKSUM_CODE" = "200" ]; then
+    echo "   ✓ Checksum endpoint working"
+else
+    echo "   ⚠ Checksum endpoint returned $CHECKSUM_CODE"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# Test WebDAV proxy (remote versioned file)
+echo ""
+echo "8. Testing WebDAV proxy for remote files..."
+# Find a remote file from the nginx config
+REMOTE_FILE=$(grep -o 'location = /[^{]*\.versatiles' ./volumes/download/nginx_conf/download.conf 2>/dev/null | grep -v '/osm\.versatiles' | head -1 | sed 's/location = //' || echo "")
+if [ -n "$REMOTE_FILE" ]; then
+    REMOTE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}${REMOTE_FILE}" 2>/dev/null || echo "000")
+    if [ "$REMOTE_CODE" = "200" ]; then
+        echo "   ✓ WebDAV proxy working (${REMOTE_FILE})"
+    else
+        echo "   ✗ WebDAV proxy returned $REMOTE_CODE for ${REMOTE_FILE}"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "   ⚠ No remote files found to test"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# Test RSS feed
+echo ""
+echo "9. Testing RSS feeds..."
+RSS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/feed-osm.xml" 2>/dev/null || echo "000")
+if [ "$RSS_CODE" = "200" ]; then
+    echo "   ✓ RSS feed working"
+else
+    echo "   ⚠ RSS feed returned $RSS_CODE"
     WARNINGS=$((WARNINGS + 1))
 fi
 
 # Test webhook
 echo ""
-echo "8. Testing webhook endpoint..."
+echo "10. Testing webhook endpoint..."
 if [ -n "${WEBHOOK:-}" ]; then
     WEBHOOK_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}" 2>/dev/null || echo "000")
     if [ "$WEBHOOK_CODE" = "200" ]; then
@@ -166,7 +205,7 @@ fi
 
 # Check cron job
 echo ""
-echo "9. Checking certificate renewal cron job..."
+echo "11. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renewal.sh"; then
     echo "   ✓ Certificate renewal cron job is configured"
     crontab -l | grep "bin/cert/renewal.sh"
