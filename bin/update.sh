@@ -4,6 +4,7 @@ set -euo pipefail
 # This script performs a series of setup operations for a project:
 # - Pulls latest updates from Git
 # - Updates data using a custom script
+# - Updates download pipeline
 # - Clears cached data
 # - Restarts Docker Compose services
 
@@ -33,5 +34,9 @@ echo "Clearing cache data..."
 echo "Restarting Docker Compose services..."
 docker compose pull
 docker compose up --detach --force-recreate --build
+
+# Update download pipeline
+echo "Updating download pipeline..."
+./bin/download/update.sh
 
 echo "Operations completed successfully."

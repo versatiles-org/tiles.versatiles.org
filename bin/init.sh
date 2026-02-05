@@ -7,16 +7,28 @@ set -euo pipefail
 # Move to the project's root directory relative to the script's location
 cd "$(dirname "$0")/.."
 
+# Load environment variables from the .env file
+source .env
+
 # Persist maximum socket connections setting across reboots
 echo "vm.max_map_count=262144" > /etc/sysctl.d/99-versatiles.conf
 sysctl -p /etc/sysctl.d/99-versatiles.conf
 
-# Create a necessary directory for storing volumes
+# Create necessary directories for storing volumes
+echo "Creating volume directories..."
 mkdir -p volumes
+mkdir -p volumes/download/remote_files
+mkdir -p volumes/download/local_files
+mkdir -p volumes/download/nginx_conf
 
-# Prepare SSL/TLS dummy certificates
-echo "Preparing certificates..."
-./bin/cert/create_dummy.sh
+# Mount remote storage via SSHFS
+echo "Mounting remote storage..."
+./bin/sshfs/mount.sh
+
+# Prepare SSL/TLS dummy certificates for both domains
+echo "Preparing dummy certificates..."
+./bin/cert/create_dummy.sh "${DOMAIN_NAME}"
+./bin/cert/create_dummy.sh "${DOWNLOAD_DOMAIN}"
 
 # Initialize RAM disk for better performance
 echo "Initializing RAM disk..."
@@ -32,10 +44,15 @@ echo "Fetching data..."
 
 # Start Docker Compose services with force recreate to ensure clean setup
 echo "Starting Docker Compose..."
-docker compose up --detach --force-recreate
+docker compose up --detach --force-recreate --build
 
-# Initialize Let's Encrypt valid certificates
+# Run download pipeline to generate initial nginx config
+echo "Running download pipeline..."
+./bin/download/update.sh
+
+# Initialize Let's Encrypt valid certificates for both domains
 echo "Initializing Let's Encrypt certificates..."
-./bin/cert/create_valid.sh
+./bin/cert/create_valid.sh "${DOMAIN_NAME}"
+./bin/cert/create_valid.sh "${DOWNLOAD_DOMAIN}"
 
 echo "System setup completed successfully."

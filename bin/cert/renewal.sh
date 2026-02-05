@@ -13,8 +13,13 @@ source .env
 # Use Docker Compose to execute the Certbot 'renew' command in the 'certbot' service container
 docker compose run --rm certbot renew
 
-# Copy the newly renewed certificates to the nginx directory
-cp -LfR ./volumes/certbot-cert/live/"${DOMAIN_NAME}" ./volumes/nginx-cert/live/
+# Copy the newly renewed certificates to the nginx directory for both domains
+if [ -d "./volumes/certbot-cert/live/${DOMAIN_NAME}" ]; then
+    cp -LfR ./volumes/certbot-cert/live/"${DOMAIN_NAME}" ./volumes/nginx-cert/live/
+fi
+if [ -d "./volumes/certbot-cert/live/${DOWNLOAD_DOMAIN}" ]; then
+    cp -LfR ./volumes/certbot-cert/live/"${DOWNLOAD_DOMAIN}" ./volumes/nginx-cert/live/
+fi
 
 # Reload nginx to apply the new certificates
 docker compose exec nginx nginx -s reload
