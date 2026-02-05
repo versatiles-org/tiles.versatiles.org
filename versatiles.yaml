@@ -5,7 +5,7 @@ server:
 static:
   - src: /data/frontend.br.tar
 
-tile_sources:
+tiles:
   - name: osm
     source: /data/osm.versatiles
   - name: hillshade-vectors
