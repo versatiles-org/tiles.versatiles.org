@@ -1,25 +1,13 @@
 /**
- * Hash generation utilities for `.versatiles` files.
+ * Hash utilities for `.versatiles` files.
  *
- * This module ensures that each file in the remote storage has associated
- * MD5 and SHA256 checksums. Missing hashes are computed over SSH on the
- * remote host and cached locally.
- *
- * Workflow:
- * - For every `FileRef`, check whether cached hashes exist locally.
- * - For missing hashes, execute `{md5,sha256}sum` remotely via SSH.
- * - Store the resulting checksum in a local cache file.
- * - Assign all hash values to `file.hashes`.
- *
- * Requirements:
- * - Environment variable `STORAGE_URL` must contain the SSH user@host.
- * - SSH identity `.ssh/storage` must exist in the container environment.
+ * Downloads existing MD5 and SHA256 hash files from remote storage via SSH.
+ * If hash files don't exist on remote, calculates them remotely via SSH.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { basename, dirname, join } from 'path';
 import { FileRef } from './file_ref.js';
-import { ProgressBar } from 'work-faster';
 import { spawnSync } from 'child_process';
 
 /** Local cache directory for hash files */
@@ -27,10 +15,8 @@ const HASH_CACHE_DIR = '/volumes/local_files/.hash_cache';
 
 /**
  * Gets the local cache path for a hash file.
- * Organizes by remote path structure to avoid collisions.
  */
 function getHashCachePath(remotePath: string, hashType: string): string {
-	// Convert /home/osm/file.versatiles to osm/file.versatiles
 	const relativePath = remotePath.replace(/^\/home\//, '');
 	return join(HASH_CACHE_DIR, relativePath + '.' + hashType);
 }
@@ -46,98 +32,136 @@ function ensureCacheDir(cachePath: string): void {
 }
 
 /**
- * Ensures that all provided files have MD5 and SHA256 checksums.
- *
- * For each file:
- * - If cached hash exists locally, use it.
- * - Otherwise, compute remotely via SSH and cache locally.
- *
- * After processing, every file receives `file.hashes = { md5, sha256 }`.
+ * Runs an SSH command and returns stdout, ignoring common warnings.
+ */
+function sshCommand(args: string[]): { success: boolean; stdout: string } {
+	const storageUrl = process.env['STORAGE_URL'];
+	if (!storageUrl) throw new Error('STORAGE_URL not set');
+
+	const fullArgs = [
+		storageUrl,
+		'-p', '23',
+		'-i', '/app/.ssh/storage',
+		'-oBatchMode=yes',
+		'-oStrictHostKeyChecking=accept-new',
+		...args
+	];
+
+	const result = spawnSync('ssh', fullArgs);
+
+	return {
+		success: result.status === 0,
+		stdout: result.stdout.toString().trim()
+	};
+}
+
+/**
+ * Downloads a hash file from remote storage via SSH.
+ * Returns the hash string or null if not found.
+ */
+function downloadHashFile(remotePath: string, hashType: string): string | null {
+	const remoteHashPath = `${remotePath}.${hashType}`;
+	const result = sshCommand(['cat', remoteHashPath]);
+
+	if (!result.success || result.stdout.length === 0) {
+		return null;
+	}
+
+	// Parse hash from output: "<hash>  filename" or "<hash> filename"
+	const hash = result.stdout.split(/\s/)[0];
+	return (hash && hash.length >= 32) ? hash : null;
+}
+
+/**
+ * Calculates a hash on the remote server via SSH.
+ * Returns the hash string or null on failure.
+ */
+function calculateHashRemote(remotePath: string, hashType: string): string | null {
+	console.log(`   Calculating ${hashType} for ${basename(remotePath)} on remote...`);
+	const result = sshCommand([`${hashType}sum`, remotePath]);
+
+	if (!result.success || result.stdout.length === 0) {
+		return null;
+	}
+
+	// Parse hash from output: "<hash>  /path/to/file"
+	const hash = result.stdout.split(/\s/)[0];
+	return (hash && hash.length >= 32) ? hash : null;
+}
+
+/**
+ * Gets hash for a file - tries to download existing, falls back to calculating.
+ */
+function getHash(remotePath: string, hashType: string): string {
+	// First try to download existing hash file
+	let hash = downloadHashFile(remotePath, hashType);
+
+	// If not found, calculate on remote
+	if (!hash) {
+		hash = calculateHashRemote(remotePath, hashType);
+	}
+
+	if (!hash) {
+		throw new Error(`Failed to get ${hashType} hash for ${remotePath}`);
+	}
+
+	return hash;
+}
+
+/**
+ * Downloads and caches hashes for all files from remote storage.
+ * Uses existing .md5 and .sha256 files on the remote, or calculates if missing.
  */
 export async function generateHashes(files: FileRef[]) {
-	/** List of (file, hashName) tasks that must be computed remotely. */
-	const todos: { file: FileRef, hashName: string }[] = [];
-
 	// Ensure cache directory exists
 	if (!existsSync(HASH_CACHE_DIR)) {
 		mkdirSync(HASH_CACHE_DIR, { recursive: true });
 	}
 
-	console.log('Checking hashes...');
-	files.forEach(file => {
-		const md5CachePath = getHashCachePath(file.remotePath, 'md5');
-		if (!existsSync(md5CachePath)) {
-			todos.push({ file, hashName: 'md5' });
-		}
+	console.log('Fetching hashes from remote storage...');
 
-		const sha256CachePath = getHashCachePath(file.remotePath, 'sha256');
-		if (!existsSync(sha256CachePath)) {
-			todos.push({ file, hashName: 'sha256' });
-		}
-	});
+	let downloaded = 0;
+	let calculated = 0;
+	let cached = 0;
 
-	/**
-	 * Compute missing hashes remotely and cache locally.
-	 */
-	if (todos.length > 0) {
-		console.log(` - Calculating ${todos.length} missing hashes...`);
+	for (const file of files) {
+		for (const hashType of ['md5', 'sha256'] as const) {
+			const cachePath = getHashCachePath(file.remotePath, hashType);
 
-		const sum = todos.reduce((s, t) => s + t.file.size, 0);
-		const progress = new ProgressBar(sum);
-
-		const storageUrl = process.env['STORAGE_URL'];
-		if (!storageUrl) throw new Error('STORAGE_URL environment variable is not set');
-
-		for (const todo of todos) {
-			const { file, hashName } = todo;
-			const cachePath = getHashCachePath(file.remotePath, hashName);
+			if (existsSync(cachePath)) {
+				cached++;
+				continue;
+			}
 
 			ensureCacheDir(cachePath);
 
-			const args = [
-				storageUrl,
-				'-p', '23',
-				'-i', '/app/.ssh/storage',
-				'-oBatchMode=yes',
-				'-oStrictHostKeyChecking=accept-new',
-				hashName + 'sum',
-				file.remotePath
-			];
-
-			const result = spawnSync('ssh', args);
-			if (result.stderr.length > 0) {
-				const stderr = result.stderr.toString();
-				// Ignore common SSH warnings (host key, post-quantum, etc.)
-				const isWarning = stderr.includes('Warning:') ||
-					stderr.includes('WARNING:') ||
-					stderr.includes('Permanently added') ||
-					stderr.includes('post-quantum');
-				if (!isWarning) {
-					throw Error(`SSH error for ${file.filename}: ${stderr}`);
+			// Try download first, then calculate
+			let hash = downloadHashFile(file.remotePath, hashType);
+			if (hash) {
+				downloaded++;
+			} else {
+				hash = calculateHashRemote(file.remotePath, hashType);
+				if (hash) {
+					calculated++;
+				} else {
+					throw new Error(`Failed to get ${hashType} hash for ${file.remotePath}`);
 				}
 			}
 
-			// Parse hash from output: "<hash>  /path/to/file"
-			const output = result.stdout.toString();
-			const hash = output.split(/\s/)[0];
-
-			if (!hash || hash.length < 32) {
-				throw new Error(`Invalid hash output for ${file.filename}: ${output}`);
-			}
-
-			// Store hash with filename format: "<hash> <filename>"
 			writeFileSync(cachePath, `${hash} ${basename(file.remotePath)}\n`);
-			progress.increment(file.size);
 		}
 	}
 
-	console.log('Reading hashes...');
-	files.forEach(f => {
-		f.hashes = {
-			md5: readHash(f.remotePath, 'md5'),
-			sha256: readHash(f.remotePath, 'sha256'),
+	console.log(` - ${downloaded} downloaded, ${calculated} calculated, ${cached} cached`);
+
+	// Read all hashes from cache
+	console.log('Reading hashes from cache...');
+	for (const file of files) {
+		file.hashes = {
+			md5: readHash(file.remotePath, 'md5'),
+			sha256: readHash(file.remotePath, 'sha256'),
 		};
-	});
+	}
 }
 
 /**
