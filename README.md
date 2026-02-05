@@ -135,3 +135,44 @@ If migration fails:
 ```
 
 Then update DNS to point download.versatiles.org back to the old server.
+
+## Development
+
+### Prerequisites
+
+- Node.js 22+
+- npm
+
+### Setup
+
+```bash
+cd download
+npm install
+```
+
+### Running locally
+
+```bash
+npm run once    # Run pipeline once
+npm run server  # Start webhook server
+```
+
+### Linting and Testing
+
+```bash
+npm run lint       # Check for lint errors
+npm run lint:fix   # Auto-fix lint errors
+npm test           # Run tests
+npm run test:watch # Run tests in watch mode
+npm run typecheck  # TypeScript type checking
+```
+
+## Contributing
+
+Before submitting a PR, ensure:
+
+1. All tests pass: `cd download && npm test`
+2. Linting passes: `npm run lint`
+3. TypeScript compiles: `npm run typecheck`
+4. ShellCheck passes: `shellcheck bin/**/*.sh`
+5. Docker compose validates: `docker compose config --quiet`
