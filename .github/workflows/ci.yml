@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./bin
+
+      - name: Validate docker compose
+        run: |
+          cp template.env .env
+          docker compose config --quiet
+
+      - name: YAML lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: compose.yaml
+          config_data: |
+            extends: relaxed
+            rules:
+              line-length: disable
