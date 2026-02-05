@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # This script configures a RAM disk for caching by updating /etc/fstab and mounting it.
 
@@ -25,17 +26,9 @@ echo "ramdisk $(pwd)/volumes/cache/ tmpfs defaults,size=${RAM_DISK_GB}G,x-gvfs-s
 # Reload the systemd daemon to apply changes to fstab
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
-if [ $? -ne 0 ]; then
-    echo "Failed to reload the systemd daemon."
-    exit 1
-fi
 
 # Mount the newly configured RAM disk
 echo "Mounting the RAM disk..."
 mount volumes/cache
-if [ $? -ne 0 ]; then
-    echo "Failed to mount the RAM disk."
-    exit 1
-fi
 
 echo "RAM disk configured and mounted successfully."
