@@ -12,28 +12,36 @@ source .env
 # Ensure the directory for VersaTiles data exists.
 mkdir -p volumes/versatiles
 
+echo "Updating VersaTiles data..."
+
 function download {
     local NAME="$1.versatiles"
     local URL="https://download.versatiles.org/${NAME}"
 
+    echo "Checking ${NAME}..."
+
     local MD5_LOCAL
     MD5_LOCAL=$(cat "volumes/versatiles/${NAME}.md5" 2>/dev/null || echo "")
     local MD5_REMOTE
-    MD5_REMOTE=$(curl -sf "${URL}.md5" | tr -d ' \n\r' || { echo "Failed to fetch MD5 for ${NAME}" >&2; exit 1; })
+    MD5_REMOTE=$(curl -sf "${URL}.md5" | tr -d ' \n\r') || {
+        echo "  Error: Failed to fetch MD5 checksum" >&2
+        exit 1
+    }
 
-    if [ ! -f "volumes/versatiles/${NAME}" ] || [ "$MD5_LOCAL" != "$MD5_REMOTE" ]; then
-        # Download OpenStreetMap data in VersaTiles format.
-        if [ -z "${BBOX:-}" ]; then
-            # Download the complete dataset if BBOX is not specified.
-            echo "Downloading the complete planet data..."
-            wget -q "$URL" -O "volumes/temp/${NAME}"
-        else
-            # Download only the specified BBOX area.
-            echo "Downloading data for specified bbox..."
-            docker run --rm -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch versatiles convert --bbox "$BBOX" --bbox-border 3 "$URL" "/data/${NAME}"
-        fi
-        wget -q "${URL}.md5" -O "volumes/temp/${NAME}.md5"
+    if [ -f "volumes/versatiles/${NAME}" ] && [ "$MD5_LOCAL" = "$MD5_REMOTE" ]; then
+        echo "  Up-to-date, skipping"
+        return
     fi
+
+    if [ -z "${BBOX:-}" ]; then
+        echo "  Downloading full dataset..."
+        wget -q "$URL" -O "volumes/temp/${NAME}"
+    else
+        echo "  Downloading with bbox filter..."
+        docker run --rm -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch versatiles convert --bbox "$BBOX" --bbox-border 3 "$URL" "/data/${NAME}"
+    fi
+    wget -q "${URL}.md5" -O "volumes/temp/${NAME}.md5"
+    echo "  Done"
 }
 
 # Prepare a temporary directory for downloads.
@@ -52,8 +60,8 @@ rm -rf volumes/temp
 
 # Check for successful download and setup.
 if [ ! -f volumes/versatiles/osm.versatiles ]; then
-    echo "Failed to download or convert VersaTiles data."
+    echo "Error: osm.versatiles not found after update" >&2
     exit 1
 fi
 
-echo "Setup completed successfully."
+echo "Update completed successfully."
