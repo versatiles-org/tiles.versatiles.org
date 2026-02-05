@@ -7,10 +7,10 @@ static:
 
 tiles:
   - name: osm
-    source: /data/osm.versatiles
+    src: /data/osm.versatiles
   - name: hillshade-vectors
-    source: /data/hillshade-vectors.versatiles
+    src: /data/hillshade-vectors.versatiles
   - name: landcover-vectors
-    source: /data/landcover-vectors.versatiles
+    src: /data/landcover-vectors.versatiles
   - name: bathymetry-vectors
-    source: /data/bathymetry-vectors.versatiles
+    src: /data/bathymetry-vectors.versatiles
