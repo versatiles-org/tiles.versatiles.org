@@ -9,6 +9,9 @@
 		"lib": [
 			"ESNext"
 		],
+		"types": [
+			"node"
+		],
 		"rootDir": "src",
 		"strict": true,
 		"alwaysStrict": true,
@@ -27,9 +30,14 @@
 		"downlevelIteration": true,
 		"declaration": true,
 		"pretty": true,
-		"isolatedModules": true
+		"isolatedModules": true,
+		"skipLibCheck": true
 	},
 	"include": [
 		"src/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"**/*.test.ts"
 	]
 }
