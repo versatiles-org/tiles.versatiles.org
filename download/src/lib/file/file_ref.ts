@@ -130,7 +130,8 @@ export class FileRef {
  * Scans remote storage via SSH and returns a list of FileRef instances
  * for all .versatiles files found.
  *
- * Uses SSH to run `find` on the remote storage and parses the output.
+ * Uses SSH to run `find` and `ls` on the remote storage and parses the output.
+ * Compatible with BusyBox/limited shells (doesn't use find -printf).
  */
 export function getRemoteFilesViaSSH(): FileRef[] {
 	const storageUrl = process.env['STORAGE_URL'];
@@ -140,13 +141,13 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 
 	console.log('Scanning remote storage via SSH...');
 
-	// Use find to list all .versatiles files with their sizes
-	// Format: size path
-	const cmd = `ssh -i ${sshKeyPath} -p 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${storageUrl} "find /home -name '*.versatiles' -printf '%s %p\\n'"`;
+	// Use find with ls -l for compatibility with BusyBox
+	// Output format: -rw-r--r-- 1 user group SIZE date time path
+	const cmd = `ssh -i ${sshKeyPath} -p 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${storageUrl} "find /home -name '*.versatiles' -exec ls -l {} +"`;
 
 	let output: string;
 	try {
-		output = execSync(cmd, { encoding: 'utf-8', timeout: 60000 });
+		output = execSync(cmd, { encoding: 'utf-8', timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
 	} catch (error) {
 		throw new Error(`Failed to scan remote storage via SSH: ${error}`);
 	}
@@ -155,15 +156,21 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 	const lines = output.trim().split('\n').filter(line => line.length > 0);
 
 	for (const line of lines) {
-		const match = line.match(/^(\d+)\s+(.+)$/);
-		if (!match) continue;
+		// Parse ls -l output: -rw-r--r-- 1 user group SIZE month day time/year path
+		// Fields: perms, links, user, group, size, month, day, time, path
+		const parts = line.trim().split(/\s+/);
+		if (parts.length < 9) continue;
 
-		const size = parseInt(match[1], 10);
-		const remotePath = match[2]; // e.g., /home/osm/osm.20240101.versatiles
+		const size = parseInt(parts[4], 10);
+		if (isNaN(size)) continue;
+
+		// Path is everything from field 8 onwards (in case path has spaces)
+		const remotePath = parts.slice(8).join(' ');
+		if (!remotePath.endsWith('.versatiles')) continue;
+
 		const filename = basename(remotePath);
 
 		// Create FileRef with remote path info
-		// fullname is set to remotePath for now, will be used in nginx config
 		const file = new FileRef(remotePath, size, remotePath);
 		file.filename = filename;
 		file.url = '/' + filename;
