@@ -32,8 +32,11 @@ export class FileRef {
 	/** Whether this file is served via WebDAV proxy (true) or local alias (false). */
 	public isRemote: boolean;
 
-	/** Path on remote storage for WebDAV URL construction. */
+	/** Full path on remote storage (e.g., /home/osm/file.versatiles). */
 	public remotePath: string;
+
+	/** Path for WebDAV URL (without /home prefix). */
+	public webdavPath: string;
 
 	/** Optional precomputed hashes for integrity / checksum files. */
 	public hashes?: { md5: string, sha256: string };
@@ -52,18 +55,21 @@ export class FileRef {
 				this.size = statSync(a).size;
 				this.isRemote = false;
 				this.remotePath = '';
+				this.webdavPath = '';
 			} else if (typeof b === 'number' && typeof c === 'string') {
 				// (fullname, size, remotePath) - remote file
 				this.url = '/' + this.filename;
 				this.size = b;
 				this.isRemote = true;
 				this.remotePath = c;
+				this.webdavPath = c.replace(/^\/home/, '');
 			} else if (typeof b === 'number') {
 				// (fullname, size) - local file with known size
 				this.url = '/' + this.filename;
 				this.size = b;
 				this.isRemote = false;
 				this.remotePath = '';
+				this.webdavPath = '';
 			} else {
 				throw new Error('Invalid FileRef constructor arguments.');
 			}
@@ -74,6 +80,7 @@ export class FileRef {
 			this.size = a.size;
 			this.isRemote = a.isRemote;
 			this.remotePath = a.remotePath;
+			this.webdavPath = a.webdavPath;
 			this.hashes = a.hashes;
 		} else {
 			throw new Error('Invalid FileRef constructor arguments.');
@@ -84,11 +91,6 @@ export class FileRef {
 		if (!/^\/[^/]/.test(this.url)) {
 			throw new Error(`FileRef.url must start with a single '/', got: ${this.url}`);
 		}
-	}
-
-	/** Returns the path for WebDAV URL (without /home prefix). */
-	get webdavPath(): string {
-		return this.remotePath.replace(/^\/home/, '');
 	}
 
 	/** Returns the MD5 hash of the file. Throws if not set. */
