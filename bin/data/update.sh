@@ -35,7 +35,7 @@ function download {
 
     if [ -z "${BBOX:-}" ]; then
         echo "  Downloading full dataset..."
-        wget -q "$URL" -O "volumes/temp/${NAME}"
+        wget --progress=bar:force -O "volumes/temp/${NAME}" "$URL"
     else
         echo "  Downloading with bbox filter..."
         docker run --rm -v "$(pwd)/volumes/temp/:/data/:rw" versatiles/versatiles:latest-scratch versatiles convert --bbox "$BBOX" --bbox-border 3 "$URL" "/data/${NAME}"
