@@ -5,18 +5,7 @@ services:
     restart: always
     networks: [docker_network]
     expose: [8080]
-    command:
-      - server
-      - -i
-      - "0.0.0.0"
-      - -p
-      - "8080"
-      - -s
-      - /data/frontend.br.tar
-      - "[osm]/data/osm.versatiles"
-      - "[hillshade-vectors]/data/hillshade-vectors.versatiles"
-      - "[landcover-vectors]/data/landcover-vectors.versatiles"
-      - "[bathymetry-vectors]/data/bathymetry-vectors.versatiles"
+    command: ["serve", "-c", "/config.yaml"]
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -27,6 +16,7 @@ services:
       start_period: 10s
     volumes:
       - ./volumes/versatiles/:/data/:ro
+      - ./versatiles.yaml:/config.yaml:ro
 
   download-updater:
     container_name: download-updater

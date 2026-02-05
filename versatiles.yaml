@@ -1,0 +1,16 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+static:
+  - src: /data/frontend.br.tar
+
+tile_sources:
+  - name: osm
+    source: /data/osm.versatiles
+  - name: hillshade-vectors
+    source: /data/hillshade-vectors.versatiles
+  - name: landcover-vectors
+    source: /data/landcover-vectors.versatiles
+  - name: bathymetry-vectors
+    source: /data/bathymetry-vectors.versatiles
