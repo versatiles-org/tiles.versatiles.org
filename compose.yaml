@@ -6,6 +6,8 @@ services:
     networks: [docker_network]
     expose: [8080]
     command: versatiles server -i 0.0.0.0 -p 8080 -s /data/frontend.br.tar "[osm]/data/osm.versatiles" "[hillshade-vectors]/data/hillshade-vectors.versatiles" "[landcover-vectors]/data/landcover-vectors.versatiles" "[bathymetry-vectors]/data/bathymetry-vectors.versatiles"
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./volumes/versatiles/:/data/:ro
 
@@ -23,6 +25,8 @@ services:
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
+    security_opt:
+      - no-new-privileges:true
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
       - RAM_DISK_GB=${RAM_DISK_GB}
