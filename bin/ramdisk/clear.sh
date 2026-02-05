@@ -10,8 +10,7 @@ cd "$(dirname "$0")/../.."
 if [ -d "./volumes/cache" ]; then
     echo "Clearing cache..."
     rm -rf ./volumes/cache/*
+    echo "Cache cleared successfully."
 else
     echo "Cache directory not found."
 fi
-
-echo "Cache cleared successfully."
