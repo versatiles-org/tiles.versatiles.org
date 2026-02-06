@@ -232,7 +232,7 @@ if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     crontab -l | grep "bin/cert/renew.sh"
 else
     echo "   ⚠ Certificate renewal cron job not found"
-    echo "     → Cron job will be added when running cert scripts"
+    echo "     → Run: ./bin/cert/setup_renewal.sh"
     WARNINGS=$((WARNINGS + 1))
 fi
 
