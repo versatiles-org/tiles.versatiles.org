@@ -4,7 +4,7 @@ set -euo pipefail
 # Post-deployment verification script for tiles.versatiles.org
 # Run this AFTER deployment to verify everything is working
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 
 source .env
 
