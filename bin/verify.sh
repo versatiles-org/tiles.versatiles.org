@@ -229,7 +229,6 @@ echo ""
 echo "12. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     echo "   ✓ Certificate renewal cron job is configured"
-    crontab -l | grep "bin/cert/renew.sh"
 else
     echo "   ⚠ Certificate renewal cron job not found"
     echo "     → Run: ./bin/cert/setup_renewal.sh"
