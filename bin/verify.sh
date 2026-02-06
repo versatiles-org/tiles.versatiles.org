@@ -235,6 +235,35 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
+# Check nginx rate limit configuration
+echo ""
+echo "13. Checking nginx rate limit configuration..."
+RATE_VALUE=$(docker exec nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+if [ -n "$RATE_VALUE" ]; then
+    if [ "$RATE_VALUE" -ge 50 ]; then
+        echo "   ✓ Rate limit: ${RATE_VALUE}r/s"
+    else
+        echo "   ✗ Rate limit too low: ${RATE_VALUE}r/s (expected ≥50)"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "   ⚠ Could not read rate limit from nginx config"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+BURST_VALUE=$(docker exec nginx sh -c "grep -o 'burst=[0-9]*' /etc/nginx/conf.d/proxy.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+if [ -n "$BURST_VALUE" ]; then
+    if [ "$BURST_VALUE" -ge 200 ]; then
+        echo "   ✓ Burst limit: ${BURST_VALUE}"
+    else
+        echo "   ✗ Burst limit too low: ${BURST_VALUE} (expected ≥200)"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "   ⚠ Could not read burst limit from nginx config"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
 # Summary
 echo ""
 echo "============================================"
