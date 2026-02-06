@@ -37,19 +37,8 @@ fi
 echo "Clearing cache data..."
 ./bin/ramdisk/clear.sh
 
-# Start all Docker Compose services
+# Start all Docker Compose services (force-recreate ensures fresh start with new config)
 echo "Starting Docker Compose services..."
 docker compose up --detach --force-recreate --build
-
-# Wait for nginx to be healthy before reloading
-echo "Waiting for nginx to be ready..."
-for _ in {1..30}; do
-    if docker compose exec nginx nginx -t &>/dev/null; then
-        echo "Reloading nginx..."
-        docker compose exec nginx nginx -s reload
-        break
-    fi
-    sleep 1
-done
 
 echo "Operations completed successfully."
