@@ -28,17 +28,16 @@ echo "Starting download-updater and fetching data..."
 docker compose up --detach --build download-updater
 docker compose exec download-updater npx tsx src/run_once.ts
 
-# Test NGINX config if nginx is running
-if docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
-    docker exec nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t"
-fi
+# Ensure all services are up to date (only recreates containers whose config/image changed)
+echo "Starting Docker Compose services..."
+docker compose up --detach --build
+
+# Regenerate NGINX config from templates and reload without downtime
+echo "Reloading NGINX configuration..."
+docker exec nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t && nginx -s reload"
 
 # Clear cache data
 echo "Clearing cache data..."
 ./bin/ramdisk/clear.sh
-
-# Start all Docker Compose services (force-recreate ensures fresh start with new config)
-echo "Starting Docker Compose services..."
-docker compose up --detach --force-recreate --build
 
 echo "Operations completed successfully."
