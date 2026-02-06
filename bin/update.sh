@@ -32,9 +32,10 @@ docker compose exec download-updater npx tsx src/run_once.ts
 echo "Starting Docker Compose services..."
 docker compose up --detach --build
 
-# Regenerate NGINX config from templates and reload without downtime
-echo "Reloading NGINX configuration..."
-docker exec nginx sh -c "/docker-entrypoint.d/20-envsubst-on-templates.sh; nginx -t && nginx -s reload"
+# Force-recreate nginx to pick up bind-mounted file changes (e.g. nginx.conf)
+# Single-file bind mounts track by inode; git pull creates new inodes.
+echo "Recreating nginx container..."
+docker compose up --detach --force-recreate nginx
 
 # Clear cache data
 echo "Clearing cache data..."
