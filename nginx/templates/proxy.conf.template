@@ -104,7 +104,7 @@ server {
 	}
 
    location / {
-      limit_req zone=tiles burst=50 nodelay;
+      limit_req zone=tiles burst=200 nodelay;
       proxy_pass            http://versatiles_backend;
       proxy_set_header      Host $host;
       proxy_http_version    1.1;
