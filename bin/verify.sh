@@ -214,7 +214,7 @@ echo ""
 echo "11. Testing webhook endpoint..."
 if [ -n "${WEBHOOK:-}" ]; then
     WEBHOOK_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}" 2>/dev/null || echo "000")
-    if [ "$WEBHOOK_CODE" = "200" ]; then
+    if [ "$WEBHOOK_CODE" = "200" ] || [ "$WEBHOOK_CODE" = "202" ]; then
         echo "   ✓ Webhook endpoint accessible"
     else
         echo "   ⚠ Webhook returned $WEBHOOK_CODE"
