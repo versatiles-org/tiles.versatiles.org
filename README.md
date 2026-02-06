@@ -80,7 +80,7 @@ chmod 600 .ssh/storage
 ### 7. Verify Deployment
 
 ```bash
-./bin/deploy/verify.sh
+./bin/verify.sh
 ```
 
 ## Configuration
