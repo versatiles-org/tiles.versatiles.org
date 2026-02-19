@@ -1,3 +1,6 @@
+[![CI status](https://img.shields.io/github/actions/workflow/status/versatiles-org/tiles.versatiles.org/ci.yml)](https://github.com/versatiles-org/tiles.versatiles.org/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 # tiles.versatiles.org
 
 Production setup for serving VersaTiles map tiles and downloads with nginx reverse proxy, SSL via Let's Encrypt, and RAM disk caching.
