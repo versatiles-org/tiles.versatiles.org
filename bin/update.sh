@@ -19,23 +19,22 @@ git pull
 echo "Fetching frontend..."
 ./bin/frontend/update.sh
 
-# Pull latest images
+# Pull latest images (old containers keep serving traffic)
 echo "Pulling latest Docker images..."
 docker compose pull
 
-# Build and start download-updater first to download data
+# Build all custom images (old containers keep serving traffic)
+echo "Building Docker images..."
+docker compose build
+
+# Start download-updater with new image and run download task
 echo "Starting download-updater and fetching data..."
-docker compose up --detach --build download-updater
+docker compose up --detach --force-recreate download-updater
 docker compose exec download-updater npx tsx src/run_once.ts
 
-# Ensure all services are up to date (only recreates containers whose config/image changed)
-echo "Starting Docker Compose services..."
-docker compose up --detach --build
-
-# Force-recreate nginx to pick up bind-mounted file changes (e.g. nginx.conf)
-# Single-file bind mounts track by inode; git pull creates new inodes.
-echo "Recreating nginx container..."
-docker compose up --detach --force-recreate nginx
+# Recreate all containers at once (minimal downtime, images are already built/pulled)
+echo "Recreating all Docker Compose services..."
+docker compose up --detach --force-recreate
 
 # Clear cache data
 echo "Clearing cache data..."
