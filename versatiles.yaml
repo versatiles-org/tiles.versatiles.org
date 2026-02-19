@@ -3,16 +3,16 @@ server:
   port: 8080
 
 static:
-  - src: /data/frontend.br.tar
+  - src: /data/frontend/frontend.br.tar
 
 tiles:
   - name: osm
-    src: /data/osm.versatiles
+    src: /data/tiles/osm.versatiles
   - name: hillshade-vectors
-    src: /data/hillshade-vectors.versatiles
+    src: /data/tiles/hillshade-vectors.versatiles
   - name: landcover-vectors
-    src: /data/landcover-vectors.versatiles
+    src: /data/tiles/landcover-vectors.versatiles
   - name: bathymetry-vectors
-    src: /data/bathymetry-vectors.versatiles
+    src: /data/tiles/bathymetry-vectors.versatiles
   - name: satellite
-    src: /data/satellite.versatiles
+    src: /data/tiles/satellite.versatiles

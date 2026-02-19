@@ -28,7 +28,8 @@ import { FileResponse } from './file/file_response.js';
  * - `domain`: public domain name used to construct absolute URLs
  *   (falls back to the `DOMAIN` environment variable when omitted).
  * - `volumeFolder`: root folder containing the expected subdirectories:
- *   - `data/` — shared data folder (tiles + download files)
+ *   - `tiles/` — tile data (*.versatiles files)
+ *   - `content/` — generated HTML and RSS feeds
  *   - `nginx_conf/` — output location for the generated NGINX config
  *
  * When `volumeFolder` is not provided, a default `/volumes/` folder is used
@@ -43,13 +44,13 @@ export interface Options {
  * Executes the full site update pipeline.
  *
  * Steps:
- * 1. Resolve `volumeFolder`, `localFolder`, and `nginxFolder`.
+ * 1. Resolve `volumeFolder`, `tilesFolder`, `contentFolder`, and `nginxFolder`.
  * 2. Resolve `domain` from `options.domain` or the `DOMAIN` environment variable.
  * 3. Discover all `.versatiles` files in remote storage via SSH.
  * 4. Generate or load MD5/SHA256 hashes for each file (cached locally).
  * 5. Group files into `FileGroup`s and derive metadata.
- * 6. Mirror "local" files (latest OSM) into `localFolder`.
- * 7. Generate `index.html` and per-group RSS feeds into `localFolder`.
+ * 6. Mirror "local" files (latest OSM) into `tilesFolder`.
+ * 7. Generate `index.html` and per-group RSS feeds into `contentFolder`.
  * 8. Build the list of public `FileRef`s (local files + remote files).
  * 9. Derive all `FileResponse`s for synthetic endpoints.
  * 10. Render and write the NGINX configuration with WebDAV proxy.
@@ -62,7 +63,8 @@ export interface Options {
 export async function run(options: Options = {}) {
 	// Define key folder paths
 	const volumeFolder = options.volumeFolder ?? '/volumes';
-	const dataFolder = resolve(volumeFolder, 'data');
+	const tilesFolder = resolve(volumeFolder, 'tiles');
+	const contentFolder = resolve(volumeFolder, 'content');
 	const nginxFolder = resolve(volumeFolder, 'nginx_conf');
 
 	// Get the domain from environment variables
@@ -82,15 +84,15 @@ export async function run(options: Options = {}) {
 	const fileGroups = groupFiles(files);
 
 	// Download "local" files (latest versions of local groups like OSM)
-	await downloadLocalFiles(fileGroups, dataFolder);
+	await downloadLocalFiles(fileGroups, tilesFolder);
 
 	// Collect all files for nginx configuration
-	// - Local files (synced to data/) use alias
+	// - Local files (synced to tiles/ or content/) use alias
 	// - Remote files use WebDAV proxy
 	const publicFiles = collectFiles(
 		fileGroups,
-		generateHTML(fileGroups, resolve(dataFolder, 'index.html')),
-		generateRSSFeeds(fileGroups, resolve(dataFolder)),
+		generateHTML(fileGroups, resolve(contentFolder, 'index.html')),
+		generateRSSFeeds(fileGroups, contentFolder),
 	).map(f => {
 		const cloned = f.clone();
 		// Update fullname for local files to container path

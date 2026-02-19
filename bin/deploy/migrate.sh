@@ -60,7 +60,9 @@ next_phase "Creating Volume Directories"
 
 mkdir -p volumes/download/nginx_conf
 mkdir -p volumes/download/hash_cache
-mkdir -p volumes/versatiles
+mkdir -p volumes/download/content
+mkdir -p volumes/tiles
+mkdir -p volumes/frontend
 mkdir -p volumes/cache
 mkdir -p volumes/certbot-cert
 mkdir -p volumes/certbot-www

@@ -15,7 +15,8 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - ./volumes/versatiles/:/data/:ro
+      - ./volumes/tiles/:/data/tiles/:ro
+      - ./volumes/frontend/:/data/frontend/:ro
       - ./versatiles.yaml:/config.yaml:ro
 
   download-updater:
@@ -35,7 +36,8 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./volumes/versatiles:/volumes/data:rw
+      - ./volumes/tiles:/volumes/tiles:rw
+      - ./volumes/download/content:/volumes/content:rw
       - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
       - ./volumes/download/hash_cache:/volumes/hash_cache:rw
       - ./.ssh:/app/.ssh:ro
@@ -55,7 +57,8 @@ services:
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
       - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
-      - ./volumes/versatiles/:/volumes/data/:ro
+      - ./volumes/tiles/:/volumes/tiles/:ro
+      - ./volumes/download/content/:/volumes/content/:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:

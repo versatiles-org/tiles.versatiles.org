@@ -6,11 +6,11 @@ set -euo pipefail
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
 
-# Ensure the directory for VersaTiles data exists.
-mkdir -p volumes/versatiles
+# Ensure the directory for frontend data exists.
+mkdir -p volumes/frontend
 
-FRONTEND_FILE="volumes/versatiles/frontend.br.tar"
-TAG_FILE="volumes/versatiles/frontend.version"
+FRONTEND_FILE="volumes/frontend/frontend.br.tar"
+TAG_FILE="volumes/frontend/frontend.version"
 
 # Get the latest release tag via redirect (lightweight HEAD request, no body downloaded)
 LATEST_TAG=$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/versatiles-org/versatiles-frontend/releases/latest)
