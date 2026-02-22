@@ -16,18 +16,21 @@ echo ""
 ERRORS=0
 WARNINGS=0
 
+pass() { echo -e "   \033[0;32m✓ $*\033[0m"; }
+fail() { echo -e "   \033[0;31m✗ $*\033[0m"; ERRORS=$((ERRORS + 1)); }
+warn() { echo -e "   \033[0;33m⚠ $*\033[0m"; WARNINGS=$((WARNINGS + 1)); }
+
 # Check Docker services
 echo "1. Checking Docker services..."
 SERVICES="versatiles download-updater nginx"
 for service in $SERVICES; do
     # Check if container is running using docker compose ps with grep
     if docker compose ps --status running 2>/dev/null | grep -q "$service"; then
-        echo "   ✓ $service is running"
+        pass "$service is running"
     elif docker compose ps 2>/dev/null | grep -E "$service.*Up" > /dev/null; then
-        echo "   ✓ $service is running"
+        pass "$service is running"
     else
-        echo "   ✗ $service is NOT running"
-        ERRORS=$((ERRORS + 1))
+        fail "$service is NOT running"
     fi
 done
 
@@ -35,36 +38,32 @@ done
 echo ""
 echo "2. Checking nginx configuration..."
 if docker exec nginx nginx -t &> /dev/null; then
-    echo "   ✓ Nginx configuration is valid"
+    pass "Nginx configuration is valid"
 else
-    echo "   ✗ Nginx configuration is invalid"
+    fail "Nginx configuration is invalid"
     docker exec nginx nginx -t 2>&1 | head -5
-    ERRORS=$((ERRORS + 1))
 fi
 
 # Check generated download config
 echo ""
 echo "3. Checking download nginx config..."
 if [ -f "./volumes/download/nginx_conf/download.conf" ]; then
-    echo "   ✓ download.conf exists"
+    pass "download.conf exists"
 
     if grep -q "server_name ${DOWNLOAD_DOMAIN}" ./volumes/download/nginx_conf/download.conf; then
-        echo "   ✓ download.conf contains correct domain"
+        pass "download.conf contains correct domain"
     else
-        echo "   ✗ download.conf has wrong domain"
-        ERRORS=$((ERRORS + 1))
+        fail "download.conf has wrong domain"
     fi
 
     # Check for WebDAV proxy configuration
     if grep -q "proxy_pass https://" ./volumes/download/nginx_conf/download.conf; then
-        echo "   ✓ download.conf contains WebDAV proxy configuration"
+        pass "download.conf contains WebDAV proxy configuration"
     else
-        echo "   ⚠ download.conf missing WebDAV proxy (may be OK if all files are local)"
-        WARNINGS=$((WARNINGS + 1))
+        warn "download.conf missing WebDAV proxy (may be OK if all files are local)"
     fi
 else
-    echo "   ✗ download.conf not found - run: ./bin/download-updater/update.sh"
-    ERRORS=$((ERRORS + 1))
+    fail "download.conf not found - run: ./bin/download-updater/update.sh"
 fi
 
 # Check SSL certificates
@@ -77,15 +76,13 @@ for domain in "${DOMAIN_NAME}" "${DOWNLOAD_DOMAIN}"; do
         ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
         if echo "$ISSUER" | grep -qi "Let's Encrypt\|R3\|E1\|R10\|R11"; then
             EXPIRY=$(openssl x509 -in "$CERT_PATH" -noout -enddate 2>/dev/null | cut -d= -f2)
-            echo "   ✓ $domain has valid Let's Encrypt certificate (expires: $EXPIRY)"
+            pass "$domain has valid Let's Encrypt certificate (expires: $EXPIRY)"
         else
-            echo "   ⚠ $domain has dummy/self-signed certificate"
+            warn "$domain has dummy/self-signed certificate"
             echo "     → Run: ./bin/cert/create_valid.sh $domain"
-            WARNINGS=$((WARNINGS + 1))
         fi
     else
-        echo "   ✗ $domain certificate not found"
-        ERRORS=$((ERRORS + 1))
+        fail "$domain certificate not found"
     fi
 done
 
@@ -97,36 +94,32 @@ echo "5. Testing HTTP endpoints..."
 echo "   Testing ${DOMAIN_NAME}..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${DOMAIN_NAME}/" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "301" ]; then
-    echo "   ✓ HTTP redirect working (301)"
+    pass "HTTP redirect working (301)"
 else
-    echo "   ⚠ HTTP returned $HTTP_CODE (expected 301)"
-    WARNINGS=$((WARNINGS + 1))
+    warn "HTTP returned $HTTP_CODE (expected 301)"
 fi
 
 HTTPS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/" 2>/dev/null || echo "000")
 if [ "$HTTPS_CODE" = "200" ]; then
-    echo "   ✓ HTTPS working (200)"
+    pass "HTTPS working (200)"
 else
-    echo "   ⚠ HTTPS returned $HTTPS_CODE (expected 200)"
-    WARNINGS=$((WARNINGS + 1))
+    warn "HTTPS returned $HTTPS_CODE (expected 200)"
 fi
 
 # Download domain
 echo "   Testing ${DOWNLOAD_DOMAIN}..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${DOWNLOAD_DOMAIN}/" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "301" ]; then
-    echo "   ✓ HTTP redirect working (301)"
+    pass "HTTP redirect working (301)"
 else
-    echo "   ⚠ HTTP returned $HTTP_CODE (expected 301)"
-    WARNINGS=$((WARNINGS + 1))
+    warn "HTTP returned $HTTP_CODE (expected 301)"
 fi
 
 HTTPS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/" 2>/dev/null || echo "000")
 if [ "$HTTPS_CODE" = "200" ]; then
-    echo "   ✓ HTTPS working (200)"
+    pass "HTTPS working (200)"
 else
-    echo "   ⚠ HTTPS returned $HTTPS_CODE (expected 200)"
-    WARNINGS=$((WARNINGS + 1))
+    warn "HTTPS returned $HTTPS_CODE (expected 200)"
 fi
 
 # Test tile endpoint
@@ -134,10 +127,9 @@ echo ""
 echo "6. Testing tile endpoint..."
 TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/tiles/osm/0/0/0" 2>/dev/null || echo "000")
 if [ "$TILE_CODE" = "200" ]; then
-    echo "   ✓ Tile endpoint working"
+    pass "Tile endpoint working"
 else
-    echo "   ⚠ Tile endpoint returned $TILE_CODE"
-    WARNINGS=$((WARNINGS + 1))
+    warn "Tile endpoint returned $TILE_CODE"
 fi
 
 # Test style JSON
@@ -145,10 +137,9 @@ echo ""
 echo "7. Testing style JSON..."
 STYLE_URL="https://${DOMAIN_NAME}/assets/styles/colorful/style.json"
 if curl -sk "$STYLE_URL" 2>/dev/null | python3 -m json.tool >/dev/null 2>&1; then
-    echo "   ✓ Style JSON is valid"
+    pass "Style JSON is valid"
 else
-    echo "   ✗ Style JSON is invalid or missing"
-    ERRORS=$((ERRORS + 1))
+    fail "Style JSON is invalid or missing"
 fi
 
 # Test CORS headers on various endpoints
@@ -163,10 +154,9 @@ CORS_PATHS=(
 for path in "${CORS_PATHS[@]}"; do
     CORS_HEADER=$(curl -sk -o /dev/null -w "%{http_code}" -H "Origin: https://example.com" -D - "https://${DOMAIN_NAME}${path}" 2>/dev/null | grep -i "access-control-allow-origin" || echo "")
     if [ -n "$CORS_HEADER" ]; then
-        echo "   ✓ CORS header present on ${path}"
+        pass "CORS header present on ${path}"
     else
-        echo "   ✗ CORS header missing on ${path}"
-        ERRORS=$((ERRORS + 1))
+        fail "CORS header missing on ${path}"
     fi
 done
 
@@ -176,19 +166,17 @@ echo "9. Testing download endpoints..."
 echo "   Testing local file (osm.versatiles)..."
 LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/osm.versatiles" 2>/dev/null || echo "000")
 if [ "$LOCAL_CODE" = "200" ]; then
-    echo "   ✓ Local file endpoint working"
+    pass "Local file endpoint working"
 else
-    echo "   ⚠ Local file returned $LOCAL_CODE"
-    WARNINGS=$((WARNINGS + 1))
+    warn "Local file returned $LOCAL_CODE"
 fi
 
 echo "   Testing checksum file..."
 CHECKSUM_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/osm.versatiles.md5" 2>/dev/null || echo "000")
 if [ "$CHECKSUM_CODE" = "200" ]; then
-    echo "   ✓ Checksum endpoint working"
+    pass "Checksum endpoint working"
 else
-    echo "   ⚠ Checksum endpoint returned $CHECKSUM_CODE"
-    WARNINGS=$((WARNINGS + 1))
+    warn "Checksum endpoint returned $CHECKSUM_CODE"
 fi
 
 # Test WebDAV proxy (remote versioned file)
@@ -199,14 +187,12 @@ REMOTE_FILE=$(grep -o 'location = /[^{]*\.versatiles' ./volumes/download/nginx_c
 if [ -n "$REMOTE_FILE" ]; then
     REMOTE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}${REMOTE_FILE}" 2>/dev/null || echo "000")
     if [ "$REMOTE_CODE" = "200" ]; then
-        echo "   ✓ WebDAV proxy working (${REMOTE_FILE})"
+        pass "WebDAV proxy working (${REMOTE_FILE})"
     else
-        echo "   ✗ WebDAV proxy returned $REMOTE_CODE for ${REMOTE_FILE}"
-        ERRORS=$((ERRORS + 1))
+        fail "WebDAV proxy returned $REMOTE_CODE for ${REMOTE_FILE}"
     fi
 else
-    echo "   ⚠ No remote files found to test"
-    WARNINGS=$((WARNINGS + 1))
+    warn "No remote files found to test"
 fi
 
 # Test RSS feed
@@ -214,10 +200,9 @@ echo ""
 echo "11. Testing RSS feeds..."
 RSS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/feed-osm.xml" 2>/dev/null || echo "000")
 if [ "$RSS_CODE" = "200" ]; then
-    echo "   ✓ RSS feed working"
+    pass "RSS feed working"
 else
-    echo "   ⚠ RSS feed returned $RSS_CODE"
-    WARNINGS=$((WARNINGS + 1))
+    warn "RSS feed returned $RSS_CODE"
 fi
 
 # Test webhook
@@ -226,24 +211,22 @@ echo "12. Testing webhook endpoint..."
 if [ -n "${WEBHOOK:-}" ]; then
     WEBHOOK_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}" 2>/dev/null || echo "000")
     if [ "$WEBHOOK_CODE" = "200" ] || [ "$WEBHOOK_CODE" = "202" ]; then
-        echo "   ✓ Webhook endpoint accessible"
+        pass "Webhook endpoint accessible"
     else
-        echo "   ⚠ Webhook returned $WEBHOOK_CODE"
-        WARNINGS=$((WARNINGS + 1))
+        warn "Webhook returned $WEBHOOK_CODE"
     fi
 else
-    echo "   ⚠ WEBHOOK not set in .env"
+    warn "WEBHOOK not set in .env"
 fi
 
 # Check cron job
 echo ""
 echo "13. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
-    echo "   ✓ Certificate renewal cron job is configured"
+    pass "Certificate renewal cron job is configured"
 else
-    echo "   ⚠ Certificate renewal cron job not found"
+    warn "Certificate renewal cron job not found"
     echo "     → Run: ./bin/cert/setup_renewal.sh"
-    WARNINGS=$((WARNINGS + 1))
 fi
 
 # Check nginx rate limit configuration
@@ -252,27 +235,23 @@ echo "14. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker exec nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then
-        echo "   ✓ Rate limit: ${RATE_VALUE}r/s"
+        pass "Rate limit: ${RATE_VALUE}r/s"
     else
-        echo "   ✗ Rate limit too low: ${RATE_VALUE}r/s (expected ≥50)"
-        ERRORS=$((ERRORS + 1))
+        fail "Rate limit too low: ${RATE_VALUE}r/s (expected ≥50)"
     fi
 else
-    echo "   ⚠ Could not read rate limit from nginx config"
-    WARNINGS=$((WARNINGS + 1))
+    warn "Could not read rate limit from nginx config"
 fi
 
 BURST_VALUE=$(docker exec nginx sh -c "grep -o 'burst=[0-9]*' /etc/nginx/conf.d/proxy.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$BURST_VALUE" ]; then
     if [ "$BURST_VALUE" -ge 200 ]; then
-        echo "   ✓ Burst limit: ${BURST_VALUE}"
+        pass "Burst limit: ${BURST_VALUE}"
     else
-        echo "   ✗ Burst limit too low: ${BURST_VALUE} (expected ≥200)"
-        ERRORS=$((ERRORS + 1))
+        fail "Burst limit too low: ${BURST_VALUE} (expected ≥200)"
     fi
 else
-    echo "   ⚠ Could not read burst limit from nginx config"
-    WARNINGS=$((WARNINGS + 1))
+    warn "Could not read burst limit from nginx config"
 fi
 
 # Summary
@@ -281,12 +260,12 @@ echo "============================================"
 echo "Verification Summary"
 echo "============================================"
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-    echo "✓ All checks passed! Deployment successful."
+    echo -e "\033[0;32m✓ All checks passed! Deployment successful.\033[0m"
     exit 0
 elif [ $ERRORS -eq 0 ]; then
-    echo "⚠ $WARNINGS warning(s). Deployment mostly successful but review warnings."
+    echo -e "\033[0;33m⚠ $WARNINGS warning(s). Deployment mostly successful but review warnings.\033[0m"
     exit 0
 else
-    echo "✗ $ERRORS error(s), $WARNINGS warning(s). Please resolve issues."
+    echo -e "\033[0;31m✗ $ERRORS error(s), $WARNINGS warning(s). Please resolve issues.\033[0m"
     exit 1
 fi
