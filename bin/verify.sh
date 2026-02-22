@@ -140,9 +140,20 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
+# Test style JSON
+echo ""
+echo "7. Testing style JSON..."
+STYLE_BODY=$(curl -sk "https://${DOMAIN_NAME}/assets/styles/colorful/style.json" 2>/dev/null || echo "")
+if echo "$STYLE_BODY" | jq empty 2>/dev/null; then
+    echo "   ✓ Style JSON is valid"
+else
+    echo "   ✗ Style JSON is invalid or missing"
+    ERRORS=$((ERRORS + 1))
+fi
+
 # Test CORS headers on various endpoints
 echo ""
-echo "7. Checking CORS headers..."
+echo "8. Checking CORS headers..."
 CORS_PATHS=(
     "/tiles/osm/0/0/0"
     "/assets/sprites/basics/sprites.json"
@@ -161,7 +172,7 @@ done
 
 # Test download file (local file)
 echo ""
-echo "8. Testing download endpoints..."
+echo "9. Testing download endpoints..."
 echo "   Testing local file (osm.versatiles)..."
 LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/osm.versatiles" 2>/dev/null || echo "000")
 if [ "$LOCAL_CODE" = "200" ]; then
@@ -182,7 +193,7 @@ fi
 
 # Test WebDAV proxy (remote versioned file)
 echo ""
-echo "9. Testing WebDAV proxy for remote files..."
+echo "10. Testing WebDAV proxy for remote files..."
 # Find a remote file from the nginx config
 REMOTE_FILE=$(grep -o 'location = /[^{]*\.versatiles' ./volumes/download/nginx_conf/download.conf 2>/dev/null | grep -v '/osm\.versatiles' | head -1 | sed 's/location = //' || echo "")
 if [ -n "$REMOTE_FILE" ]; then
@@ -200,7 +211,7 @@ fi
 
 # Test RSS feed
 echo ""
-echo "10. Testing RSS feeds..."
+echo "11. Testing RSS feeds..."
 RSS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/feed-osm.xml" 2>/dev/null || echo "000")
 if [ "$RSS_CODE" = "200" ]; then
     echo "   ✓ RSS feed working"
@@ -211,7 +222,7 @@ fi
 
 # Test webhook
 echo ""
-echo "11. Testing webhook endpoint..."
+echo "12. Testing webhook endpoint..."
 if [ -n "${WEBHOOK:-}" ]; then
     WEBHOOK_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}" 2>/dev/null || echo "000")
     if [ "$WEBHOOK_CODE" = "200" ] || [ "$WEBHOOK_CODE" = "202" ]; then
@@ -226,7 +237,7 @@ fi
 
 # Check cron job
 echo ""
-echo "12. Checking certificate renewal cron job..."
+echo "13. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     echo "   ✓ Certificate renewal cron job is configured"
 else
@@ -237,7 +248,7 @@ fi
 
 # Check nginx rate limit configuration
 echo ""
-echo "13. Checking nginx rate limit configuration..."
+echo "14. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker exec nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then
