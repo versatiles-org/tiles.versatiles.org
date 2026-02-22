@@ -27,14 +27,17 @@ docker compose pull
 echo "Building Docker images..."
 docker compose build
 
-# Start download-updater with new image and run download task
-echo "Starting download-updater and fetching data..."
-docker compose up --detach --force-recreate download-updater
+# Recreate backend services first (nginx keeps serving with old backends)
+echo "Updating backend services..."
+docker compose up --detach versatiles download-updater
+
+# Run download pipeline to fetch latest data
+echo "Fetching data..."
 docker compose exec download-updater npx tsx src/run_once.ts
 
-# Recreate all containers at once (minimal downtime, images are already built/pulled)
-echo "Recreating all Docker Compose services..."
-docker compose up --detach --force-recreate
+# Recreate nginx last (backends are already up and healthy)
+echo "Updating nginx..."
+docker compose up --detach nginx
 
 # Clear cache data
 echo "Clearing cache data..."
