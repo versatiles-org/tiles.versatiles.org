@@ -143,11 +143,21 @@ fi
 # Test style JSON
 echo ""
 echo "7. Testing style JSON..."
-STYLE_BODY=$(curl -sk "https://${DOMAIN_NAME}/assets/styles/colorful/style.json" 2>/dev/null || echo "")
-if echo "$STYLE_BODY" | jq empty 2>/dev/null; then
+STYLE_URL="https://${DOMAIN_NAME}/assets/styles/colorful/style.json"
+STYLE_HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "$STYLE_URL" 2>/dev/null || echo "000")
+STYLE_BODY=$(curl -sk "$STYLE_URL" 2>/dev/null || echo "")
+STYLE_CONTENT_TYPE=$(curl -sk -o /dev/null -w "%{content_type}" "$STYLE_URL" 2>/dev/null || echo "")
+echo "   HTTP status: $STYLE_HTTP_CODE"
+echo "   Content-Type: $STYLE_CONTENT_TYPE"
+echo "   Body length: ${#STYLE_BODY}"
+echo "   Body (first 200 chars): ${STYLE_BODY:0:200}"
+if [ "$STYLE_HTTP_CODE" != "200" ]; then
+    echo "   ✗ Style endpoint returned $STYLE_HTTP_CODE"
+    ERRORS=$((ERRORS + 1))
+elif echo "$STYLE_BODY" | jq empty 2>/dev/null; then
     echo "   ✓ Style JSON is valid"
 else
-    echo "   ✗ Style JSON is invalid or missing"
+    echo "   ✗ Style JSON is invalid"
     ERRORS=$((ERRORS + 1))
 fi
 
