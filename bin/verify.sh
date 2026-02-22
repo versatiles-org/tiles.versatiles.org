@@ -154,11 +154,15 @@ echo "   Body (first 200 chars): ${STYLE_BODY:0:200}"
 if [ "$STYLE_HTTP_CODE" != "200" ]; then
     echo "   ✗ Style endpoint returned $STYLE_HTTP_CODE"
     ERRORS=$((ERRORS + 1))
-elif echo "$STYLE_BODY" | jq empty 2>/dev/null; then
-    echo "   ✓ Style JSON is valid"
 else
-    echo "   ✗ Style JSON is invalid"
-    ERRORS=$((ERRORS + 1))
+    JQ_ERROR=$(echo "$STYLE_BODY" | jq empty 2>&1)
+    if [ $? -eq 0 ]; then
+        echo "   ✓ Style JSON is valid"
+    else
+        echo "   ✗ Style JSON is invalid"
+        echo "   jq error: $JQ_ERROR"
+        ERRORS=$((ERRORS + 1))
+    fi
 fi
 
 # Test CORS headers on various endpoints
