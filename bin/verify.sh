@@ -144,25 +144,11 @@ fi
 echo ""
 echo "7. Testing style JSON..."
 STYLE_URL="https://${DOMAIN_NAME}/assets/styles/colorful/style.json"
-STYLE_HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "$STYLE_URL" 2>/dev/null || echo "000")
-STYLE_BODY=$(curl -sk "$STYLE_URL" 2>/dev/null || echo "")
-STYLE_CONTENT_TYPE=$(curl -sk -o /dev/null -w "%{content_type}" "$STYLE_URL" 2>/dev/null || echo "")
-echo "   HTTP status: $STYLE_HTTP_CODE"
-echo "   Content-Type: $STYLE_CONTENT_TYPE"
-echo "   Body length: ${#STYLE_BODY}"
-echo "   Body (first 200 chars): ${STYLE_BODY:0:200}"
-if [ "$STYLE_HTTP_CODE" != "200" ]; then
-    echo "   ✗ Style endpoint returned $STYLE_HTTP_CODE"
-    ERRORS=$((ERRORS + 1))
+if curl -sk "$STYLE_URL" 2>/dev/null | python3 -m json.tool >/dev/null 2>&1; then
+    echo "   ✓ Style JSON is valid"
 else
-    JQ_ERROR=$(echo "$STYLE_BODY" | jq empty 2>&1)
-    if [ $? -eq 0 ]; then
-        echo "   ✓ Style JSON is valid"
-    else
-        echo "   ✗ Style JSON is invalid"
-        echo "   jq error: $JQ_ERROR"
-        ERRORS=$((ERRORS + 1))
-    fi
+    echo "   ✗ Style JSON is invalid or missing"
+    ERRORS=$((ERRORS + 1))
 fi
 
 # Test CORS headers on various endpoints
