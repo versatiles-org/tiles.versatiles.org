@@ -19,6 +19,10 @@ git pull
 echo "Fetching frontend..."
 ./bin/frontend/update.sh
 
+# Update styles
+echo "Fetching styles..."
+./bin/styles/update.sh
+
 # Pull latest images (old containers keep serving traffic)
 echo "Pulling latest Docker images..."
 docker compose pull

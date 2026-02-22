@@ -4,6 +4,8 @@ server:
 
 static:
   - src: /data/frontend/frontend.br.tar
+  - src: /data/frontend/styles.tar
+    prefix: /assets/styles
 
 tiles:
   - name: osm
