@@ -54,19 +54,16 @@
 
 		<div class="field">
 			<span class="label">Using:</span>
-			<div class="tool-row">
-				<div class="toggles">
-					<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles</button>
-					<button class:active={tool === 'docker'} onclick={() => (tool = 'docker')}>docker</button>
-				</div>
-				{#if tool === 'versatiles'}
-					<a
-						class="install-link"
-						href="https://docs.versatiles.org/guides/install_versatiles.html"
-						target="_blank"
-						rel="noopener noreferrer">installation instructions &#x2197;</a
-					>
-				{/if}
+			<div class="toggles">
+				<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles</button>
+				<a
+					class="install-link"
+					href="https://docs.versatiles.org/guides/install_versatiles.html"
+					target="_blank"
+					rel="noopener noreferrer"
+					title="Installation instructions">&#x2197;</a
+				>
+				<button class:active={tool === 'docker'} onclick={() => (tool = 'docker')}>docker</button>
 			</div>
 		</div>
 
@@ -172,16 +169,10 @@
 		font-size: 0.9em;
 	}
 
-	.tool-row {
-		display: flex;
-		align-items: center;
-		gap: 0.8em;
-		flex-wrap: wrap;
-	}
-
 	.toggles {
 		display: flex;
 		gap: 0.4em;
+		align-items: center;
 	}
 
 	.toggles button {
@@ -204,8 +195,9 @@
 	}
 
 	.install-link {
-		font-size: 0.8em;
-		opacity: 0.5;
+		font-size: 0.9em;
+		opacity: 0.4;
+		margin-right: 0.4em;
 	}
 
 	.install-link:hover {
