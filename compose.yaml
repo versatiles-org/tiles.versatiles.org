@@ -41,9 +41,11 @@ services:
 
   nginx:
     container_name: nginx
-    image: nginx:alpine
+    image: nginx:1.28-alpine
     restart: always
-    depends_on: [versatiles]
+    depends_on:
+      versatiles:
+        condition: service_healthy
     networks: [docker_network]
     ports: [80:80, 443:443]
     volumes:
@@ -70,8 +72,10 @@ services:
 
   certbot:
     container_name: certbot
-    image: certbot/certbot:latest
-    depends_on: [nginx]
+    image: certbot/certbot:v5.3.1
+    depends_on:
+      nginx:
+        condition: service_healthy
     profiles: [donotstart]
     security_opt:
       - no-new-privileges:true
