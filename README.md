@@ -47,12 +47,6 @@ cd tiles.versatiles.org
 
 ### 3. Configure Environment
 
-Interactive setup:
-```bash
-./bin/deploy/setup-env.sh
-```
-
-Or manually:
 ```bash
 cp template.env .env
 nano .env
@@ -67,23 +61,13 @@ cp /path/to/storage-key .ssh/storage
 chmod 600 .ssh/storage
 ```
 
-### 5. Run Pre-flight Checks
+### 5. Deploy
 
 ```bash
-./bin/deploy/preflight.sh
+./bin/deploy/setup.sh
 ```
 
-### 6. Deploy
-
-```bash
-./bin/deploy/migrate.sh
-```
-
-### 7. Verify Deployment
-
-```bash
-./bin/verify.sh
-```
+This runs preflight checks and then sets up everything: volumes, RAM disk, frontend, styles, Docker images, SSL certificates, and all services.
 
 ## Configuration
 
@@ -142,15 +126,6 @@ Certificates are renewed automatically via weekly cron job. Manual renewal:
 docker compose logs -f           # All services
 docker compose logs -f nginx     # Nginx only
 ```
-
-## Rollback
-
-If migration fails:
-```bash
-./bin/deploy/rollback.sh
-```
-
-Then update DNS to point download.versatiles.org back to the old server.
 
 ## Development
 
