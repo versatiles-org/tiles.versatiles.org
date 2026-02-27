@@ -4,5 +4,6 @@
 /download/.svelte-kit
 /download/build
 /download/coverage
+/download/data
 /download/node_modules
 /volumes
