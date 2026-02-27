@@ -54,10 +54,11 @@
 <dialog bind:this={dialog} onclick={backdropClick}>
 	<div class="dialog-content">
 		<div class="dialog-header">
-			<span>Download <strong>{baseName}</strong> as</span>
+			<span>Download <strong>{baseName}</strong></span>
 			<button class="close-btn" onclick={close}>&#x2715;</button>
 		</div>
 
+		<span class="label">Format:</span>
 		<div class="format-toggles">
 			{#each formats as f}
 				<button class:active={format === f} onclick={() => (format = f)}>.{f}</button>
@@ -67,7 +68,7 @@
 		<div class="field">
 			<span class="label">Using:</span>
 			<div class="toggles">
-				<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles</button>
+				<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles binary</button>
 				<a
 					class="install-link"
 					href="https://docs.versatiles.org/guides/install_versatiles.html"
@@ -209,7 +210,7 @@
 	.install-link {
 		font-size: 0.9em;
 		opacity: 0.4;
-		margin-right: 0.4em;
+		margin-right: 1em;
 	}
 
 	.install-link:hover {
