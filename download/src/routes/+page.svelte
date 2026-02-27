@@ -47,7 +47,13 @@
 
 		{#each data.fileGroups as group}
 			<h2>{group.title}</h2>
-			<dd class="small">{@html group.desc}</dd>
+			<dd class="small">
+				{@html group.desc}
+				<p class="group-links small">
+					<a href="/urllist_{group.slug}.tsv">URL list</a>
+					<a href="/feed-{group.slug}.xml">RSS</a>
+				</p>
+			</dd>
 
 			{#if group.latestFile}
 				<a class="row" href={group.latestFile.url} title={group.latestFile.filename}>
@@ -66,9 +72,6 @@
 							<a href={file.url}>{file.sizeString}</a>
 						</div>
 					{/each}
-					<p class="small rss-link">
-						<a href="/feed-{group.slug}.xml">RSS</a>
-					</p>
 				</details>
 			{/if}
 		{/each}
@@ -155,9 +158,12 @@
 		font-weight: normal;
 	}
 
-	.rss-link {
+	.group-links {
 		text-align: center;
-		margin-top: 1em;
+		margin-top: 0.5em;
+		display: flex;
+		justify-content: center;
+		gap: 1.5em;
 	}
 
 	footer {
