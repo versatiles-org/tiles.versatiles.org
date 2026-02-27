@@ -1,14 +1,9 @@
 {
+	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
 		"esModuleInterop": true,
 		"sourceMap": true,
 		"noEmit": true,
-		"target": "ESNext",
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
-		"lib": ["ESNext"],
-		"types": ["node"],
-		"rootDir": "src",
 		"strict": true,
 		"alwaysStrict": true,
 		"strictFunctionTypes": true,
@@ -21,11 +16,6 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
-		"downlevelIteration": true,
-		"declaration": true,
-		"pretty": true,
 		"isolatedModules": true,
 		"skipLibCheck": true
 	},

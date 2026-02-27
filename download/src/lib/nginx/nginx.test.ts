@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('fs', () => ({
-	readFileSync: vi.fn(
-		() =>
-			'{{{webhook}}}|{{{domain}}}|{{{webdavHost}}}|{{{webdavAuth}}}|{{#each localFiles}}L:{{{this.url}}},{{/each}}{{#each remoteFiles}}R:{{{this.url}}},{{/each}}{{#each responses}}V:{{{this.url}}},{{/each}}',
-	),
 	writeFileSync: vi.fn(),
 	renameSync: vi.fn(),
 }));
@@ -36,9 +32,10 @@ describe('buildNginxConf', () => {
 		vi.stubEnv('STORAGE_URL', 'myuser@storage.example.com');
 		vi.stubEnv('STORAGE_PASS', 'mypass');
 		vi.stubEnv('WEBHOOK', '');
-		vi.stubEnv('DOMAIN', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
 
-		const result = buildNginxConf([], []);
+		const files = [createFileRef('/remote.versatiles', true)];
+		const result = buildNginxConf(files, []);
 
 		expect(result).toContain('storage.example.com');
 		// Base64 of "myuser:mypass"
@@ -46,28 +43,39 @@ describe('buildNginxConf', () => {
 		expect(result).toContain(expectedAuth);
 	});
 
+	it('contains server_name directive', () => {
+		vi.stubEnv('STORAGE_URL', 'u@h');
+		vi.stubEnv('STORAGE_PASS', 'p');
+		vi.stubEnv('WEBHOOK', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
+
+		const result = buildNginxConf([], []);
+
+		expect(result).toContain('server_name download.example.org');
+	});
+
 	it('separates local vs remote files', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
 		vi.stubEnv('WEBHOOK', '');
-		vi.stubEnv('DOMAIN', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const files = [createFileRef('/local.versatiles', false), createFileRef('/remote.versatiles', true)];
 
 		const result = buildNginxConf(files, []);
 
-		expect(result).toContain('L:/local.versatiles,');
-		expect(result).toContain('R:/remote.versatiles,');
-		// local should not appear in remote list
-		expect(result).not.toContain('R:/local.versatiles');
-		expect(result).not.toContain('L:/remote.versatiles');
+		// Local file uses alias
+		expect(result).toContain('location = /local.versatiles { alias /local/local.versatiles; }');
+		// Remote file uses proxy_pass
+		expect(result).toContain('location = /remote.versatiles {');
+		expect(result).toContain('proxy_pass https://h/data/remote.versatiles');
 	});
 
 	it('sorts deterministically', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
 		vi.stubEnv('WEBHOOK', '');
-		vi.stubEnv('DOMAIN', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const files = [
 			createFileRef('/z.versatiles', false),
@@ -77,19 +85,22 @@ describe('buildNginxConf', () => {
 
 		const result = buildNginxConf(files, []);
 
-		const localPart = result.match(/L:[^|]*/)?.[0] ?? '';
-		expect(localPart).toBe('L:/a.versatiles,L:/m.versatiles,L:/z.versatiles,');
+		const aIdx = result.indexOf('/a.versatiles');
+		const mIdx = result.indexOf('/m.versatiles');
+		const zIdx = result.indexOf('/z.versatiles');
+		expect(aIdx).toBeLessThan(mIdx);
+		expect(mIdx).toBeLessThan(zIdx);
 	});
 
-	it('passes webhook and domain to template', () => {
+	it('passes webhook and domain to output', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', 'https://hook.example.com');
+		vi.stubEnv('WEBHOOK', 'secret-hook-path');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const result = buildNginxConf([], []);
 
-		expect(result).toContain('https://hook.example.com');
+		expect(result).toContain('location = /secret-hook-path');
 		expect(result).toContain('download.example.org');
 	});
 
@@ -97,12 +108,27 @@ describe('buildNginxConf', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
 		vi.stubEnv('WEBHOOK', '');
-		vi.stubEnv('DOMAIN', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const responses = [new FileResponse('/hash.md5', 'abc123 file\n')];
 
 		const result = buildNginxConf([], responses);
 
-		expect(result).toContain('V:/hash.md5,');
+		expect(result).toContain('location = /hash.md5');
+		expect(result).toContain('return 200');
+	});
+
+	it('contains SSL and security directives', () => {
+		vi.stubEnv('STORAGE_URL', 'u@h');
+		vi.stubEnv('STORAGE_PASS', 'p');
+		vi.stubEnv('WEBHOOK', '');
+		vi.stubEnv('DOMAIN', 'download.example.org');
+
+		const result = buildNginxConf([], []);
+
+		expect(result).toContain('ssl_certificate');
+		expect(result).toContain('Strict-Transport-Security');
+		expect(result).toContain('X-Content-Type-Options');
+		expect(result).toContain('limit_conn download_addr');
 	});
 });

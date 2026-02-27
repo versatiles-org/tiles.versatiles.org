@@ -15,13 +15,20 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",
+    "build:site": "vite build",
+    "dev:site": "vite dev",
+    "preview:site": "vite preview",
+    "prepare": "svelte-kit sync",
     "upgrade": "npm-check-updates -u; rm -r node_modules; rm package-lock.json; npm install"
   },
   "dependencies": {
-    "handlebars": "^4.7.8",
+    "@sveltejs/adapter-static": "^3.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "svelte": "^5.0.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
@@ -31,6 +38,8 @@
     "eslint": "^10.0.2",
     "npm-check-updates": "^19.6.2",
     "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.5.0",
+    "svelte-check": "^4.0.0",
     "vitest": "^4.0.18"
   }
 }

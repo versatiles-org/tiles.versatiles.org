@@ -1,84 +1,89 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('fs', () => ({
-	readFileSync: vi.fn(),
 	writeFileSync: vi.fn(),
 	renameSync: vi.fn(),
+	mkdirSync: vi.fn(),
+	readdirSync: vi.fn(() => ['feed-osm.xml', 'feed-hillshade.xml', 'other.html']),
+	copyFileSync: vi.fn(),
 	statSync: vi.fn(() => ({ size: 100 })),
 }));
 
-import { renderTemplate, generateRSSFeeds } from './template.js';
+vi.mock('child_process', () => ({
+	execSync: vi.fn(),
+}));
+
+import { generateSite } from './template.js';
 import { FileGroup } from '../file/file_group.js';
 import { FileRef } from '../file/file_ref.js';
-import { readFileSync, writeFileSync, statSync } from 'fs';
+import { writeFileSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
+import { execSync } from 'child_process';
 
-describe('renderTemplate', () => {
+describe('generateSite', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(readdirSync).mockReturnValue(['feed-osm.xml', 'feed-hillshade.xml', 'other.html'] as any);
 	});
 
-	it('renders Handlebars template with data', () => {
-		vi.mocked(readFileSync).mockReturnValue('Groups: {{#each fileGroups}}{{this.slug}},{{/each}}');
-
-		const group = new FileGroup({
-			slug: 'osm',
-			title: 'OSM',
-			desc: 'test',
-			order: 0,
-		});
-
-		const result = renderTemplate([group], 'index.html');
-		expect(result).toBe('Groups: osm,');
-	});
-
-	it('converts class instances to plain objects via JSON round-trip', () => {
-		vi.mocked(readFileSync).mockReturnValue('{{#each fileGroups}}{{this.title}}{{/each}}');
-
-		const group = new FileGroup({
-			slug: 'test',
-			title: 'Test Title',
-			desc: 'desc',
-			order: 1,
-		});
-
-		const result = renderTemplate([group], 'test.html');
-		expect(result).toBe('Test Title');
-	});
-});
-
-describe('generateRSSFeeds', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		vi.mocked(readFileSync).mockReturnValue('<rss>{{#each fileGroups}}{{this.slug}}{{/each}}</rss>');
-		vi.mocked(statSync).mockReturnValue({ size: 50 } as any);
-	});
-
-	it('creates feed-<slug>.xml for each group', () => {
+	it('writes data/fileGroups.json with serialised data', () => {
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-		const groups = [
-			new FileGroup({ slug: 'osm', title: 'OSM', desc: 'desc', order: 0 }),
-			new FileGroup({ slug: 'hillshade', title: 'Hillshade', desc: 'desc', order: 1 }),
-		];
+		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
 
-		const refs = generateRSSFeeds(groups, '/output');
+		generateSite(groups, '/output');
 
-		expect(refs).toHaveLength(2);
-		expect(writeFileSync).toHaveBeenCalledTimes(2);
+		expect(mkdirSync).toHaveBeenCalled();
+		expect(writeFileSync).toHaveBeenCalledWith(expect.stringContaining('fileGroups.json'), expect.any(String));
+
+		const dataCall = vi.mocked(writeFileSync).mock.calls.find((c) => String(c[0]).includes('fileGroups.json'));
+		expect(dataCall).toBeDefined();
+		const parsed = JSON.parse(dataCall![1] as string);
+		expect(parsed[0].slug).toBe('osm');
 
 		consoleSpy.mockRestore();
 	});
 
-	it('returns FileRef array with correct URLs', () => {
+	it('invokes vite build', () => {
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'desc', order: 0 })];
+		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
 
-		const refs = generateRSSFeeds(groups, '/output');
+		generateSite(groups, '/output');
 
-		expect(refs).toHaveLength(1);
-		expect(refs[0].url).toBe('/feed-osm.xml');
-		expect(refs[0]).toBeInstanceOf(FileRef);
+		expect(execSync).toHaveBeenCalledWith('npx vite build', { stdio: 'inherit' });
+
+		consoleSpy.mockRestore();
+	});
+
+	it('copies index.html and feed XML files to content folder', () => {
+		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
+
+		generateSite(groups, '/output');
+
+		// index.html copy
+		expect(copyFileSync).toHaveBeenCalledWith(expect.stringContaining('index.html'), expect.stringContaining('.tmp'));
+
+		// feed XML copies (only feed-*.xml, not other.html)
+		const feedCopyCalls = vi.mocked(copyFileSync).mock.calls.filter((c) => String(c[0]).includes('feed-'));
+		expect(feedCopyCalls).toHaveLength(2);
+
+		consoleSpy.mockRestore();
+	});
+
+	it('returns correct FileRef objects', () => {
+		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
+
+		const { htmlRef, rssRefs } = generateSite(groups, '/output');
+
+		expect(htmlRef).toBeInstanceOf(FileRef);
+		expect(htmlRef.url).toBe('/index.html');
+
+		expect(rssRefs).toHaveLength(2);
+		expect(rssRefs.map((r) => r.url).sort()).toEqual(['/feed-hillshade.xml', '/feed-osm.xml']);
 
 		consoleSpy.mockRestore();
 	});

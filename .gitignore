@@ -1,6 +1,8 @@
 
 /.env
 /.ssh
+/download/.svelte-kit
+/download/build
 /download/coverage
 /download/node_modules
 /volumes

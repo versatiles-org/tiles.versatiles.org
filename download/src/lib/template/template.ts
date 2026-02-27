@@ -1,83 +1,70 @@
 /**
- * Template rendering utilities for generating the HTML and RSS output of
- * download.versatiles.org.
+ * Site generation utilities for download.versatiles.org.
  *
- * All templates are Handlebars files stored under `template/` and receive
- * strongly typed data structures (`FileGroup[]`) as input. This module produces:
+ * Writes file group data as JSON, runs SvelteKit's `vite build` to
+ * pre-render the site, then copies the generated HTML and RSS files
+ * to the content folder. Produces:
  *
  * - `index.html` — the main overview page listing all file groups
  * - `feed-<slug>.xml` — per-group RSS feeds for version updates
  *
- * These outputs are written to disk and wrapped in `FileRef` objects so they
- * can be included in the final NGINX configuration and file inventory.
+ * These outputs are wrapped in `FileRef` objects so they can be
+ * included in the final NGINX configuration and file inventory.
  */
-import { readFileSync, writeFileSync, renameSync } from 'fs';
-import Handlebars from 'handlebars';
+import { writeFileSync, renameSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
+import { execSync } from 'child_process';
 import type { FileGroup } from '../file/file_group.js';
 import { FileRef } from '../file/file_ref.js';
 import { resolve } from 'path';
 
 /**
- * Renders a Handlebars template from the `template/` directory.
+ * Generates the static site using SvelteKit and copies output to the
+ * content folder.
  *
- * Parameters:
- * - `fileGroups`: the data passed into the template as `{ fileGroups }`
- * - `templateFilename`: the filename under `template/` (e.g. `"index.html"`)
- *
- * Returns the rendered template as a UTF-8 string.
- *
- * Throws:
- * - If the template file cannot be found or read.
+ * Steps:
+ * 1. Writes `data/fileGroups.json` with serialised file group data
+ * 2. Runs `npx vite build` to pre-render all pages
+ * 3. Copies `build/index.html` and `build/feed-*.xml` to `contentFolder`
+ * 4. Returns `FileRef` objects for inclusion in NGINX config
  */
-export function renderTemplate(fileGroups: FileGroup[], templateFilename: string): string {
-	const templateUrl = new URL(`../../../template/${templateFilename}`, import.meta.url);
-	const template = Handlebars.compile(readFileSync(templateUrl, 'utf-8'));
-	// Convert class instances to plain objects for Handlebars
-	const data = JSON.parse(JSON.stringify({ fileGroups }));
-	return template(data);
-}
+export function generateSite(fileGroups: FileGroup[], contentFolder: string): { htmlRef: FileRef; rssRefs: FileRef[] } {
+	console.log('Generating site...');
 
-/**
- * Generates the main `index.html` file.
- *
- * - Uses the `index.html` Handlebars template.
- * - Writes the result to `filename` atomically (via temp file + rename).
- * - Wraps the output in a `FileRef` with URL `/index.html` so it becomes part
- *   of the public file set.
- *
- * Logs progress to stdout.
- */
-export function generateHTML(fileGroups: FileGroup[], filename: string): FileRef {
-	console.log('Generating HTML...');
-	const tempFile = filename + '.tmp';
-	writeFileSync(tempFile, renderTemplate(fileGroups, 'index.html'));
-	renameSync(tempFile, filename);
+	// 1. Write data file for SvelteKit to consume
+	const dataDir = resolve('data');
+	mkdirSync(dataDir, { recursive: true });
+	const dataPath = resolve(dataDir, 'fileGroups.json');
+	writeFileSync(dataPath, JSON.stringify(fileGroups));
 
-	return new FileRef(filename, '/index.html');
-}
+	// 2. Run vite build (SvelteKit static adapter)
+	console.log(' - Running vite build...');
+	execSync('npx vite build', { stdio: 'inherit' });
 
-/**
- * Generates per-group RSS feeds (`feed-<slug>.xml`).
- *
- * For each `FileGroup`:
- * - Renders the `feed.xml` template with a single-element array `[group]`
- * - Writes the output to `<outputDir>/feed-<slug>.xml` atomically (via temp file + rename)
- * - Creates a `FileRef` with URL `/feed-<slug>.xml`
- *
- * Returns the list of all generated `FileRef`s.
- */
-export function generateRSSFeeds(fileGroups: FileGroup[], outputDir: string): FileRef[] {
-	console.log('Generating RSS feeds...');
-	const refs: FileRef[] = [];
+	// 3. Copy build output to content folder
+	const buildDir = resolve('build');
 
-	fileGroups.forEach((g) => {
-		const filename = `feed-${g.slug}.xml`;
-		const outputPath = resolve(outputDir, filename);
-		const tempPath = outputPath + '.tmp';
-		writeFileSync(tempPath, renderTemplate([g], 'feed.xml'));
-		renameSync(tempPath, outputPath);
-		refs.push(new FileRef(outputPath, '/' + filename));
-	});
+	// Copy index.html
+	const indexSrc = resolve(buildDir, 'index.html');
+	const indexDest = resolve(contentFolder, 'index.html');
+	const indexTmp = indexDest + '.tmp';
+	copyFileSync(indexSrc, indexTmp);
+	renameSync(indexTmp, indexDest);
+	const htmlRef = new FileRef(indexDest, '/index.html');
 
-	return refs;
+	// Copy feed-*.xml files
+	const rssRefs: FileRef[] = [];
+	const buildFiles = readdirSync(buildDir);
+	for (const file of buildFiles) {
+		if (file.startsWith('feed-') && file.endsWith('.xml')) {
+			const src = resolve(buildDir, file);
+			const dest = resolve(contentFolder, file);
+			const tmp = dest + '.tmp';
+			copyFileSync(src, tmp);
+			renameSync(tmp, dest);
+			rssRefs.push(new FileRef(dest, '/' + file));
+		}
+	}
+
+	console.log(' - Site generation complete');
+	return { htmlRef, rssRefs };
 }
