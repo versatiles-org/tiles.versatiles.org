@@ -6,6 +6,9 @@ set -euo pipefail
 # Navigate to the project's root directory relative to this script
 cd "$(dirname "$0")/../.."
 
+echo "Building download-updater image..."
+docker compose build download-updater
+
 echo "Running download pipeline update..."
 docker compose run --rm download-updater
 

@@ -30,6 +30,7 @@ docker compose pull
 # Build all custom images (old containers keep serving traffic)
 echo "Building Docker images..."
 docker compose build
+docker compose build download-updater
 
 # Recreate backend services first (nginx keeps serving with old backends)
 echo "Updating backend services..."
