@@ -1,5 +1,6 @@
 
 /.env
 /.ssh
+/download/coverage
 /download/node_modules
 /volumes
