@@ -35,6 +35,12 @@ services:
       - PORT=8081
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     volumes:
       - ./volumes/tiles:/volumes/tiles:rw
       - ./volumes/download/content:/volumes/content:rw
