@@ -10,6 +10,7 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "upgrade": "npm-check-updates -u; rm -r node_modules; rm package-lock.json; npm install"
@@ -20,11 +21,12 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/node": "^25.2.1",
-    "@typescript-eslint/eslint-plugin": "^8.22.0",
-    "@typescript-eslint/parser": "^8.22.0",
-    "eslint": "^9.19.0",
+    "@types/node": "^25.3.2",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.2",
     "npm-check-updates": "^19.6.2",
-    "vitest": "^3.0.5"
+    "vitest": "^4.0.18"
   }
 }
