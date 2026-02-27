@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 # Remove all files in the cache directory safely, ensuring the path is not empty to avoid dangerous deletions
 if [ -d "./volumes/cache" ]; then
     echo "Clearing cache..."
-    rm -rf ./volumes/cache/*
+    find ./volumes/cache -mindepth 1 -delete 2>/dev/null || true
     echo "Cache cleared successfully."
 else
     echo "Cache directory not found."
