@@ -39,7 +39,7 @@
 	const formats = ['versatiles', 'pmtiles', 'mbtiles', 'tar'] as const;
 </script>
 
-<button class="convert-btn" onclick={open} title="Convert to other format">&#x21C4;</button>
+<button class="convert-btn" onclick={open} title="Convert to other format">&hellip;</button>
 
 <dialog bind:this={dialog} onclick={backdropClick}>
 	<div class="dialog-content">
