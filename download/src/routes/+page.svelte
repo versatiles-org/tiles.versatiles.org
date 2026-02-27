@@ -158,11 +158,16 @@
 	.row {
 		margin: 0 auto;
 		padding: 0.1em max(0px, calc(50% - 250px));
-		display: flex;
-		justify-content: space-between;
+		display: grid;
+		grid-template-columns: 1fr auto auto 5em;
+		column-gap: 0.8em;
 		background-color: #111;
 		text-decoration: none;
 		align-items: center;
+	}
+
+	.row > :last-child {
+		text-align: right;
 	}
 
 	.row:hover {
