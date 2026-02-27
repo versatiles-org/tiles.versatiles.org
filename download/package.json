@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "npm run lint && npm run typecheck && npm run test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint:fix": "eslint src/ --fix",
     "lint": "eslint src/",
     "once": "tsx src/run_once.ts",
@@ -28,6 +30,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "npm-check-updates": "^19.6.2",
+    "prettier": "^3.8.1",
     "vitest": "^4.0.18"
   }
 }
