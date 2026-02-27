@@ -14,6 +14,11 @@ RUN npm ci --omit=dev
 # Copy source code
 COPY . .
 
+# Create non-root user
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
+
+USER appuser
+
 # Expose port 8081 for the webhook server
 EXPOSE 8081
 
