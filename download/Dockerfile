@@ -14,9 +14,11 @@ RUN npm ci --omit=dev
 # Copy source code
 COPY . .
 
-# Create non-root user with ownership of /app
+# Create non-root user with write access to directories needed by vite build
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 \
-    && chown -R appuser:appuser /app
+    && chown appuser:appuser /app \
+    && mkdir -p /app/data /app/build /app/.svelte-kit \
+    && chown appuser:appuser /app/data /app/build /app/.svelte-kit
 
 USER appuser
 
