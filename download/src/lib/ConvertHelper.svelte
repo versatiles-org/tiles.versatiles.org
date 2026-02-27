@@ -37,36 +37,36 @@
 	const formats = ['versatiles', 'pmtiles', 'mbtiles', 'tar'] as const;
 </script>
 
-<button class="convert-btn" onclick={open}>convert</button>
+<button class="convert-btn" onclick={open} title="Convert to other format">&#x21C4;</button>
 
 <dialog bind:this={dialog} onclick={backdropClick}>
 	<div class="dialog-content">
 		<div class="dialog-header">
-			<span>Convert {filename}</span>
+			<span>Download <strong>{baseName}</strong> as</span>
 			<button class="close-btn" onclick={close}>&#x2715;</button>
 		</div>
 
-		<div class="field">
-			<span class="label">Format:</span>
-			<div class="toggles">
-				{#each formats as f}
-					<button class:active={format === f} onclick={() => (format = f)}>.{f}</button>
-				{/each}
-			</div>
+		<div class="format-toggles">
+			{#each formats as f}
+				<button class:active={format === f} onclick={() => (format = f)}>.{f}</button>
+			{/each}
 		</div>
 
 		<div class="field">
 			<span class="label">Using:</span>
-			<div class="toggles">
-				<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>
+			<div class="tool-row">
+				<div class="toggles">
+					<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles</button>
+					<button class:active={tool === 'docker'} onclick={() => (tool = 'docker')}>docker</button>
+				</div>
+				{#if tool === 'versatiles'}
 					<a
+						class="install-link"
 						href="https://docs.versatiles.org/guides/install_versatiles.html"
 						target="_blank"
-						rel="noopener noreferrer"
-						onclick={(e) => e.stopPropagation()}>versatiles &#x2197;</a
+						rel="noopener noreferrer">installation instructions &#x2197;</a
 					>
-				</button>
-				<button class:active={tool === 'docker'} onclick={() => (tool = 'docker')}>docker</button>
+				{/if}
 			</div>
 		</div>
 
@@ -80,16 +80,16 @@
 <style>
 	.convert-btn {
 		background: none;
-		border: 1px solid #555;
-		color: #ccc;
-		padding: 0.1em 0.5em;
+		border: none;
+		color: #888;
 		cursor: pointer;
-		font-size: 0.8em;
-		border-radius: 3px;
+		font-size: 0.85em;
+		padding: 0 0.2em;
+		line-height: 1;
 	}
 
 	.convert-btn:hover {
-		background: #333;
+		color: #fff;
 	}
 
 	dialog {
@@ -114,8 +114,12 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 1em;
+		margin-bottom: 0.8em;
 		font-size: 1.1em;
+	}
+
+	.dialog-header strong {
+		color: #fff;
 	}
 
 	.close-btn {
@@ -131,6 +135,32 @@
 		color: #fff;
 	}
 
+	.format-toggles {
+		display: flex;
+		gap: 0.4em;
+		flex-wrap: wrap;
+		margin-bottom: 1.2em;
+	}
+
+	.format-toggles button {
+		background: #333;
+		border: none;
+		color: #ccc;
+		padding: 0.4em 0.9em;
+		cursor: pointer;
+		border-radius: 4px;
+		font-size: 0.95em;
+	}
+
+	.format-toggles button:hover {
+		background: #444;
+	}
+
+	.format-toggles button.active {
+		background: #555;
+		color: #fff;
+	}
+
 	.field {
 		margin-bottom: 1em;
 	}
@@ -142,10 +172,16 @@
 		font-size: 0.9em;
 	}
 
+	.tool-row {
+		display: flex;
+		align-items: center;
+		gap: 0.8em;
+		flex-wrap: wrap;
+	}
+
 	.toggles {
 		display: flex;
 		gap: 0.4em;
-		flex-wrap: wrap;
 	}
 
 	.toggles button {
@@ -167,13 +203,13 @@
 		color: #fff;
 	}
 
-	.toggles a {
-		color: inherit;
-		text-decoration: none;
+	.install-link {
+		font-size: 0.8em;
+		opacity: 0.5;
 	}
 
-	.toggles a:hover {
-		text-decoration: underline;
+	.install-link:hover {
+		opacity: 0.8;
 	}
 
 	.command-row {
