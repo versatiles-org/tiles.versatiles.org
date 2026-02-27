@@ -37,11 +37,11 @@ done
 # Check nginx config
 echo ""
 echo "2. Checking nginx configuration..."
-if docker exec nginx nginx -t &> /dev/null; then
+if docker compose exec -T nginx nginx -t &> /dev/null; then
     pass "Nginx configuration is valid"
 else
     fail "Nginx configuration is invalid"
-    docker exec nginx nginx -t 2>&1 | head -5
+    docker compose exec -T nginx nginx -t 2>&1 | head -5
 fi
 
 # Check generated download config
@@ -232,7 +232,7 @@ fi
 # Check nginx rate limit configuration
 echo ""
 echo "14. Checking nginx rate limit configuration..."
-RATE_VALUE=$(docker exec nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then
         pass "Rate limit: ${RATE_VALUE}r/s"
@@ -243,7 +243,7 @@ else
     warn "Could not read rate limit from nginx config"
 fi
 
-BURST_VALUE=$(docker exec nginx sh -c "grep -o 'burst=[0-9]*' /etc/nginx/conf.d/proxy.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+BURST_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'burst=[0-9]*' /etc/nginx/conf.d/proxy.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$BURST_VALUE" ]; then
     if [ "$BURST_VALUE" -ge 200 ]; then
         pass "Burst limit: ${BURST_VALUE}"
