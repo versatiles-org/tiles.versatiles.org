@@ -33,11 +33,11 @@ docker compose build
 
 # Recreate backend services first (nginx keeps serving with old backends)
 echo "Updating backend services..."
-docker compose up --detach versatiles download-updater
+docker compose up --detach versatiles
 
 # Run download pipeline to fetch latest data
 echo "Fetching data..."
-docker compose exec download-updater npx tsx src/run_once.ts
+docker compose run --rm download-updater
 
 # Recreate nginx last (backends are already up and healthy)
 echo "Updating nginx..."

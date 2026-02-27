@@ -24,23 +24,14 @@ services:
     build:
       context: ./download
       dockerfile: Dockerfile
-    restart: always
+    profiles: [donotstart]
     networks: [docker_network]
-    expose: [8081]
     environment:
       - DOMAIN=${DOWNLOAD_DOMAIN}
       - STORAGE_URL=${STORAGE_URL}
       - STORAGE_PASS=${STORAGE_PASS}
-      - WEBHOOK=${WEBHOOK}
-      - PORT=8081
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     volumes:
       - ./volumes/tiles:/volumes/tiles:rw
       - ./volumes/download/content:/volumes/content:rw
@@ -52,7 +43,7 @@ services:
     container_name: nginx
     image: nginx:alpine
     restart: always
-    depends_on: [versatiles, download-updater]
+    depends_on: [versatiles]
     networks: [docker_network]
     ports: [80:80, 443:443]
     volumes:

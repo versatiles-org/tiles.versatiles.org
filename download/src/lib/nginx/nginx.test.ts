@@ -31,7 +31,6 @@ describe('buildNginxConf', () => {
 	it('parses STORAGE_URL to extract webdav host and auth', () => {
 		vi.stubEnv('STORAGE_URL', 'myuser@storage.example.com');
 		vi.stubEnv('STORAGE_PASS', 'mypass');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const files = [createFileRef('/remote.versatiles', true)];
@@ -46,7 +45,6 @@ describe('buildNginxConf', () => {
 	it('contains server_name directive', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const result = buildNginxConf([], []);
@@ -57,7 +55,6 @@ describe('buildNginxConf', () => {
 	it('separates local vs remote files', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const files = [createFileRef('/local.versatiles', false), createFileRef('/remote.versatiles', true)];
@@ -74,7 +71,6 @@ describe('buildNginxConf', () => {
 	it('sorts deterministically', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const files = [
@@ -92,22 +88,9 @@ describe('buildNginxConf', () => {
 		expect(mIdx).toBeLessThan(zIdx);
 	});
 
-	it('passes webhook and domain to output', () => {
-		vi.stubEnv('STORAGE_URL', 'u@h');
-		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', 'secret-hook-path');
-		vi.stubEnv('DOMAIN', 'download.example.org');
-
-		const result = buildNginxConf([], []);
-
-		expect(result).toContain('location = /secret-hook-path');
-		expect(result).toContain('download.example.org');
-	});
-
 	it('includes responses in output', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const responses = [new FileResponse('/hash.md5', 'abc123 file\n')];
@@ -121,7 +104,6 @@ describe('buildNginxConf', () => {
 	it('contains SSL and security directives', () => {
 		vi.stubEnv('STORAGE_URL', 'u@h');
 		vi.stubEnv('STORAGE_PASS', 'p');
-		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', 'download.example.org');
 
 		const result = buildNginxConf([], []);

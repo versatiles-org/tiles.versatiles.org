@@ -22,7 +22,7 @@ warn() { echo -e "   \033[0;33m⚠ $*\033[0m"; WARNINGS=$((WARNINGS + 1)); }
 
 # Check Docker services
 echo "1. Checking Docker services..."
-SERVICES="versatiles download-updater nginx"
+SERVICES="versatiles nginx"
 for service in $SERVICES; do
     # Check if container is running using docker compose ps with grep
     if docker compose ps --status running 2>/dev/null | grep -q "$service"; then
@@ -205,23 +205,9 @@ else
     warn "RSS feed returned $RSS_CODE"
 fi
 
-# Test webhook
-echo ""
-echo "12. Testing webhook endpoint..."
-if [ -n "${WEBHOOK:-}" ]; then
-    WEBHOOK_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}" 2>/dev/null || echo "000")
-    if [ "$WEBHOOK_CODE" = "200" ] || [ "$WEBHOOK_CODE" = "202" ]; then
-        pass "Webhook endpoint accessible"
-    else
-        warn "Webhook returned $WEBHOOK_CODE"
-    fi
-else
-    warn "WEBHOOK not set in .env"
-fi
-
 # Check cron job
 echo ""
-echo "13. Checking certificate renewal cron job..."
+echo "12. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     pass "Certificate renewal cron job is configured"
 else
@@ -231,7 +217,7 @@ fi
 
 # Check nginx rate limit configuration
 echo ""
-echo "14. Checking nginx rate limit configuration..."
+echo "13. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then

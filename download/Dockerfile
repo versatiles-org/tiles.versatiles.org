@@ -22,8 +22,5 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 \
 
 USER appuser
 
-# Expose port 8081 for the webhook server
-EXPOSE 8081
-
-# Run the server
-CMD ["npx", "tsx", "src/server.ts"]
+# Run the pipeline
+CMD ["npx", "tsx", "src/run_once.ts"]

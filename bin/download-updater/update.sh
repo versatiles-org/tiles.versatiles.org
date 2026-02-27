@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 echo "Running download pipeline update..."
-docker compose exec download-updater npx tsx src/run_once.ts
+docker compose run --rm download-updater
 
 echo "Reloading nginx to pick up new configuration..."
 docker compose exec nginx nginx -s reload

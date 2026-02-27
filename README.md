@@ -15,12 +15,11 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 - **SSL**: Automatic Let's Encrypt certificates with OCSP stapling
 - **Security**: Rate limiting, anonymized logging, no-new-privileges containers
 - **Health checks**: Container health monitoring for all services
-- **Webhooks**: Trigger updates via secure webhook endpoint
 
 ## Architecture
 
 - **versatiles**: Tile server serving .versatiles files
-- **download-updater**: Scans remote storage via SSH, generates nginx config with WebDAV proxy
+- **download-updater**: One-shot pipeline that scans remote storage via SSH, generates nginx config with WebDAV proxy
 - **nginx**: Reverse proxy for both domains (proxies to WebDAV for remote files)
 - **certbot**: SSL certificate management
 
@@ -98,7 +97,6 @@ Edit `.env` to configure:
 | `EMAIL`           | Email for Let's Encrypt        | mail@versatiles.org     |
 | `STORAGE_URL`     | Storage box SSH URL            | user@host.de            |
 | `STORAGE_PASS`    | Storage box password (WebDAV)  | (password)              |
-| `WEBHOOK`         | Update webhook secret          | (random string)         |
 
 ## Operations
 
@@ -131,11 +129,6 @@ This will:
 - Update nginx configuration for new files
 - Reload nginx to serve new files
 
-You can also trigger this via webhook:
-```bash
-curl "https://${DOWNLOAD_DOMAIN}/${WEBHOOK}"
-```
-
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:
@@ -148,7 +141,6 @@ Certificates are renewed automatically via weekly cron job. Manual renewal:
 ```bash
 docker compose logs -f           # All services
 docker compose logs -f nginx     # Nginx only
-docker compose logs -f download-updater  # Download service only
 ```
 
 ## Rollback
@@ -178,7 +170,6 @@ npm install
 
 ```bash
 npm run once    # Run pipeline once
-npm run server  # Start webhook server
 ```
 
 ### Linting and Testing

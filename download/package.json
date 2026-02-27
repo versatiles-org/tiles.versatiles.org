@@ -15,7 +15,6 @@
     "once": "tsx src/run_once.ts",
     "prepare": "svelte-kit sync",
     "preview:site": "vite preview",
-    "server": "tsx src/server.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test": "vitest run",

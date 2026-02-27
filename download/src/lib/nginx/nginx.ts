@@ -6,7 +6,6 @@
  * - `localFiles`: files served from local storage (alias)
  * - `remoteFiles`: files served via WebDAV proxy
  * - `responses`: virtual inline responses such as checksum files or URL lists
- * - `webhook`: optional webhook endpoint for triggering updates
  * - `webdavAuth`: Base64-encoded credentials for WebDAV proxy
  * - `webdavHost`: WebDAV server hostname
  */
@@ -18,7 +17,6 @@ import { FileResponse } from '../file/file_response.js';
  * Builds the full NGINX configuration as a string.
  */
 export function buildNginxConf(files: FileRef[], responses: FileResponse[]): string {
-	const webhook = process.env['WEBHOOK'];
 	const domain = process.env['DOMAIN'];
 
 	// Parse STORAGE_URL to get WebDAV host and user
@@ -66,13 +64,6 @@ export function buildNginxConf(files: FileRef[], responses: FileResponse[]): str
 		.join('\n');
 
 	const responseBlocks = responses.map((r) => `    location = ${r.url} { return 200 "${r.content}"; }`).join('\n');
-
-	const webhookBlock = webhook
-		? `
-    location = /${webhook} {
-        proxy_pass http://download-updater:8081/update;
-    }`
-		: '';
 
 	return `server {
     listen 80;
@@ -155,7 +146,6 @@ ${responseBlocks}
     location = / {
         try_files \$uri \$uri/ /index.html;
     }
-${webhookBlock}
 }
 `;
 }
