@@ -118,6 +118,8 @@ server {
     types {
         text/plain md5 sha256 tsv txt;
         text/html html;
+        text/css css;
+        application/javascript js;
         application/octet-stream versatiles;
         application/rss+xml xml;
     }
