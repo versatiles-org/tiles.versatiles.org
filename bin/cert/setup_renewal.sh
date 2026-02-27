@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 PROJECT_DIR="$(pwd)"
-CRON_CMD="0 3 * * 0 cd ${PROJECT_DIR} && ./bin/cert/renew.sh >> /var/log/cert-renewal.log 2>&1"
+CRON_CMD="0 3 * * 0 cd '${PROJECT_DIR}' && ./bin/cert/renew.sh >> /var/log/cert-renewal.log 2>&1"
 
 if ! crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
