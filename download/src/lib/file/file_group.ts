@@ -237,12 +237,10 @@ export function collectFiles(...entries: (FileGroup | FileGroup[] | FileRef | Fi
 
 
 /**
- * Converts a hexadecimal hash string into a base64url-encoded string
- * with proper padding.
+ * Converts a hexadecimal hash string into a standard base64-encoded string.
  *
- * This is used for integrity fields where base64url encoding is required.
+ * This is used for the TsvHttpData-1.0 format which expects standard base64.
  */
 export function hex2base64(hex: string): string {
-	const base64 = Buffer.from(hex, 'hex').toString('base64url');
-	return base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+	return Buffer.from(hex, 'hex').toString('base64');
 }
