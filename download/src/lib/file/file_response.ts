@@ -22,8 +22,11 @@ export class FileResponse {
 
 		this.url = url;
 
-		// Escape for nginx config embedding
+		// Escape for nginx config embedding (inside `return 200 "..."` directives)
 		this.content = content
+			.replaceAll('\\', '\\\\')
+			.replaceAll('"', '\\"')
+			.replaceAll('$', '\\$')
 			.replaceAll('\n', '\\n')
 			.replaceAll('\t', '\\t');
 	}
