@@ -4,9 +4,9 @@ vi.mock('fs', () => ({
 	writeFileSync: vi.fn(),
 	renameSync: vi.fn(),
 	mkdirSync: vi.fn(),
-	readdirSync: vi.fn(() => ['feed-osm.xml', 'feed-hillshade.xml', 'other.html']),
+	readdirSync: vi.fn(() => []),
 	copyFileSync: vi.fn(),
-	statSync: vi.fn(() => ({ size: 100 })),
+	statSync: vi.fn(() => ({ size: 100, isDirectory: () => false })),
 }));
 
 vi.mock('child_process', () => ({
@@ -19,13 +19,20 @@ import { FileRef } from '../file/file_ref.js';
 import { writeFileSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
 import { execSync } from 'child_process';
 
+function mockBuildOutput() {
+	// readdirSync is called twice: once for build/ (files), once for _app/ (contents)
+	vi.mocked(readdirSync)
+		.mockReturnValueOnce(['feed-osm.xml', 'feed-hillshade.xml', 'other.html', '_app'] as any)
+		.mockReturnValueOnce([] as any);
+}
+
 describe('generateSite', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(readdirSync).mockReturnValue(['feed-osm.xml', 'feed-hillshade.xml', 'other.html'] as any);
 	});
 
 	it('writes data/fileGroups.json with serialised data', () => {
+		mockBuildOutput();
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
 		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
@@ -44,6 +51,7 @@ describe('generateSite', () => {
 	});
 
 	it('invokes vite build', () => {
+		mockBuildOutput();
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
 		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
@@ -56,6 +64,7 @@ describe('generateSite', () => {
 	});
 
 	it('copies index.html and feed XML files to content folder', () => {
+		mockBuildOutput();
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
 		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
@@ -73,6 +82,7 @@ describe('generateSite', () => {
 	});
 
 	it('returns correct FileRef objects', () => {
+		mockBuildOutput();
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
 		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'test', order: 0 })];
