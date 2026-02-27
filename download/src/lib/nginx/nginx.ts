@@ -46,8 +46,8 @@ export function buildNginxConf(files: FileRef[], responses: FileResponse[]): str
 	}
 
 	// Separate local and remote files
-	const localFiles = files.filter(f => !f.isRemote);
-	const remoteFiles = files.filter(f => f.isRemote);
+	const localFiles = files.filter((f) => !f.isRemote);
+	const remoteFiles = files.filter((f) => f.isRemote);
 
 	// Sort for deterministic output
 	localFiles.sort((a, b) => a.url.localeCompare(b.url));

@@ -11,7 +11,7 @@ describe('FileResponse', () => {
 
 		it('throws when URL does not start with /', () => {
 			expect(() => new FileResponse('test.txt', 'hello')).toThrow(
-				"FileResponse.url must start with '/', got: test.txt"
+				"FileResponse.url must start with '/', got: test.txt",
 			);
 		});
 

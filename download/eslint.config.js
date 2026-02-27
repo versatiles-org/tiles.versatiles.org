@@ -8,16 +8,16 @@ export default [
 		languageOptions: {
 			parser: tsparser,
 			parserOptions: {
-				project: './tsconfig.json'
-			}
+				project: './tsconfig.json',
+			},
 		},
 		plugins: {
-			'@typescript-eslint': tseslint
+			'@typescript-eslint': tseslint,
 		},
 		rules: {
 			...tseslint.configs.recommended.rules,
 			'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-			'@typescript-eslint/explicit-function-return-type': 'off'
-		}
-	}
+			'@typescript-eslint/explicit-function-return-type': 'off',
+		},
+	},
 ];

@@ -81,7 +81,7 @@ describe('FileRef', () => {
 		it('throws when url does not start with /', () => {
 			vi.mocked(statSync).mockReturnValue({ size: 100 } as any);
 			expect(() => new FileRef('/data/test.versatiles', 'no-leading-slash')).toThrow(
-				"FileRef.url must start with a single '/'"
+				"FileRef.url must start with a single '/'",
 			);
 		});
 	});

@@ -50,19 +50,27 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 	const tempPath = localPath + '.download.' + Date.now();
 
 	const args = [
-		'-i', '/app/.ssh/storage',
-		'-P', '23',
-		'-o', 'BatchMode=yes',
-		'-o', 'StrictHostKeyChecking=accept-new',
+		'-i',
+		'/app/.ssh/storage',
+		'-P',
+		'23',
+		'-o',
+		'BatchMode=yes',
+		'-o',
+		'StrictHostKeyChecking=accept-new',
 		`${storageUrl}:${remotePath}`,
-		tempPath
+		tempPath,
 	];
 
 	console.log(` - Downloading ${basename(remotePath)}...`);
 	const result = spawnSync('scp', args, { stdio: 'inherit', timeout: 3600000 });
 
 	if (result.status !== 0) {
-		try { rmSync(tempPath); } catch { /* ignore cleanup errors */ }
+		try {
+			rmSync(tempPath);
+		} catch {
+			/* ignore cleanup errors */
+		}
 		throw new Error(`SCP failed for ${remotePath}`);
 	}
 
@@ -78,9 +86,7 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
  * - All other files are ignored.
  */
 export async function downloadLocalFiles(fileGroups: FileGroup[], localFolder: string) {
-	const wantedFiles = fileGroups.flatMap(group =>
-		(group.local && group.latestFile) ? [group.latestFile] : []
-	);
+	const wantedFiles = fileGroups.flatMap((group) => (group.local && group.latestFile ? [group.latestFile] : []));
 
 	const existingFiles = getLocalFiles(localFolder);
 
@@ -104,9 +110,9 @@ export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], loca
 	}
 
 	/** Map of existing local files by filename */
-	const existingMap = new Map(existingFiles.map(f => [f.filename, f]));
+	const existingMap = new Map(existingFiles.map((f) => [f.filename, f]));
 	/** Map of wanted files by filename */
-	const wantedMap = new Map(wantedFiles.map(f => [f.filename, f]));
+	const wantedMap = new Map(wantedFiles.map((f) => [f.filename, f]));
 
 	// Delete files that are no longer wanted
 	for (const [filename, existingFile] of existingMap) {

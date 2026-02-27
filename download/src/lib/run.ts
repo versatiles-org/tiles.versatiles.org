@@ -93,7 +93,7 @@ export async function run(options: Options = {}) {
 		fileGroups,
 		generateHTML(fileGroups, resolve(contentFolder, 'index.html')),
 		generateRSSFeeds(fileGroups, contentFolder),
-	).map(f => {
+	).map((f) => {
 		const cloned = f.clone();
 		// Update fullname for local files to container path
 		if (!cloned.isRemote) {
@@ -102,7 +102,7 @@ export async function run(options: Options = {}) {
 		return cloned;
 	});
 
-	const publicResponses: FileResponse[] = fileGroups.flatMap(f => f.getResponses(baseURL));
+	const publicResponses: FileResponse[] = fileGroups.flatMap((f) => f.getResponses(baseURL));
 
 	// Generate NGINX configuration with WebDAV proxy support
 	const confFilename = resolve(nginxFolder, 'download.conf');

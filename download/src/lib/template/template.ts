@@ -50,7 +50,7 @@ export function renderTemplate(fileGroups: FileGroup[], templateFilename: string
 export function generateHTML(fileGroups: FileGroup[], filename: string): FileRef {
 	console.log('Generating HTML...');
 	const tempFile = filename + '.tmp';
-	writeFileSync(tempFile, renderTemplate(fileGroups, "index.html"));
+	writeFileSync(tempFile, renderTemplate(fileGroups, 'index.html'));
 	renameSync(tempFile, filename);
 
 	return new FileRef(filename, '/index.html');
@@ -70,11 +70,11 @@ export function generateRSSFeeds(fileGroups: FileGroup[], outputDir: string): Fi
 	console.log('Generating RSS feeds...');
 	const refs: FileRef[] = [];
 
-	fileGroups.forEach(g => {
+	fileGroups.forEach((g) => {
 		const filename = `feed-${g.slug}.xml`;
 		const outputPath = resolve(outputDir, filename);
 		const tempPath = outputPath + '.tmp';
-		writeFileSync(tempPath, renderTemplate([g], "feed.xml"));
+		writeFileSync(tempPath, renderTemplate([g], 'feed.xml'));
 		renameSync(tempPath, outputPath);
 		refs.push(new FileRef(outputPath, '/' + filename));
 	});

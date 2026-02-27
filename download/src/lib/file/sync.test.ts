@@ -24,7 +24,7 @@ function createFileRef(filename: string, size: number, remote = true): FileRef {
 	ref.filename = filename;
 	ref.url = '/' + filename;
 	ref.size = size;
-	ref.sizeString = (size / (2 ** 30)).toFixed(1) + ' GB';
+	ref.sizeString = (size / 2 ** 30).toFixed(1) + ' GB';
 	ref.isRemote = remote;
 	ref.remotePath = remote ? `/home/data/${filename}` : '';
 	ref.webdavPath = remote ? `/data/${filename}` : '';
@@ -136,12 +136,8 @@ describe('downloadLocalFiles', () => {
 		await downloadLocalFiles([localGroup, remoteGroup, noLatest], '/local');
 
 		// Only osm.versatiles should be downloaded (local + has latestFile)
-		const scpCalls = vi.mocked(spawnSync).mock.calls.filter(
-			([cmd]) => cmd === 'scp'
-		);
+		const scpCalls = vi.mocked(spawnSync).mock.calls.filter(([cmd]) => cmd === 'scp');
 		expect(scpCalls).toHaveLength(1);
-		expect(scpCalls[0][1]).toEqual(
-			expect.arrayContaining([expect.stringContaining('osm.versatiles')])
-		);
+		expect(scpCalls[0][1]).toEqual(expect.arrayContaining([expect.stringContaining('osm.versatiles')]));
 	});
 });

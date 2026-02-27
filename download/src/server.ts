@@ -24,8 +24,10 @@ const server = http.createServer((req, res) => {
 		console.log('update started');
 		run()
 			.then(() => console.log('update complete'))
-			.catch(err => console.error('update failed:', err))
-			.finally(() => { running = false; });
+			.catch((err) => console.error('update failed:', err))
+			.finally(() => {
+				running = false;
+			});
 		return;
 	}
 

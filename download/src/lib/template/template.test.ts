@@ -18,9 +18,7 @@ describe('renderTemplate', () => {
 	});
 
 	it('renders Handlebars template with data', () => {
-		vi.mocked(readFileSync).mockReturnValue(
-			'Groups: {{#each fileGroups}}{{this.slug}},{{/each}}'
-		);
+		vi.mocked(readFileSync).mockReturnValue('Groups: {{#each fileGroups}}{{this.slug}},{{/each}}');
 
 		const group = new FileGroup({
 			slug: 'osm',
@@ -34,9 +32,7 @@ describe('renderTemplate', () => {
 	});
 
 	it('converts class instances to plain objects via JSON round-trip', () => {
-		vi.mocked(readFileSync).mockReturnValue(
-			'{{#each fileGroups}}{{this.title}}{{/each}}'
-		);
+		vi.mocked(readFileSync).mockReturnValue('{{#each fileGroups}}{{this.title}}{{/each}}');
 
 		const group = new FileGroup({
 			slug: 'test',
@@ -53,9 +49,7 @@ describe('renderTemplate', () => {
 describe('generateRSSFeeds', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(readFileSync).mockReturnValue(
-			'<rss>{{#each fileGroups}}{{this.slug}}{{/each}}</rss>'
-		);
+		vi.mocked(readFileSync).mockReturnValue('<rss>{{#each fileGroups}}{{this.slug}}{{/each}}</rss>');
 		vi.mocked(statSync).mockReturnValue({ size: 50 } as any);
 	});
 
@@ -78,9 +72,7 @@ describe('generateRSSFeeds', () => {
 	it('returns FileRef array with correct URLs', () => {
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-		const groups = [
-			new FileGroup({ slug: 'osm', title: 'OSM', desc: 'desc', order: 0 }),
-		];
+		const groups = [new FileGroup({ slug: 'osm', title: 'OSM', desc: 'desc', order: 0 })];
 
 		const refs = generateRSSFeeds(groups, '/output');
 

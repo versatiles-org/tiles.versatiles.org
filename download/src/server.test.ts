@@ -10,7 +10,7 @@ function fetch(url: string, method = 'GET'): Promise<{ status: number; body: str
 	return new Promise((resolve, reject) => {
 		const req = http.request(url, { method }, (res) => {
 			let data = '';
-			res.on('data', (chunk) => data += chunk);
+			res.on('data', (chunk) => (data += chunk));
 			res.on('end', () => resolve({ status: res.statusCode!, body: data }));
 		});
 		req.on('error', reject);
@@ -63,7 +63,9 @@ describe('server', () => {
 				res.end('update started');
 				(run as ReturnType<typeof vi.fn>)()
 					.catch(() => {})
-					.finally(() => { running = false; });
+					.finally(() => {
+						running = false;
+					});
 				return;
 			}
 

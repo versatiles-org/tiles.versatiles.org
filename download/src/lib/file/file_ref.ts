@@ -39,7 +39,7 @@ export class FileRef {
 	public webdavPath: string;
 
 	/** Optional precomputed hashes for integrity / checksum files. */
-	public hashes?: { md5: string, sha256: string };
+	public hashes?: { md5: string; sha256: string };
 
 	constructor(fullname: string, url: string);
 	constructor(fullname: string, size: number);
@@ -86,7 +86,7 @@ export class FileRef {
 			throw new Error('Invalid FileRef constructor arguments.');
 		}
 
-		this.sizeString = (this.size / (2 ** 30)).toFixed(1) + ' GB';
+		this.sizeString = (this.size / 2 ** 30).toFixed(1) + ' GB';
 
 		if (!/^\/[^/]/.test(this.url)) {
 			throw new Error(`FileRef.url must start with a single '/', got: ${this.url}`);
@@ -150,10 +150,14 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 
 	// Use ls -lR for compatibility with restricted shells (Hetzner storage box)
 	const args = [
-		'-i', sshKeyPath,
-		'-p', '23',
-		'-o', 'BatchMode=yes',
-		'-o', 'StrictHostKeyChecking=accept-new',
+		'-i',
+		sshKeyPath,
+		'-p',
+		'23',
+		'-o',
+		'BatchMode=yes',
+		'-o',
+		'StrictHostKeyChecking=accept-new',
 		storageUrl,
 		'ls -lR /home',
 	];

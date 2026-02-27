@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('fs', () => ({
-	readFileSync: vi.fn(() => '{{{webhook}}}|{{{domain}}}|{{{webdavHost}}}|{{{webdavAuth}}}|{{#each localFiles}}L:{{{this.url}}},{{/each}}{{#each remoteFiles}}R:{{{this.url}}},{{/each}}{{#each responses}}V:{{{this.url}}},{{/each}}'),
+	readFileSync: vi.fn(
+		() =>
+			'{{{webhook}}}|{{{domain}}}|{{{webdavHost}}}|{{{webdavAuth}}}|{{#each localFiles}}L:{{{this.url}}},{{/each}}{{#each remoteFiles}}R:{{{this.url}}},{{/each}}{{#each responses}}V:{{{this.url}}},{{/each}}',
+	),
 	writeFileSync: vi.fn(),
 	renameSync: vi.fn(),
 }));
@@ -49,10 +52,7 @@ describe('buildNginxConf', () => {
 		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', '');
 
-		const files = [
-			createFileRef('/local.versatiles', false),
-			createFileRef('/remote.versatiles', true),
-		];
+		const files = [createFileRef('/local.versatiles', false), createFileRef('/remote.versatiles', true)];
 
 		const result = buildNginxConf(files, []);
 
@@ -99,9 +99,7 @@ describe('buildNginxConf', () => {
 		vi.stubEnv('WEBHOOK', '');
 		vi.stubEnv('DOMAIN', '');
 
-		const responses = [
-			new FileResponse('/hash.md5', 'abc123 file\n'),
-		];
+		const responses = [new FileResponse('/hash.md5', 'abc123 file\n')];
 
 		const result = buildNginxConf([], responses);
 

@@ -40,18 +40,20 @@ function sshCommand(args: string[]): { success: boolean; stdout: string } {
 
 	const fullArgs = [
 		storageUrl,
-		'-p', '23',
-		'-i', '/app/.ssh/storage',
+		'-p',
+		'23',
+		'-i',
+		'/app/.ssh/storage',
 		'-oBatchMode=yes',
 		'-oStrictHostKeyChecking=accept-new',
-		...args
+		...args,
 	];
 
 	const result = spawnSync('ssh', fullArgs);
 
 	return {
 		success: result.status === 0,
-		stdout: result.stdout.toString().trim()
+		stdout: result.stdout.toString().trim(),
 	};
 }
 
@@ -69,7 +71,7 @@ function downloadHashFile(remotePath: string, hashType: string): string | null {
 
 	// Parse hash from output: "<hash>  filename" or "<hash> filename"
 	const hash = result.stdout.split(/\s/)[0];
-	return (hash && hash.length >= 32) ? hash : null;
+	return hash && hash.length >= 32 ? hash : null;
 }
 
 /**
@@ -86,7 +88,7 @@ function calculateHashRemote(remotePath: string, hashType: string): string | nul
 
 	// Parse hash from output: "<hash>  /path/to/file"
 	const hash = result.stdout.split(/\s/)[0];
-	return (hash && hash.length >= 32) ? hash : null;
+	return hash && hash.length >= 32 ? hash : null;
 }
 
 /**

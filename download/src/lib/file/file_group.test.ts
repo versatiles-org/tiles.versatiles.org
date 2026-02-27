@@ -26,7 +26,7 @@ describe('FileGroup', () => {
 				slug: 'test',
 				title: 'Test Group',
 				desc: 'A test group',
-				order: 1
+				order: 1,
 			});
 
 			expect(group.slug).toBe('test');
@@ -44,7 +44,7 @@ describe('FileGroup', () => {
 				title: 'Test',
 				desc: 'Test',
 				order: 1,
-				local: true
+				local: true,
 			});
 
 			expect(group.local).toBe(true);
@@ -57,7 +57,7 @@ describe('FileGroup', () => {
 				slug: 'test',
 				title: 'Test',
 				desc: 'Test',
-				order: 1
+				order: 1,
 			});
 
 			expect(() => group.getResponseUrlList('https://example.com')).toThrow();
@@ -73,11 +73,11 @@ describe('groupFiles', () => {
 		ref.filename = filename;
 		ref.url = `/${filename}`;
 		ref.size = size;
-		ref.sizeString = (size / (2 ** 30)).toFixed(1) + ' GB';
+		ref.sizeString = (size / 2 ** 30).toFixed(1) + ' GB';
 		ref.isRemote = true;
 		ref.remotePath = `/home/test/${filename}`;
 		ref.webdavPath = `/test/${filename}`;
-		ref.clone = function() {
+		ref.clone = function () {
 			return createMockFileRef(this.filename, this.size);
 		};
 		return ref;
@@ -97,9 +97,7 @@ describe('groupFiles', () => {
 	});
 
 	it('assigns correct metadata to known groups', () => {
-		const files = [
-			createMockFileRef('osm.20240101.versatiles', 1000),
-		];
+		const files = [createMockFileRef('osm.20240101.versatiles', 1000)];
 
 		const groups = groupFiles(files);
 
@@ -139,9 +137,7 @@ describe('groupFiles', () => {
 	it('handles unknown groups with warning', () => {
 		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		const files = [
-			createMockFileRef('unknown-dataset.20240101.versatiles', 1000),
-		];
+		const files = [createMockFileRef('unknown-dataset.20240101.versatiles', 1000)];
 
 		const groups = groupFiles(files);
 
@@ -169,10 +165,7 @@ describe('collectFiles', () => {
 	}
 
 	it('collects files from FileRef array', () => {
-		const files = [
-			createMockFileRef('/file1.txt'),
-			createMockFileRef('/file2.txt'),
-		];
+		const files = [createMockFileRef('/file1.txt'), createMockFileRef('/file2.txt')];
 
 		const result = collectFiles(files);
 
@@ -180,11 +173,7 @@ describe('collectFiles', () => {
 	});
 
 	it('deduplicates files by url', () => {
-		const files = [
-			createMockFileRef('/file1.txt'),
-			createMockFileRef('/file1.txt'),
-			createMockFileRef('/file2.txt'),
-		];
+		const files = [createMockFileRef('/file1.txt'), createMockFileRef('/file1.txt'), createMockFileRef('/file2.txt')];
 
 		const result = collectFiles(files);
 
@@ -201,7 +190,7 @@ describe('collectFiles', () => {
 			desc: 'Test',
 			order: 1,
 			latestFile: file1,
-			olderFiles: [file2]
+			olderFiles: [file2],
 		});
 
 		const result = collectFiles(group);
@@ -218,7 +207,7 @@ describe('collectFiles', () => {
 			title: 'Test',
 			desc: 'Test',
 			order: 1,
-			latestFile: file1
+			latestFile: file1,
 		});
 
 		const result = collectFiles(group, [file2]);
