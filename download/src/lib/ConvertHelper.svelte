@@ -1,5 +1,7 @@
 <script lang="ts">
-	let { url, filename }: { url: string; filename: string } = $props();
+	import type { FileRefData } from './data.js';
+
+	let { file }: { file: FileRefData } = $props();
 
 	let format: 'versatiles' | 'pmtiles' | 'mbtiles' | 'tar' = $state('pmtiles');
 	let tool: 'versatiles' | 'docker' = $state('versatiles');
@@ -7,9 +9,9 @@
 
 	let dialog: HTMLDialogElement;
 
-	const baseName = $derived(filename.replace(/\.versatiles$/, ''));
+	const baseName = $derived(file.filename.replace(/\.versatiles$/, ''));
 	const outputFile = $derived(`${baseName}.${format}`);
-	const fullUrl = $derived(`https://download.versatiles.org${url}`);
+	const fullUrl = $derived(`https://download.versatiles.org${file.url}`);
 	const command = $derived(
 		tool === 'versatiles'
 			? `versatiles convert "${fullUrl}" "${outputFile}"`

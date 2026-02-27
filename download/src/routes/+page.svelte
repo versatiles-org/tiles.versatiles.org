@@ -72,7 +72,7 @@
 					<a href="{group.latestFile.url}.md5" class="small">md5</a>
 					<a href="{group.latestFile.url}.sha256" class="small">sha256</a>
 					<a href={group.latestFile.url}>{group.latestFile.sizeString}</a>
-					<ConvertHelper url={group.latestFile.url} filename={group.latestFile.filename} />
+					<ConvertHelper file={group.latestFile} />
 				</div>
 			{/if}
 			{#if group.olderFiles.length > 0}
@@ -84,7 +84,7 @@
 							<a href="{file.url}.md5" class="small">md5</a>
 							<a href="{file.url}.sha256" class="small">sha256</a>
 							<a href={file.url}>{file.sizeString}</a>
-							<ConvertHelper url={file.url} filename={file.filename} />
+							<ConvertHelper {file} />
 						</div>
 					{/each}
 				</details>
