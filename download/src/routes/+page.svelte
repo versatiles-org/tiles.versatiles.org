@@ -51,19 +51,21 @@
 
 		{#each data.fileGroups as group}
 			<h2>{group.title}</h2>
-			<dd class="small">
+			<div class="small group-desc">
 				{@html group.desc}
 				<p class="group-links small">
 					<a href="/urllist_{group.slug}.tsv">URL list</a>
 					<a href="/feed-{group.slug}.xml">RSS</a>
 				</p>
-			</dd>
+			</div>
 
 			{#if group.latestFile}
-				<a class="row" href={group.latestFile.url} title={group.latestFile.filename}>
-					<span>{group.latestFile.filename}</span>
-					<span>{group.latestFile.sizeString}</span>
-				</a>
+				<div class="row">
+					<a href={group.latestFile.url}>{group.latestFile.filename}</a>
+					<a href="{group.latestFile.url}.md5" class="small">md5</a>
+					<a href="{group.latestFile.url}.sha256" class="small">sha256</a>
+					<a href={group.latestFile.url}>{group.latestFile.sizeString}</a>
+				</div>
 			{/if}
 			{#if group.olderFiles.length > 0}
 				<details>
@@ -123,12 +125,12 @@
 
 	summary,
 	header,
-	dd {
+	.group-desc {
 		margin: 1em 0;
 		text-align: center;
 	}
 
-	dd,
+	.group-desc,
 	header,
 	h1,
 	h2 {
