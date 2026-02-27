@@ -12,11 +12,21 @@
 	const baseName = $derived(file.filename.replace(/\.versatiles$/, ''));
 	const outputFile = $derived(`${baseName}.${format}`);
 	const fullUrl = $derived(`https://download.versatiles.org${file.url}`);
-	const command = $derived(
-		tool === 'versatiles'
-			? `versatiles convert \\\n  "${fullUrl}" \\\n  "${outputFile}"`
-			: `docker run -it --rm \\\n  -v $(pwd):/data \\\n  versatiles/versatiles:latest convert \\\n  "${fullUrl}" \\\n  "/data/${outputFile}"`,
-	);
+	function buildCommand(t: typeof tool, source: string, output: string): string {
+		let parts: string[] = [];
+		switch (t) {
+			case 'versatiles':
+				parts.push('versatiles convert');
+				break;
+			case 'docker':
+				parts.push('docker run -it --rm -v $(pwd):/data', 'versatiles/versatiles:latest convert');
+				break;
+		}
+		parts.push(`"${source}"`, `"${t == 'docker' ? '/data/' : ''}${output}"`);
+		return parts.join(' \\\n  ');
+	}
+
+	const command = $derived(buildCommand(tool, fullUrl, outputFile));
 
 	function open() {
 		dialog.showModal();
