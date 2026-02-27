@@ -25,6 +25,9 @@ describe('server', () => {
 	beforeEach(async () => {
 		vi.resetModules();
 		vi.stubEnv('PORT', '0'); // random port
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(console, 'info').mockImplementation(() => {});
 
 		// Re-mock run for fresh module
 		vi.doMock('./lib/run.js', () => ({
