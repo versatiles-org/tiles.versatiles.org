@@ -94,7 +94,7 @@
 		color: #ccc;
 		margin: 0;
 		padding: 0;
-		font-family: 'Source Sans Pro', sans-serif;
+		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 		font-weight: 500;
 		font-size: min(1.2rem, 5vmin);
 		line-height: 1.3;
@@ -102,7 +102,7 @@
 	}
 
 	:global(a) {
-		color: #eee !important;
+		color: #eee;
 		text-decoration: none;
 	}
 
@@ -117,7 +117,7 @@
 
 	summary,
 	.small {
-		opacity: 0.4;
+		opacity: 0.5;
 		font-size: 0.8em;
 	}
 
@@ -141,7 +141,6 @@
 	}
 
 	.row {
-		display: block;
 		margin: 0 auto;
 		padding: 0.1em max(0px, calc(50% - 250px));
 		display: flex;
