@@ -50,7 +50,7 @@ describe('generateSite', () => {
 		consoleSpy.mockRestore();
 	});
 
-	it('invokes vite build', () => {
+	it('invokes svelte-kit sync and vite build', () => {
 		mockBuildOutput();
 		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -58,6 +58,7 @@ describe('generateSite', () => {
 
 		generateSite(groups, '/output');
 
+		expect(execSync).toHaveBeenCalledWith('npx svelte-kit sync', { stdio: 'inherit' });
 		expect(execSync).toHaveBeenCalledWith('npx vite build', { stdio: 'inherit' });
 
 		consoleSpy.mockRestore();
