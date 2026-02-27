@@ -24,6 +24,11 @@ docker compose run --rm certbot certonly --force-renewal --webroot --webroot-pat
 mkdir -p ./volumes/nginx-cert/live/"${DOMAIN}"
 cp -LfR ./volumes/certbot-cert/live/"${DOMAIN}" ./volumes/nginx-cert/live/
 
+if [ ! -f "./volumes/nginx-cert/live/${DOMAIN}/fullchain.pem" ]; then
+	echo "Error: Certificate copy failed for ${DOMAIN}"
+	exit 1
+fi
+
 # Reload nginx to apply the new certificates using Docker Compose
 docker compose exec nginx nginx -s reload
 

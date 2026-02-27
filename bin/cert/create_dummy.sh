@@ -20,4 +20,7 @@ mkdir -p "./volumes/nginx-cert/live/${DOMAIN}/"
 # Generate a new self-signed SSL certificate and private key for the domain
 openssl req -nodes -new -x509 -subj "/CN=${DOMAIN}" -keyout "./volumes/nginx-cert/live/${DOMAIN}/privkey.pem" -out "./volumes/nginx-cert/live/${DOMAIN}/fullchain.pem"
 
+# Create chain.pem (nginx references ssl_trusted_certificate chain.pem; for self-signed, it's the same as fullchain)
+cp "./volumes/nginx-cert/live/${DOMAIN}/fullchain.pem" "./volumes/nginx-cert/live/${DOMAIN}/chain.pem"
+
 echo "Dummy certificate created for ${DOMAIN}"
