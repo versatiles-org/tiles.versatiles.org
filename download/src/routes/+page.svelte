@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types.js';
+	import ConvertHelper from '$lib/ConvertHelper.svelte';
 
 	let { data }: { data: PageData } = $props();
 </script>
@@ -71,6 +72,7 @@
 					<a href="{group.latestFile.url}.md5" class="small">md5</a>
 					<a href="{group.latestFile.url}.sha256" class="small">sha256</a>
 					<a href={group.latestFile.url}>{group.latestFile.sizeString}</a>
+					<ConvertHelper url={group.latestFile.url} filename={group.latestFile.filename} />
 				</div>
 			{/if}
 			{#if group.olderFiles.length > 0}
@@ -82,6 +84,7 @@
 							<a href="{file.url}.md5" class="small">md5</a>
 							<a href="{file.url}.sha256" class="small">sha256</a>
 							<a href={file.url}>{file.sizeString}</a>
+							<ConvertHelper url={file.url} filename={file.filename} />
 						</div>
 					{/each}
 				</details>
@@ -159,14 +162,14 @@
 		margin: 0 auto;
 		padding: 0.1em max(0px, calc(50% - 250px));
 		display: grid;
-		grid-template-columns: 1fr auto auto 5em;
+		grid-template-columns: 1fr auto auto 5em auto;
 		column-gap: 0.8em;
 		background-color: #111;
 		text-decoration: none;
 		align-items: center;
 	}
 
-	.row > :last-child {
+	.row > :nth-child(4) {
 		text-align: right;
 	}
 
