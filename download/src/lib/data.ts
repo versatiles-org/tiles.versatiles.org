@@ -5,7 +5,7 @@
  * writes before running `vite build`. The data structures are plain-object
  * versions of the `FileGroup` and `FileRef` classes used by the pipeline.
  */
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
 /** Plain-object version of FileRef (as serialised to JSON). */
@@ -35,8 +35,10 @@ export interface FileGroupData {
 /**
  * Loads the file groups from the JSON data file written by the pipeline.
  * The file is located at `data/fileGroups.json` relative to the project root.
+ * Returns an empty array when the file does not exist (e.g. during `dev:site`).
  */
 export function loadFileGroups(): FileGroupData[] {
 	const dataPath = resolve('data/fileGroups.json');
+	if (!existsSync(dataPath)) return [];
 	return JSON.parse(readFileSync(dataPath, 'utf-8')) as FileGroupData[];
 }
