@@ -195,6 +195,9 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 		const filename = parts.slice(8).join(' ');
 		if (!filename.endsWith('.versatiles')) continue;
 
+		// Guard against path traversal
+		if (filename.includes('..') || filename.includes('/')) continue;
+
 		const remotePath = `${currentDir}/${filename}`;
 
 		// Create FileRef with remote path info
