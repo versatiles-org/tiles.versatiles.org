@@ -7,8 +7,8 @@
         {{#each olderFiles}}
         <item>
             <title>{{url}}</title>
-            <link>https://download.versatiles.org/{{url}}</link>
-            <guid>https://download.versatiles.org/{{url}}</guid>
+            <link>https://download.versatiles.org{{url}}</link>
+            <guid>https://download.versatiles.org{{url}}</guid>
             <description>{{ sizeString }}</description>
         </item>
         {{/each}}
