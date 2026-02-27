@@ -14,8 +14,8 @@
 	const fullUrl = $derived(`https://download.versatiles.org${file.url}`);
 	const command = $derived(
 		tool === 'versatiles'
-			? `versatiles convert "${fullUrl}" "${outputFile}"`
-			: `docker run -it --rm -v $(pwd):/data versatiles/versatiles:latest convert "${fullUrl}" "/data/${outputFile}"`,
+			? `versatiles convert \\\n  "${fullUrl}" \\\n  "${outputFile}"`
+			: `docker run -it --rm \\\n  -v $(pwd):/data \\\n  versatiles/versatiles:latest convert \\\n  "${fullUrl}" \\\n  "/data/${outputFile}"`,
 	);
 
 	function open() {
@@ -215,15 +215,15 @@
 	pre {
 		flex: 1;
 		background: #080808;
-		padding: 0.8em;
+		padding: 0.4em 0.6em;
 		border-radius: 4px;
 		overflow-x: auto;
 		margin: 0;
-		font-size: 0.85em;
+		font-size: 0.6em;
+		line-height: 1.5em;
 	}
 
 	code {
-		white-space: pre;
 		font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 	}
 
