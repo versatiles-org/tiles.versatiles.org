@@ -8,9 +8,15 @@
 	<meta charset="utf-8" />
 	<title>VersaTiles - Download</title>
 	<meta name="viewport" content="width=device-width" />
-	<meta name="description" content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers." />
+	<meta
+		name="description"
+		content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers."
+	/>
 	<meta property="og:title" content="VersaTiles Downloads" />
-	<meta property="og:description" content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers." />
+	<meta
+		property="og:description"
+		content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers."
+	/>
 	<meta property="og:type" content="website" />
 
 	<link
@@ -96,7 +102,14 @@
 		color: #ccc;
 		margin: 0;
 		padding: 0;
-		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			'Segoe UI',
+			Roboto,
+			'Helvetica Neue',
+			Arial,
+			sans-serif;
 		font-weight: 500;
 		font-size: min(1.2rem, 5vmin);
 		line-height: 1.3;
