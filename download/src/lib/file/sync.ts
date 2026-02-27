@@ -26,19 +26,15 @@ function getLocalFiles(folderPath: string): FileRef[] {
 	}
 
 	const files: FileRef[] = [];
-	try {
-		const filenames = readdirSync(folderPath);
-		for (const filename of filenames) {
-			if (!filename.endsWith('.versatiles')) continue;
-			const fullPath = resolve(folderPath, filename);
-			const stat = statSync(fullPath);
-			if (stat.isFile()) {
-				const file = new FileRef(fullPath, '/' + filename);
-				files.push(file);
-			}
+	const filenames = readdirSync(folderPath);
+	for (const filename of filenames) {
+		if (!filename.endsWith('.versatiles')) continue;
+		const fullPath = resolve(folderPath, filename);
+		const stat = statSync(fullPath);
+		if (stat.isFile()) {
+			const file = new FileRef(fullPath, '/' + filename);
+			files.push(file);
 		}
-	} catch {
-		// Directory doesn't exist or can't be read
 	}
 	return files;
 }
@@ -63,7 +59,7 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 	];
 
 	console.log(` - Downloading ${basename(remotePath)}...`);
-	const result = spawnSync('scp', args, { stdio: 'inherit' });
+	const result = spawnSync('scp', args, { stdio: 'inherit', timeout: 3600000 });
 
 	if (result.status !== 0) {
 		try { rmSync(tempPath); } catch { /* ignore cleanup errors */ }
