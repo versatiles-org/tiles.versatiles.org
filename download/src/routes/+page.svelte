@@ -160,7 +160,7 @@
 
 	.row {
 		margin: 0 auto;
-		padding: 0.1em max(0px, calc(50% - 250px));
+		padding: 0.1em max(0px, calc(50% - 300px));
 		display: grid;
 		grid-template-columns: 1fr auto auto 5em auto;
 		column-gap: 0.8em;
