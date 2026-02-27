@@ -18,7 +18,7 @@ export interface FileRefData {
 	isRemote: boolean;
 	remotePath: string;
 	webdavPath: string;
-	hashes?: { md5: string; sha256: string };
+	hashes: { md5: string; sha256: string };
 }
 
 /** Plain-object version of FileGroup (as serialised to JSON). */
