@@ -182,17 +182,17 @@ fi
 # Test WebDAV proxy (remote versioned file)
 echo ""
 echo "10. Testing WebDAV proxy for remote files..."
-# Find a remote file from the nginx config
-REMOTE_FILE=$(grep -o 'location = /[^{]*\.versatiles' ./volumes/download/nginx_conf/download.conf 2>/dev/null | grep -v '/osm\.versatiles' | head -1 | sed 's/location = //' || echo "")
+# Find a versioned remote file (e.g. osm.20250728.versatiles) from the nginx config
+REMOTE_FILE=$(grep -oP 'location = /\K[^{ ]*\.\d{8}\.versatiles' ./volumes/download/nginx_conf/download.conf 2>/dev/null | head -1 || echo "")
 if [ -n "$REMOTE_FILE" ]; then
-    REMOTE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}${REMOTE_FILE}" 2>/dev/null || echo "000")
+    REMOTE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/${REMOTE_FILE}" 2>/dev/null || echo "000")
     if [ "$REMOTE_CODE" = "200" ]; then
         pass "WebDAV proxy working (${REMOTE_FILE})"
     else
         fail "WebDAV proxy returned $REMOTE_CODE for ${REMOTE_FILE}"
     fi
 else
-    warn "No remote files found to test"
+    warn "No versioned remote files found to test"
 fi
 
 # Test RSS feed
