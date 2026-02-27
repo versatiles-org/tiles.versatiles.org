@@ -15,7 +15,7 @@ function buildRssFeed(group: FileGroupData): string {
 				`        <item>
             <title>${file.url}</title>
             <link>https://download.versatiles.org${file.url}</link>
-            <guid>https://download.versatiles.org${file.url}</guid>
+            <guid>${file.filename};${file.hashes.md5}</guid>
             <description>${file.sizeString}</description>
         </item>`,
 		)
