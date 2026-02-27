@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { basename, join, relative } from 'path';
 import { statSync } from 'fs';
 import { FileResponse } from './file_response.js';
@@ -149,14 +149,22 @@ export function getRemoteFilesViaSSH(): FileRef[] {
 	console.log('Scanning remote storage via SSH...');
 
 	// Use ls -lR for compatibility with restricted shells (Hetzner storage box)
-	const cmd = `ssh -i ${sshKeyPath} -p 23 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${storageUrl} "ls -lR /home"`;
+	const args = [
+		'-i', sshKeyPath,
+		'-p', '23',
+		'-o', 'BatchMode=yes',
+		'-o', 'StrictHostKeyChecking=accept-new',
+		storageUrl,
+		'ls -lR /home',
+	];
 
-	let output: string;
-	try {
-		output = execSync(cmd, { encoding: 'utf-8', timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
-	} catch (error) {
-		throw new Error(`Failed to scan remote storage via SSH: ${error}`);
+	const result = spawnSync('ssh', args, { encoding: 'utf-8', timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
+
+	if (result.status !== 0) {
+		throw new Error(`Failed to scan remote storage via SSH: ${result.stderr}`);
 	}
+
+	const output = result.stdout;
 
 	const files: FileRef[] = [];
 	const lines = output.trim().split('\n');
