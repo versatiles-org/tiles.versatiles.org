@@ -18,3 +18,5 @@ tiles:
     src: /data/tiles/bathymetry-vectors.versatiles
   - name: satellite
     src: /data/tiles/satellite.versatiles
+  - name: elevation
+    src: /data/tiles/elevation.versatiles
