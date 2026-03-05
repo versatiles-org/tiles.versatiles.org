@@ -49,14 +49,14 @@ echo "Building Docker images..."
 docker compose build
 docker compose build download-updater
 
+# Run download pipeline to fetch latest data
+echo "Fetching data..."
+docker compose run --rm download-updater
+
 # Recreate backend services first (nginx keeps serving with old backends)
 echo "Updating backend services..."
 docker compose up --detach versatiles
 wait_for_healthy versatiles
-
-# Run download pipeline to fetch latest data
-echo "Fetching data..."
-docker compose run --rm download-updater
 
 # Recreate nginx last (backends are already up and healthy)
 echo "Updating nginx..."
