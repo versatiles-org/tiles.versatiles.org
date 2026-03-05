@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.53.3",
+    "@sveltejs/kit": "^2.53.4",
     "svelte": "^5.53.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
