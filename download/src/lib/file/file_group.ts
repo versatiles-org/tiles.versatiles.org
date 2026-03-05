@@ -153,13 +153,16 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 					order = 0;
 					local = true;
 					break;
-				case 'hillshade-vectors':
-					title = 'Hillshading as vector tiles';
-					desc = [
-						'Hillshade vector tiles based on <a href="https://github.com/tilezen/joerd">Mapzen Jörð Terrain Tiles</a>.',
-						'Map Data © <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Mapzen Terrain Tiles, DEM Sources</a>',
-					];
+				case 'satellite':
+					title = 'Satellite imagery (Beta)';
+					desc = ['Satellite imagery from various sources.'];
 					order = 10;
+					local = true;
+					break;
+				case 'elevation':
+					title = 'Elevation data (Beta)';
+					desc = ['Elevation data from various sources.'];
+					order = 20;
 					local = true;
 					break;
 				case 'landcover-vectors':
@@ -168,7 +171,16 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 						'Landcover vector tiles based on <a href="https://esa-worldcover.org/en/data-access">ESA Worldcover 2021</a>.',
 						'Map Data © <a href="https://esa-worldcover.org/en/data-access">ESA WorldCover project 2021</a> / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium, available under <a href="http://creativecommons.org/licenses/by/4.0/"> CC-BY 4.0 International</a>',
 					];
-					order = 20;
+					order = 30;
+					local = true;
+					break;
+				case 'hillshade-vectors':
+					title = 'Hillshading as vector tiles';
+					desc = [
+						'Hillshade vector tiles based on <a href="https://github.com/tilezen/joerd">Mapzen Jörð Terrain Tiles</a>.',
+						'Map Data © <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Mapzen Terrain Tiles, DEM Sources</a>',
+					];
+					order = 40;
 					local = true;
 					break;
 				case 'bathymetry-vectors':
@@ -176,13 +188,7 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 					desc = [
 						'Bathymetry Vectors, derived from the <a href="https://www.gebco.net/data_and_products/historical_data_sets/#gebco_2021">GEBCO 2021 Grid</a>, made with <a href="https://www.naturalearthdata.com/">NaturalEarth</a> by <a href="https://opendem.info">OpenDEM</a>',
 					];
-					order = 30;
-					local = true;
-					break;
-				case 'satellite':
-					title = 'Satellite imagery (Beta)';
-					desc = ['Satellite imagery from various sources.'];
-					order = 40;
+					order = 50;
 					local = true;
 					break;
 				default:
