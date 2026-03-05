@@ -6,6 +6,10 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      all-github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: npm
     directory: /download
@@ -13,6 +17,10 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      all-npm:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: /download
@@ -20,3 +28,7 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+    groups:
+      all-docker:
+        patterns:
+          - "*"
