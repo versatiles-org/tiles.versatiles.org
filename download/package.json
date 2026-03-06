@@ -21,6 +21,9 @@
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",
     "upgrade": "npm-check-updates -u; rm -r node_modules; rm package-lock.json; npm install"
   },
+  "overrides": {
+    "cookie": "^0.7.0"
+  },
   "dependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.53.4",
