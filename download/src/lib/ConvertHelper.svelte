@@ -219,8 +219,8 @@
 
 	.command-row {
 		display: flex;
+		flex-direction: column;
 		gap: 0.6em;
-		align-items: flex-start;
 	}
 
 	pre {
