@@ -115,9 +115,7 @@ describe('groupFiles', () => {
 
 		const groups = groupFiles(files);
 
-		expect(groups[0].slug).toBe('osm');
-		expect(groups[1].slug).toBe('hillshade-vectors');
-		expect(groups[2].slug).toBe('landcover-vectors');
+		expect(groups.map((g) => g.slug)).toEqual(['osm', 'landcover-vectors', 'hillshade-vectors']);
 	});
 
 	it('sets latestFile from most recent file', () => {
