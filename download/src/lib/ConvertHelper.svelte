@@ -58,15 +58,15 @@
 			<button class="close-btn" onclick={close}>&#x2715;</button>
 		</div>
 
-		<span class="label">Format:</span>
-		<div class="format-toggles">
+		<span class="label">Select a format:</span>
+		<div class="toggle-format">
 			{#each formats as f}
 				<button class:active={format === f} onclick={() => (format = f)}>.{f}</button>
 			{/each}
 		</div>
 
-		<div class="field">
-			<span class="label">Using:</span>
+		<div class="toggle-tool">
+			<span class="label">Select a tool:</span>
 			<div class="toggles">
 				<button class:active={tool === 'versatiles'} onclick={() => (tool = 'versatiles')}>versatiles binary</button>
 				<a
@@ -81,6 +81,7 @@
 		</div>
 
 		<div class="command-row">
+			<span class="label">Run this command:</span>
 			<pre><code>{command}</code></pre>
 			<button class="copy-btn" onclick={copy}>{copied ? 'Copied!' : 'Copy'}</button>
 		</div>
@@ -145,14 +146,14 @@
 		color: #fff;
 	}
 
-	.format-toggles {
+	.toggle-format {
 		display: flex;
 		gap: 0.4em;
 		flex-wrap: wrap;
-		margin-bottom: 1.2em;
+		margin-bottom: 1em;
 	}
 
-	.format-toggles button {
+	.toggle-format button {
 		background: #333;
 		border: none;
 		color: #ccc;
@@ -162,17 +163,17 @@
 		font-size: 0.95em;
 	}
 
-	.format-toggles button:hover {
+	.toggle-format button:hover {
 		background: #444;
 	}
 
-	.format-toggles button.active {
+	.toggle-format button.active {
 		background: #555;
 		color: #fff;
 	}
 
-	.field {
-		margin-bottom: 1em;
+	.toggle-tool {
+		margin-bottom: 2em;
 	}
 
 	.label {
@@ -220,7 +221,7 @@
 	.command-row {
 		display: flex;
 		flex-direction: column;
-		gap: 0.6em;
+		gap: 0em;
 	}
 
 	pre {
