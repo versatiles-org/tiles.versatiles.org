@@ -199,4 +199,14 @@
 		font-size: 0.8em;
 		padding: 0.5em;
 	}
+
+	@media (max-width: 500px) {
+		.row {
+			grid-template-columns: 1fr 5em auto;
+		}
+		.row > :nth-child(2),
+		.row > :nth-child(3) {
+			display: none;
+		}
+	}
 </style>
