@@ -88,7 +88,7 @@
 	</div>
 </dialog>
 
-<style>
+<style lang="scss">
 	.convert-btn {
 		background: none;
 		border: none;
@@ -97,10 +97,10 @@
 		font-size: 0.85em;
 		padding: 0 0.2em;
 		line-height: 1;
-	}
 
-	.convert-btn:hover {
-		color: #fff;
+		&:hover {
+			color: #fff;
+		}
 	}
 
 	dialog {
@@ -111,10 +111,10 @@
 		padding: 0;
 		max-width: 90vw;
 		width: 40rem;
-	}
 
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.7);
+		&::backdrop {
+			background: rgba(0, 0, 0, 0.7);
+		}
 	}
 
 	.dialog-content {
@@ -127,10 +127,10 @@
 		align-items: center;
 		margin-bottom: 0.8em;
 		font-size: 1.1em;
-	}
 
-	.dialog-header strong {
-		color: #fff;
+		strong {
+			color: #fff;
+		}
 	}
 
 	.close-btn {
@@ -140,10 +140,10 @@
 		font-size: 1.2em;
 		cursor: pointer;
 		padding: 0.2em 0.4em;
-	}
 
-	.close-btn:hover {
-		color: #fff;
+		&:hover {
+			color: #fff;
+		}
 	}
 
 	.toggle-format {
@@ -151,25 +151,25 @@
 		gap: 0.4em;
 		flex-wrap: wrap;
 		margin-bottom: 1em;
-	}
 
-	.toggle-format button {
-		background: #333;
-		border: none;
-		color: #ccc;
-		padding: 0.4em 0.9em;
-		cursor: pointer;
-		border-radius: 4px;
-		font-size: 0.95em;
-	}
+		button {
+			background: #333;
+			border: none;
+			color: #ccc;
+			padding: 0.4em 0.9em;
+			cursor: pointer;
+			border-radius: 4px;
+			font-size: 0.95em;
 
-	.toggle-format button:hover {
-		background: #444;
-	}
+			&:hover {
+				background: #444;
+			}
 
-	.toggle-format button.active {
-		background: #555;
-		color: #fff;
+			&.active {
+				background: #555;
+				color: #fff;
+			}
+		}
 	}
 
 	.toggle-tool {
@@ -187,35 +187,35 @@
 		display: flex;
 		gap: 0.4em;
 		align-items: center;
-	}
 
-	.toggles button {
-		background: #333;
-		border: none;
-		color: #ccc;
-		padding: 0.3em 0.8em;
-		cursor: pointer;
-		border-radius: 4px;
-		font-size: 0.9em;
-	}
+		button {
+			background: #333;
+			border: none;
+			color: #ccc;
+			padding: 0.3em 0.8em;
+			cursor: pointer;
+			border-radius: 4px;
+			font-size: 0.9em;
 
-	.toggles button:hover {
-		background: #444;
-	}
+			&:hover {
+				background: #444;
+			}
 
-	.toggles button.active {
-		background: #555;
-		color: #fff;
+			&.active {
+				background: #555;
+				color: #fff;
+			}
+		}
 	}
 
 	.install-link {
 		font-size: 0.9em;
 		opacity: 0.4;
 		margin-right: 1em;
-	}
 
-	.install-link:hover {
-		opacity: 0.8;
+		&:hover {
+			opacity: 0.8;
+		}
 	}
 
 	.command-row {
@@ -248,9 +248,9 @@
 		border-radius: 4px;
 		font-size: 0.85em;
 		white-space: nowrap;
-	}
 
-	.copy-btn:hover {
-		background: #444;
+		&:hover {
+			background: #444;
+		}
 	}
 </style>

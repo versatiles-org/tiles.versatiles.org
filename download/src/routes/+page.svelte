@@ -99,7 +99,7 @@
 	>
 </footer>
 
-<style>
+<style lang="scss">
 	:global(body) {
 		background: #080808;
 		color: #ccc;
@@ -122,10 +122,10 @@
 	:global(a) {
 		color: #eee;
 		text-decoration: none;
-	}
 
-	:global(a:hover) {
-		text-decoration: underline;
+		&:hover {
+			text-decoration: underline;
+		}
 	}
 
 	main {
@@ -167,21 +167,21 @@
 		background-color: #111;
 		text-decoration: none;
 		align-items: center;
-	}
 
-	.row > :nth-child(4) {
-		text-align: right;
-	}
+		& > :nth-child(4) {
+			text-align: right;
+		}
 
-	.row:hover {
-		background-color: #333;
-		text-decoration: none;
-	}
+		&:hover {
+			background-color: #333;
+			text-decoration: none;
+		}
 
-	.row .small {
-		opacity: 0.4;
-		font-size: 0.8em;
-		font-weight: normal;
+		.small {
+			opacity: 0.4;
+			font-size: 0.8em;
+			font-weight: normal;
+		}
 	}
 
 	.group-links {
@@ -203,10 +203,11 @@
 	@media (max-width: 500px) {
 		.row {
 			grid-template-columns: 1fr 5em auto;
-		}
-		.row > :nth-child(2),
-		.row > :nth-child(3) {
-			display: none;
+
+			& > :nth-child(2),
+			& > :nth-child(3) {
+				display: none;
+			}
 		}
 	}
 </style>

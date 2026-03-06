@@ -42,6 +42,7 @@
     "npm-check-updates": "^19.6.3",
     "prettier": "^3.8.1",
     "prettier-plugin-svelte": "^3.5.1",
+    "sass": "^1.97.3",
     "svelte-check": "^4.4.4"
   }
 }
