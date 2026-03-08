@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('fs', () => ({
 	existsSync: vi.fn(),
 	mkdirSync: vi.fn(),
+	readdirSync: vi.fn(() => []),
 	readFileSync: vi.fn(),
 	writeFileSync: vi.fn(),
 	unlinkSync: vi.fn(),

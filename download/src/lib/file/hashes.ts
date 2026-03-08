@@ -5,7 +5,7 @@
  * If hash files don't exist on remote, calculates them remotely via SSH.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { basename, dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { FileRef } from './file_ref.js';
@@ -124,11 +124,14 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
  * Uses existing .md5 and .sha256 files on the remote, or calculates if missing.
  */
 export async function generateHashes(files: FileRef[]) {
-	// Clear hash cache to avoid stale entries from previous runs
+	// Clear hash cache contents to avoid stale entries from previous runs
 	if (existsSync(DOWNLOAD_HASH_CACHE_DIR)) {
-		rmSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
+		for (const entry of readdirSync(DOWNLOAD_HASH_CACHE_DIR)) {
+			rmSync(join(DOWNLOAD_HASH_CACHE_DIR, entry), { recursive: true });
+		}
+	} else {
+		mkdirSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
 	}
-	mkdirSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
 
 	console.log('Fetching hashes from remote storage...');
 
