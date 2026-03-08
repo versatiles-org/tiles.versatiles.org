@@ -5,11 +5,14 @@
  * If hash files don't exist on remote, calculates them remotely via SSH.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { basename, dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { FileRef } from './file_ref.js';
 import { spawnSync } from 'child_process';
+
+/** Shared SSH connection options (without port flag, since SSH uses -p and SCP uses -P) */
+const SSH_COMMON_OPTIONS = ['-i', '/app/.ssh/storage', '-oBatchMode=yes', '-oStrictHostKeyChecking=accept-new'];
 
 /** Local cache directory for downloaded hash files */
 const DOWNLOAD_HASH_CACHE_DIR = '/volumes/download/hash_cache';
@@ -39,18 +42,13 @@ function sshCommand(args: string[]): { success: boolean; stdout: string } {
 	const storageUrl = process.env['STORAGE_URL'];
 	if (!storageUrl) throw new Error('STORAGE_URL not set');
 
-	const fullArgs = [
-		storageUrl,
-		'-p',
-		'23',
-		'-i',
-		'/app/.ssh/storage',
-		'-oBatchMode=yes',
-		'-oStrictHostKeyChecking=accept-new',
-		...args,
-	];
+	const fullArgs = [storageUrl, '-p', '23', ...SSH_COMMON_OPTIONS, ...args];
 
-	const result = spawnSync('ssh', fullArgs);
+	const result = spawnSync('ssh', fullArgs, { timeout: 1_800_000 });
+
+	if (result.status === null) {
+		return { success: false, stdout: '' };
+	}
 
 	return {
 		success: result.status === 0,
@@ -82,16 +80,7 @@ function scpUpload(localPath: string, remotePath: string): boolean {
 	const storageUrl = process.env['STORAGE_URL'];
 	if (!storageUrl) throw new Error('STORAGE_URL not set');
 
-	const result = spawnSync('scp', [
-		'-i',
-		'/app/.ssh/storage',
-		'-P',
-		'23',
-		'-oBatchMode=yes',
-		'-oStrictHostKeyChecking=accept-new',
-		localPath,
-		`${storageUrl}:${remotePath}`,
-	]);
+	const result = spawnSync('scp', ['-P', '23', ...SSH_COMMON_OPTIONS, localPath, `${storageUrl}:${remotePath}`]);
 
 	return result.status === 0;
 }
@@ -118,8 +107,14 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
 	const hashContent = `${hash}  ${basename(remotePath)}\n`;
 	const tmpFile = join(tmpdir(), `hash-${Date.now()}-${hashType}`);
 	writeFileSync(tmpFile, hashContent);
-	scpUpload(tmpFile, `${remotePath}.${hashType}`);
-	unlinkSync(tmpFile);
+	try {
+		const uploaded = scpUpload(tmpFile, `${remotePath}.${hashType}`);
+		if (!uploaded) {
+			throw new Error(`Failed to upload ${hashType} hash to remote for ${basename(remotePath)}`);
+		}
+	} finally {
+		unlinkSync(tmpFile);
+	}
 
 	return hash;
 }
@@ -129,10 +124,11 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
  * Uses existing .md5 and .sha256 files on the remote, or calculates if missing.
  */
 export async function generateHashes(files: FileRef[]) {
-	// Ensure cache directory exists
-	if (!existsSync(DOWNLOAD_HASH_CACHE_DIR)) {
-		mkdirSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
+	// Clear hash cache to avoid stale entries from previous runs
+	if (existsSync(DOWNLOAD_HASH_CACHE_DIR)) {
+		rmSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
 	}
+	mkdirSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
 
 	console.log('Fetching hashes from remote storage...');
 
