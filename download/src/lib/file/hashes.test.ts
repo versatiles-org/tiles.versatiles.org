@@ -139,7 +139,9 @@ describe('generateHashes', () => {
 			stdout: Buffer.from(''),
 		} as any);
 
-		await expect(generateHashes([file])).rejects.toThrow('Failed to get md5 hash');
+		await expect(generateHashes([file])).rejects.toThrow(
+			'Failed to calculate md5 for /home/data/test.versatiles on remote',
+		);
 	});
 
 	it('sets file.hashes on each FileRef', async () => {

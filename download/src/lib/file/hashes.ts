@@ -78,17 +78,19 @@ function downloadHashFile(remotePath: string, hashType: string): string | null {
  * Calculates a hash on the remote server via SSH and stores it on remote.
  * Returns the hash string or null on failure.
  */
-function calculateHashRemote(remotePath: string, hashType: string): string | null {
+function calculateHashRemote(remotePath: string, hashType: string): string {
 	console.log(`   Calculating ${hashType} for ${basename(remotePath)} on remote...`);
 	const result = sshCommand([`${hashType}sum`, remotePath]);
 
 	if (!result.success || result.stdout.length === 0) {
-		return null;
+		throw new Error(`Failed to calculate ${hashType} for ${remotePath} on remote`);
 	}
 
 	// Parse hash from output: "<hash>  /path/to/file"
 	const hash = result.stdout.split(/\s/)[0];
-	if (!hash || hash.length < 32) return null;
+	if (!hash || hash.length < 32) {
+		throw new Error(`Invalid ${hashType} hash for ${remotePath} on remote`);
+	}
 
 	// Store the hash file on remote for future runs
 	const remoteHashPath = `${remotePath}.${hashType}`;
@@ -134,11 +136,7 @@ export async function generateHashes(files: FileRef[]) {
 				downloaded++;
 			} else {
 				hash = calculateHashRemote(file.remotePath, hashType);
-				if (hash) {
-					calculated++;
-				} else {
-					throw new Error(`Failed to get ${hashType} hash for ${file.remotePath}`);
-				}
+				calculated++;
 			}
 
 			writeFileSync(cachePath, `${hash} ${basename(file.remotePath)}\n`);
