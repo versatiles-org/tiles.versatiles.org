@@ -10,15 +10,15 @@ import { basename, dirname, join } from 'path';
 import { FileRef } from './file_ref.js';
 import { spawnSync } from 'child_process';
 
-/** Local cache directory for hash files */
-const HASH_CACHE_DIR = '/volumes/hash_cache';
+/** Local cache directory for downloaded hash files */
+const DOWNLOAD_HASH_CACHE_DIR = '/volumes/download/hash_cache';
 
 /**
  * Gets the local cache path for a hash file.
  */
 function getHashCachePath(remotePath: string, hashType: string): string {
 	const relativePath = remotePath.replace(/^\/home\//, '');
-	return join(HASH_CACHE_DIR, relativePath + '.' + hashType);
+	return join(DOWNLOAD_HASH_CACHE_DIR, relativePath + '.' + hashType);
 }
 
 /**
@@ -75,7 +75,7 @@ function downloadHashFile(remotePath: string, hashType: string): string | null {
 }
 
 /**
- * Calculates a hash on the remote server via SSH.
+ * Calculates a hash on the remote server via SSH and stores it on remote.
  * Returns the hash string or null on failure.
  */
 function calculateHashRemote(remotePath: string, hashType: string): string | null {
@@ -88,7 +88,14 @@ function calculateHashRemote(remotePath: string, hashType: string): string | nul
 
 	// Parse hash from output: "<hash>  /path/to/file"
 	const hash = result.stdout.split(/\s/)[0];
-	return hash && hash.length >= 32 ? hash : null;
+	if (!hash || hash.length < 32) return null;
+
+	// Store the hash file on remote for future runs
+	const remoteHashPath = `${remotePath}.${hashType}`;
+	const hashContent = `${hash}  ${basename(remotePath)}`;
+	sshCommand(['sh', '-c', `echo '${hashContent}' > ${remoteHashPath}`]);
+
+	return hash;
 }
 
 /**
@@ -97,8 +104,8 @@ function calculateHashRemote(remotePath: string, hashType: string): string | nul
  */
 export async function generateHashes(files: FileRef[]) {
 	// Ensure cache directory exists
-	if (!existsSync(HASH_CACHE_DIR)) {
-		mkdirSync(HASH_CACHE_DIR, { recursive: true });
+	if (!existsSync(DOWNLOAD_HASH_CACHE_DIR)) {
+		mkdirSync(DOWNLOAD_HASH_CACHE_DIR, { recursive: true });
 	}
 
 	console.log('Fetching hashes from remote storage...');
@@ -120,7 +127,9 @@ export async function generateHashes(files: FileRef[]) {
 
 			// Try download first, then calculate
 			let hash = downloadHashFile(file.remotePath, hashType);
-			console.log(` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`);
+			console.log(
+				` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`,
+			);
 			if (hash) {
 				downloaded++;
 			} else {

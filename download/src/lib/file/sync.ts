@@ -10,11 +10,30 @@
  *   are removed.
  * - When a file with identical size already exists locally, it is reused.
  */
-import { readdirSync, rmSync, statSync, existsSync, mkdirSync, renameSync } from 'fs';
+import { readdirSync, readFileSync, rmSync, statSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { basename, resolve } from 'path';
 import { FileRef } from './file_ref.js';
 import { FileGroup } from './file_group.js';
+
+/**
+ * Reads a local hash file and returns the hash string, or null if not found.
+ */
+function readLocalHash(localFolder: string, filename: string, hashType: string): string | null {
+	const hashPath = resolve(localFolder, `${filename}.${hashType}`);
+	if (!existsSync(hashPath)) return null;
+	const content = readFileSync(hashPath, 'utf8');
+	const hash = content.split(/\s/)[0];
+	return hash && hash.length >= 32 ? hash : null;
+}
+
+/**
+ * Writes a local hash file.
+ */
+function writeLocalHash(localFolder: string, filename: string, hashType: string, hash: string): void {
+	const hashPath = resolve(localFolder, `${filename}.${hashType}`);
+	writeFileSync(hashPath, `${hash}  ${filename}\n`);
+}
 
 /**
  * Scans a local directory for .versatiles files.
@@ -117,13 +136,18 @@ export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], loca
 	// Delete files that are no longer wanted
 	for (const [filename, existingFile] of existingMap) {
 		const wantedFile = wantedMap.get(filename);
-		if (!wantedFile || wantedFile.size !== existingFile.size) {
+		if (!wantedFile) {
 			console.log(` - Deleting ${filename}`);
 			rmSync(existingFile.fullname);
+			// Also delete associated hash files
+			for (const hashType of ['md5', 'sha256']) {
+				const hashPath = resolve(localFolder, `${filename}.${hashType}`);
+				if (existsSync(hashPath)) rmSync(hashPath);
+			}
 		}
 	}
 
-	// Download missing files
+	// Download missing or changed files
 	for (const [filename, wantedFile] of wantedMap) {
 		const existingFile = existingMap.get(filename);
 		const localPath = resolve(localFolder, filename);
@@ -131,16 +155,26 @@ export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], loca
 		// Always verify file actually exists on disk before deciding to keep it
 		const fileExistsOnDisk = existingFile && existsSync(localPath);
 
-		if (fileExistsOnDisk && existingFile.size === wantedFile.size) {
-			// File already exists with correct size, reuse it
+		// Compare using hash instead of size
+		const localHash = fileExistsOnDisk ? readLocalHash(localFolder, filename, 'md5') : null;
+		const remoteHash = wantedFile.hashes?.md5 ?? null;
+
+		if (fileExistsOnDisk && localHash && remoteHash && localHash === remoteHash) {
+			// File already exists with correct hash, reuse it
 			console.log(` - Keeping ${filename} (already up to date)`);
 			wantedFile.fullname = localPath;
 			wantedFile.isRemote = false;
 		} else {
-			// Need to download (file missing, size mismatch, or doesn't exist on disk)
+			// Need to download (file missing, hash mismatch, or doesn't exist on disk)
 			downloadViaSCP(wantedFile.remotePath, localPath);
 			wantedFile.fullname = localPath;
 			wantedFile.isRemote = false;
+
+			// Write local hash files for future comparisons
+			if (wantedFile.hashes) {
+				writeLocalHash(localFolder, filename, 'md5', wantedFile.hashes.md5);
+				writeLocalHash(localFolder, filename, 'sha256', wantedFile.hashes.sha256);
+			}
 		}
 	}
 }

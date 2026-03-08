@@ -4,9 +4,11 @@ vi.mock('fs', () => ({
 	existsSync: vi.fn(() => true),
 	mkdirSync: vi.fn(),
 	readdirSync: vi.fn(() => []),
+	readFileSync: vi.fn(() => ''),
 	statSync: vi.fn(() => ({ size: 100, isFile: () => true })),
 	rmSync: vi.fn(),
 	renameSync: vi.fn(),
+	writeFileSync: vi.fn(),
 }));
 vi.mock('child_process', () => ({
 	spawnSync: vi.fn(() => ({ status: 0 })),
@@ -15,8 +17,10 @@ vi.mock('child_process', () => ({
 import { syncFiles, downloadLocalFiles } from './sync.js';
 import { FileRef } from './file_ref.js';
 import { FileGroup } from './file_group.js';
-import { existsSync, mkdirSync, rmSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { spawnSync } from 'child_process';
+
+const FAKE_MD5 = 'd41d8cd98f00b204e9800998ecf8427e';
 
 function createFileRef(filename: string, size: number, remote = true): FileRef {
 	const ref = Object.create(FileRef.prototype) as FileRef;
@@ -41,13 +45,20 @@ describe('syncFiles', () => {
 		vi.spyOn(console, 'log').mockImplementation(() => {});
 	});
 
-	it('deletes unwanted files', () => {
+	it('deletes unwanted files and their hash files', () => {
 		const existing = [createFileRef('old.versatiles', 100, false)];
 		const wanted: FileRef[] = [];
+
+		vi.mocked(existsSync).mockImplementation((p: any) => {
+			if (typeof p === 'string' && (p.endsWith('.md5') || p.endsWith('.sha256'))) return true;
+			return true;
+		});
 
 		syncFiles(wanted, existing, '/local');
 
 		expect(rmSync).toHaveBeenCalledWith('/local/old.versatiles');
+		expect(rmSync).toHaveBeenCalledWith('/local/old.versatiles.md5');
+		expect(rmSync).toHaveBeenCalledWith('/local/old.versatiles.sha256');
 	});
 
 	it('downloads missing files via SCP', () => {
@@ -68,16 +79,55 @@ describe('syncFiles', () => {
 		);
 	});
 
-	it('keeps files with matching size', () => {
+	it('keeps files with matching hash', () => {
 		const wanted = [createFileRef('same.versatiles', 500)];
+		wanted[0].hashes = { md5: FAKE_MD5, sha256: 'fake_sha' };
 		const existing = [createFileRef('same.versatiles', 500, false)];
 
 		vi.mocked(existsSync).mockReturnValue(true);
+		vi.mocked(readFileSync).mockReturnValue(`${FAKE_MD5}  same.versatiles\n`);
 
 		syncFiles(wanted, existing, '/local');
 
 		expect(rmSync).not.toHaveBeenCalled();
 		expect(spawnSync).not.toHaveBeenCalled();
+	});
+
+	it('re-downloads when hash differs', () => {
+		const wanted = [createFileRef('changed.versatiles', 500)];
+		wanted[0].hashes = { md5: FAKE_MD5, sha256: 'fake_sha' };
+		const existing = [createFileRef('changed.versatiles', 500, false)];
+
+		vi.mocked(existsSync).mockReturnValue(true);
+		vi.mocked(readFileSync).mockReturnValue('different_hash  changed.versatiles\n');
+
+		syncFiles(wanted, existing, '/local');
+
+		expect(spawnSync).toHaveBeenCalledWith(
+			'scp',
+			expect.arrayContaining([expect.stringContaining('changed.versatiles')]),
+			expect.any(Object),
+		);
+		expect(writeFileSync).toHaveBeenCalled();
+	});
+
+	it('downloads when no local hash file exists', () => {
+		const wanted = [createFileRef('nohash.versatiles', 500)];
+		wanted[0].hashes = { md5: FAKE_MD5, sha256: 'fake_sha' };
+		const existing = [createFileRef('nohash.versatiles', 500, false)];
+
+		vi.mocked(existsSync).mockImplementation((p: any) => {
+			if (typeof p === 'string' && p.endsWith('.md5')) return false;
+			return true;
+		});
+
+		syncFiles(wanted, existing, '/local');
+
+		expect(spawnSync).toHaveBeenCalledWith(
+			'scp',
+			expect.arrayContaining([expect.stringContaining('nohash.versatiles')]),
+			expect.any(Object),
+		);
 	});
 
 	it('creates folder if missing', () => {

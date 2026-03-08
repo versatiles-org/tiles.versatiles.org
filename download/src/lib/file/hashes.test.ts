@@ -88,7 +88,7 @@ describe('generateHashes', () => {
 		expect(file.hashes).toEqual({ md5: FAKE_MD5, sha256: FAKE_SHA });
 	});
 
-	it('calculates hash remotely when download fails', async () => {
+	it('calculates hash remotely and stores on remote when download fails', async () => {
 		const file = createFileRef('test.versatiles', '/home/data/test.versatiles');
 
 		vi.mocked(existsSync).mockImplementation((p: any) => {
@@ -107,6 +107,10 @@ describe('generateHashes', () => {
 				if (args.includes('sha256sum')) {
 					return { status: 0, stdout: Buffer.from(`${FAKE_SHA}  /home/data/test.versatiles\n`) } as any;
 				}
+				// Allow the 'sh' command for storing hash on remote
+				if (args.includes('sh')) {
+					return { status: 0, stdout: Buffer.from('') } as any;
+				}
 			}
 			return { status: 1, stdout: Buffer.from('') } as any;
 		});
@@ -119,8 +123,13 @@ describe('generateHashes', () => {
 
 		await generateHashes([file]);
 
+		// Should write to local cache (2 times) and store on remote via ssh (2 'sh' calls)
 		expect(writeFileSync).toHaveBeenCalledTimes(2);
 		expect(file.hashes).toEqual({ md5: FAKE_MD5, sha256: FAKE_SHA });
+
+		// Verify SSH was called with 'sh' to store hash on remote
+		const sshCalls = vi.mocked(spawnSync).mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('sh'));
+		expect(sshCalls).toHaveLength(2);
 	});
 
 	it('throws when both download and calculation fail', async () => {
