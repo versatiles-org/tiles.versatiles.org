@@ -8,13 +8,16 @@
  * - Files that should be present locally but are missing are downloaded via SSH.
  * - Files that are no longer needed (outdated or no longer marked `local`)
  *   are removed.
- * - When a file with identical size already exists locally, it is reused.
+ * - When a file with a matching hash already exists locally, it is reused.
  */
 import { readdirSync, readFileSync, rmSync, statSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { basename, resolve } from 'path';
 import { FileRef } from './file_ref.js';
 import { FileGroup } from './file_group.js';
+
+/** Shared SSH connection options (without port flag, since SSH uses -p and SCP uses -P) */
+const SSH_COMMON_OPTIONS = ['-i', '/app/.ssh/storage', '-oBatchMode=yes', '-oStrictHostKeyChecking=accept-new'];
 
 /**
  * Reads a local hash file and returns the hash string, or null if not found.
@@ -68,18 +71,7 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 
 	const tempPath = localPath + '.download.' + Date.now();
 
-	const args = [
-		'-i',
-		'/app/.ssh/storage',
-		'-P',
-		'23',
-		'-o',
-		'BatchMode=yes',
-		'-o',
-		'StrictHostKeyChecking=accept-new',
-		`${storageUrl}:${remotePath}`,
-		tempPath,
-	];
+	const args = ['-P', '23', ...SSH_COMMON_OPTIONS, `${storageUrl}:${remotePath}`, tempPath];
 
 	console.log(` - Downloading ${basename(remotePath)}...`);
 	const result = spawnSync('scp', args, { stdio: 'inherit', timeout: 3600000 });
