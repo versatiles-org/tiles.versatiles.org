@@ -120,6 +120,7 @@ export async function generateHashes(files: FileRef[]) {
 
 			// Try download first, then calculate
 			let hash = downloadHashFile(file.remotePath, hashType);
+			console.log(` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`);
 			if (hash) {
 				downloaded++;
 			} else {
