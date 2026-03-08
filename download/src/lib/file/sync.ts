@@ -117,8 +117,8 @@ export async function downloadLocalFiles(fileGroups: FileGroup[], localFolder: s
  *
  * Behaviour:
  * - Any file present locally but *not* in `wantedFiles` is deleted.
- * - Any file in `wantedFiles` that is missing or size-mismatched locally is downloaded.
- * - If a matching local file exists with identical size, it is reused.
+ * - Any file in `wantedFiles` that is missing or hash-mismatched locally is downloaded.
+ * - If a matching local file exists with an identical hash, it is reused.
  */
 export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], localFolder: string) {
 	console.log('Syncing local files...');
@@ -126,6 +126,13 @@ export function syncFiles(wantedFiles: FileRef[], existingFiles: FileRef[], loca
 	// Ensure local folder exists
 	if (!existsSync(localFolder)) {
 		mkdirSync(localFolder, { recursive: true });
+	}
+
+	// Clean up orphaned temp files from interrupted downloads
+	const orphans = readdirSync(localFolder).filter((f) => f.includes('.download.'));
+	for (const orphan of orphans) {
+		console.log(` - Cleaning up orphaned temp file: ${orphan}`);
+		rmSync(resolve(localFolder, orphan));
 	}
 
 	/** Map of existing local files by filename */
