@@ -5,8 +5,9 @@
  * If hash files don't exist on remote, calculates them remotely via SSH.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { basename, dirname, join } from 'path';
+import { tmpdir } from 'os';
 import { FileRef } from './file_ref.js';
 import { spawnSync } from 'child_process';
 
@@ -75,8 +76,29 @@ function downloadHashFile(remotePath: string, hashType: string): string | null {
 }
 
 /**
- * Calculates a hash on the remote server via SSH and stores it on remote.
- * Returns the hash string or null on failure.
+ * Uploads a file to remote storage via SCP.
+ */
+function scpUpload(localPath: string, remotePath: string): boolean {
+	const storageUrl = process.env['STORAGE_URL'];
+	if (!storageUrl) throw new Error('STORAGE_URL not set');
+
+	const result = spawnSync('scp', [
+		'-i',
+		'/app/.ssh/storage',
+		'-P',
+		'23',
+		'-oBatchMode=yes',
+		'-oStrictHostKeyChecking=accept-new',
+		localPath,
+		`${storageUrl}:${remotePath}`,
+	]);
+
+	return result.status === 0;
+}
+
+/**
+ * Calculates a hash on the remote server via SSH and stores it on remote via SCP.
+ * Returns the hash string or throws on failure.
  */
 function calculateHashRemote(remotePath: string, hashType: string): string {
 	console.log(`   Calculating ${hashType} for ${basename(remotePath)} on remote...`);
@@ -92,10 +114,12 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
 		throw new Error(`Invalid ${hashType} hash for ${remotePath} on remote`);
 	}
 
-	// Store the hash file on remote for future runs
-	const remoteHashPath = `${remotePath}.${hashType}`;
-	const hashContent = `${hash}  ${basename(remotePath)}`;
-	sshCommand(['sh', '-c', `echo '${hashContent}' > ${remoteHashPath}`]);
+	// Store the hash file on remote via SCP for future runs
+	const hashContent = `${hash}  ${basename(remotePath)}\n`;
+	const tmpFile = join(tmpdir(), `hash-${Date.now()}-${hashType}`);
+	writeFileSync(tmpFile, hashContent);
+	scpUpload(tmpFile, `${remotePath}.${hashType}`);
+	unlinkSync(tmpFile);
 
 	return hash;
 }

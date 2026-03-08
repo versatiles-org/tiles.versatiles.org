@@ -5,6 +5,7 @@ vi.mock('fs', () => ({
 	mkdirSync: vi.fn(),
 	readFileSync: vi.fn(),
 	writeFileSync: vi.fn(),
+	unlinkSync: vi.fn(),
 }));
 vi.mock('child_process', () => ({
 	spawnSync: vi.fn(),
@@ -90,7 +91,10 @@ describe('generateHashes', () => {
 			return true;
 		});
 
-		vi.mocked(spawnSync).mockImplementation((_cmd: any, args: any) => {
+		vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+			if (cmd === 'scp') {
+				return { status: 0, stdout: Buffer.from('') } as any;
+			}
 			if (args && Array.isArray(args)) {
 				if (args.includes('cat')) {
 					return { status: 1, stdout: Buffer.from('') } as any;
@@ -100,10 +104,6 @@ describe('generateHashes', () => {
 				}
 				if (args.includes('sha256sum')) {
 					return { status: 0, stdout: Buffer.from(`${FAKE_SHA}  /home/data/test.versatiles\n`) } as any;
-				}
-				// Allow the 'sh' command for storing hash on remote
-				if (args.includes('sh')) {
-					return { status: 0, stdout: Buffer.from('') } as any;
 				}
 			}
 			return { status: 1, stdout: Buffer.from('') } as any;
@@ -117,13 +117,13 @@ describe('generateHashes', () => {
 
 		await generateHashes([file]);
 
-		// Should write to local cache (2 times) and store on remote via ssh (2 'sh' calls)
-		expect(writeFileSync).toHaveBeenCalledTimes(2);
+		// Should write to local cache (2) + temp files for SCP upload (2) = 4
+		expect(writeFileSync).toHaveBeenCalledTimes(4);
 		expect(file.hashes).toEqual({ md5: FAKE_MD5, sha256: FAKE_SHA });
 
-		// Verify SSH was called with 'sh' to store hash on remote
-		const sshCalls = vi.mocked(spawnSync).mock.calls.filter(([, args]) => Array.isArray(args) && args.includes('sh'));
-		expect(sshCalls).toHaveLength(2);
+		// Verify SCP was called to upload hash files to remote
+		const scpCalls = vi.mocked(spawnSync).mock.calls.filter(([cmd]) => cmd === 'scp');
+		expect(scpCalls).toHaveLength(2);
 	});
 
 	it('throws when both download and calculation fail', async () => {
