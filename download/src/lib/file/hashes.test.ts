@@ -19,15 +19,9 @@ const FAKE_MD5 = 'd41d8cd98f00b204e9800998ecf8427e'; // 32 chars
 const FAKE_SHA = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'; // 64 chars
 
 function createFileRef(filename: string, remotePath: string): FileRef {
-	const ref = Object.create(FileRef.prototype) as FileRef;
-	ref.fullname = remotePath;
+	const ref = new FileRef(remotePath, 1000, remotePath);
 	ref.filename = filename;
 	ref.url = '/' + filename;
-	ref.size = 1000;
-	ref.sizeString = '0.0 GB';
-	ref.isRemote = true;
-	ref.remotePath = remotePath;
-	ref.webdavPath = remotePath.replace(/^\/home/, '');
 	return ref;
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { hex2base64, groupFiles, collectFiles, FileGroup } from './file_group.js';
 import { FileRef } from './file_ref.js';
 

@@ -10,15 +10,12 @@ import { FileRef } from '../file/file_ref.js';
 import { FileResponse } from '../file/file_response.js';
 
 function createFileRef(url: string, isRemote: boolean): FileRef {
-	const ref = Object.create(FileRef.prototype) as FileRef;
-	ref.fullname = isRemote ? `/home/data${url}` : `/local${url}`;
-	ref.filename = url.slice(1);
+	if (isRemote) {
+		const remotePath = `/home/data${url}`;
+		return new FileRef(remotePath, 1000, remotePath);
+	}
+	const ref = new FileRef(`/local${url}`, 1000);
 	ref.url = url;
-	ref.size = 1000;
-	ref.sizeString = '0.0 GB';
-	ref.isRemote = isRemote;
-	ref.remotePath = isRemote ? `/home/data${url}` : '';
-	ref.webdavPath = isRemote ? `/data${url}` : '';
 	return ref;
 }
 

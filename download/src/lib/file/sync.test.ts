@@ -23,16 +23,11 @@ import { spawnSync } from 'child_process';
 const FAKE_MD5 = 'd41d8cd98f00b204e9800998ecf8427e';
 
 function createFileRef(filename: string, size: number, remote = true): FileRef {
-	const ref = Object.create(FileRef.prototype) as FileRef;
-	ref.fullname = remote ? `/home/data/${filename}` : `/local/${filename}`;
-	ref.filename = filename;
-	ref.url = '/' + filename;
-	ref.size = size;
-	ref.sizeString = (size / 2 ** 30).toFixed(1) + ' GB';
-	ref.isRemote = remote;
-	ref.remotePath = remote ? `/home/data/${filename}` : '';
-	ref.webdavPath = remote ? `/data/${filename}` : '';
-	return ref;
+	if (remote) {
+		const remotePath = `/home/data/${filename}`;
+		return new FileRef(remotePath, size, remotePath);
+	}
+	return new FileRef(`/local/${filename}`, size);
 }
 
 describe('syncFiles', () => {
