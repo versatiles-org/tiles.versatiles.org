@@ -74,7 +74,7 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 	const args = ['-P', '23', ...SSH_COMMON_OPTIONS, `${storageUrl}:${remotePath}`, tempPath];
 
 	console.log(` - Downloading ${basename(remotePath)}...`);
-	const result = spawnSync('scp', args, { stdio: 'inherit', timeout: 3600000 });
+	const result = spawnSync('scp', args, { stdio: 'inherit' });
 
 	if (result.status !== 0) {
 		try {

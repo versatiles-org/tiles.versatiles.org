@@ -44,7 +44,7 @@ function sshCommand(args: string[]): { success: boolean; stdout: string } {
 
 	const fullArgs = [storageUrl, '-p', '23', ...SSH_COMMON_OPTIONS, ...args];
 
-	const result = spawnSync('ssh', fullArgs, { timeout: 1_800_000 });
+	const result = spawnSync('ssh', fullArgs);
 
 	if (result.status === null) {
 		return { success: false, stdout: '' };
