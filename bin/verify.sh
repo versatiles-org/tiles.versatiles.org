@@ -122,15 +122,17 @@ else
     warn "HTTPS returned $HTTPS_CODE (expected 200)"
 fi
 
-# Test tile endpoint
+# Test tile endpoints
 echo ""
-echo "6. Testing tile endpoint..."
-TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/tiles/osm/0/0/0" 2>/dev/null || echo "000")
-if [ "$TILE_CODE" = "200" ]; then
-    pass "Tile endpoint working"
-else
-    warn "Tile endpoint returned $TILE_CODE"
-fi
+echo "6. Testing tile endpoints..."
+for tileset in osm satellite elevation; do
+    TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/tiles/${tileset}/0/0/0" 2>/dev/null || echo "000")
+    if [ "$TILE_CODE" = "200" ]; then
+        pass "Tile endpoint working: ${tileset}"
+    else
+        warn "Tile endpoint ${tileset} returned $TILE_CODE"
+    fi
+done
 
 # Test style JSON
 echo ""
