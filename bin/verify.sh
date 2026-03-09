@@ -217,9 +217,19 @@ else
     echo "     → Run: ./bin/cert/setup_renewal.sh"
 fi
 
+# Check log rotation cron job
+echo ""
+echo "13. Checking log rotation cron job..."
+if crontab -l 2>/dev/null | grep -q "bin/log/rotate.sh"; then
+    pass "Log rotation cron job is configured"
+else
+    warn "Log rotation cron job not found"
+    echo "     → Run: ./bin/log/setup_rotation.sh"
+fi
+
 # Check nginx rate limit configuration
 echo ""
-echo "13. Checking nginx rate limit configuration..."
+echo "14. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then

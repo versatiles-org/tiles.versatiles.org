@@ -150,7 +150,11 @@ echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 ./bin/cert/create_valid.sh "$DOWNLOAD_DOMAIN"
 
-# 12. Verify deployment
+# 12. Set up log rotation cron job
+echo "Setting up log rotation..."
+./bin/log/setup_rotation.sh
+
+# 13. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh
