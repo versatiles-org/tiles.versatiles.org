@@ -1,0 +1,4 @@
+#!/bin/sh
+# Compute nginx cache max_size as 90% of RAM_DISK_GB (in MB).
+# Sourced by nginx entrypoint before envsubst runs on templates.
+export CACHE_MAX_SIZE_MB=$(( ${RAM_DISK_GB:-4} * 1024 * 9 / 10 ))

@@ -58,6 +58,7 @@ services:
       - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
       - ./volumes/tiles/:/volumes/tiles/:ro
       - ./volumes/download/content/:/volumes/content/:ro
+      - ./nginx/docker-entrypoint.d/:/docker-entrypoint.d/:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:
