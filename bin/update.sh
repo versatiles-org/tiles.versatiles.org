@@ -1,59 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script performs a series of setup operations for a project:
-# - Pulls latest updates from Git
-# - Updates frontend
-# - Runs download pipeline to fetch latest data
-# - Clears cached data
-# - Restarts Docker Compose services
+# Update script: pull latest code, rebuild, and do a rolling restart.
 
-# Navigate to the project's parent directory
 cd "$(dirname "$0")/.."
-
-wait_for_healthy() {
-	local service="$1"
-	local timeout="${2:-120}"
-	local elapsed=0
-	echo "Waiting for $service to be healthy..."
-	while [ $elapsed -lt "$timeout" ]; do
-		if docker compose ps --format json "$service" 2>/dev/null | grep -q '"healthy"'; then
-			echo "$service is healthy."
-			return 0
-		fi
-		sleep 2
-		elapsed=$((elapsed + 2))
-	done
-	echo "Error: $service did not become healthy within ${timeout}s"
-	exit 1
-}
+source bin/deploy/helpers.sh
 
 # Update the repository with the latest changes from Git
 echo "Updating repository from Git..."
 git pull
 
-# Ensure infrastructure (volumes, RAM disk, cron jobs)
-./bin/deploy/ensure.sh
-
-# Update frontend
-echo "Fetching frontend..."
-./bin/frontend/update.sh
-
-# Update styles
-echo "Fetching styles..."
-./bin/styles/update.sh
-
-# Pull latest images (old containers keep serving traffic)
-echo "Pulling latest Docker images..."
-docker compose pull
-
-# Build all custom images (old containers keep serving traffic)
-echo "Building Docker images..."
-docker compose build download-updater
-
-# Run download pipeline to fetch latest data
-echo "Fetching data..."
-docker compose run --rm download-updater
+# Build (ensure, fetch assets, pull/build images, download pipeline)
+./bin/deploy/build.sh
 
 # Recreate backend services first (nginx keeps serving with old backends)
 echo "Updating backend services..."

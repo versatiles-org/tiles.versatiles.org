@@ -5,6 +5,8 @@ set -euo pipefail
 # Run this after: installing Docker, cloning the repo, configuring .env, and copying the SSH key.
 
 cd "$(dirname "$0")/../.."
+source bin/deploy/helpers.sh
+source .env
 
 echo "============================================"
 echo "tiles.versatiles.org — Fresh Server Setup"
@@ -34,21 +36,14 @@ else
 fi
 
 # Check .env file and required variables
-if [ -f .env ]; then
-	pass ".env file exists"
-	source .env
-
-	REQUIRED_VARS="DOMAIN_NAME DOWNLOAD_DOMAIN RAM_DISK_GB EMAIL STORAGE_URL STORAGE_PASS"
-	for var in $REQUIRED_VARS; do
-		if [ -n "${!var:-}" ]; then
-			pass "$var is set"
-		else
-			fail "$var is not set in .env"
-		fi
-	done
-else
-	fail ".env file not found (copy template.env to .env and fill in values)"
-fi
+REQUIRED_VARS="DOMAIN_NAME DOWNLOAD_DOMAIN RAM_DISK_GB EMAIL STORAGE_URL STORAGE_PASS"
+for var in $REQUIRED_VARS; do
+	if [ -n "${!var:-}" ]; then
+		pass "$var is set"
+	else
+		fail "$var is not set in .env"
+	fi
+done
 
 # Check SSH key
 if [ -f .ssh/storage ]; then
@@ -76,73 +71,34 @@ echo ""
 echo "All preflight checks passed."
 echo ""
 
-# --- Helpers ---
-
-wait_for_healthy() {
-	local service="$1"
-	local timeout="${2:-120}"
-	local elapsed=0
-	echo "Waiting for $service to be healthy..."
-	while [ $elapsed -lt "$timeout" ]; do
-		if docker compose ps --format json "$service" 2>/dev/null | grep -q '"healthy"'; then
-			echo "$service is healthy."
-			return 0
-		fi
-		sleep 2
-		elapsed=$((elapsed + 2))
-	done
-	echo "Error: $service did not become healthy within ${timeout}s"
-	exit 1
-}
-
 # --- Deployment ---
 
 echo "Starting deployment..."
 echo ""
 
-# 1. Ensure infrastructure (volumes, RAM disk, cron jobs)
-./bin/deploy/ensure.sh
+# 1. Build (ensure, fetch assets, pull/build images, download pipeline)
+./bin/deploy/build.sh
 
-# 2. Fetch frontend
-echo "Fetching frontend..."
-./bin/frontend/update.sh
-
-# 3. Fetch styles
-echo "Fetching styles..."
-./bin/styles/update.sh
-
-# 4. Pull Docker images
-echo "Pulling Docker images..."
-docker compose pull
-
-# 5. Build custom images
-echo "Building Docker images..."
-docker compose build download-updater
-
-# 6. Create dummy SSL certificates
+# 2. Create dummy SSL certificates
 echo "Creating dummy SSL certificates..."
 ./bin/cert/create_dummy.sh "$DOMAIN_NAME"
 ./bin/cert/create_dummy.sh "$DOWNLOAD_DOMAIN"
 
-# 7. Start services
+# 3. Start services
 echo "Starting services..."
 docker compose up --detach
 wait_for_healthy nginx
 
-# 8. Run download pipeline
-echo "Running download pipeline..."
-docker compose run --rm download-updater
-
-# 9. Reload nginx
+# 4. Reload nginx (pick up download config from pipeline)
 echo "Reloading nginx..."
 docker compose exec nginx nginx -s reload
 
-# 10. Create valid Let's Encrypt certificates
+# 5. Create valid Let's Encrypt certificates
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 ./bin/cert/create_valid.sh "$DOWNLOAD_DOMAIN"
 
-# 11. Verify deployment
+# 6. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh
