@@ -23,6 +23,42 @@ This repository serves both **tiles.versatiles.org** (tile serving) and **downlo
 - **nginx**: Reverse proxy for both domains (proxies to WebDAV for remote files)
 - **certbot**: SSL certificate management
 
+## Volume Directories
+
+All persistent data is stored under `./volumes/` and bind-mounted into Docker containers. Created by `bin/deploy/setup.sh`.
+
+| Directory                      | Purpose                               | Mode  | Owner       | Writer           | Reader(s)         |
+|--------------------------------|---------------------------------------|-------|-------------|------------------|-------------------|
+| `volumes/tiles/`               | Downloaded `.versatiles` tile files   | rw/ro | `1001:1001` | download-updater | versatiles, nginx |
+| `volumes/frontend/`            | Built frontend assets (HTML, JS, CSS) | ro    | root        | Host scripts     | versatiles        |
+| `volumes/cache/`               | Nginx tile cache (RAM disk / tmpfs)   | rw    | root        | nginx (UID 101)  | nginx             |
+| `volumes/download/content/`    | Generated download page (HTML, RSS)   | rw/ro | `1001:1001` | download-updater | nginx             |
+| `volumes/download/nginx_conf/` | Generated nginx config for downloads  | rw/ro | `1001:1001` | download-updater | nginx             |
+| `volumes/download/hash_cache/` | Hash cache for download pipeline      | rw    | `1001:1001` | download-updater | —                 |
+| `volumes/certbot-cert/`        | Let's Encrypt certificates            | rw    | root        | certbot          | —                 |
+| `volumes/certbot-www/`         | ACME challenge files                  | rw/ro | root        | certbot          | nginx             |
+| `volumes/nginx-cert/`          | SSL certs copied for nginx            | ro    | root        | Host scripts     | nginx             |
+| `volumes/nginx-log/`           | Nginx access/error logs               | rw    | root        | nginx (UID 101)  | Host scripts      |
+
+**Mode** shows container mount modes. `rw/ro` means the writer mounts read-write, readers mount read-only.
+
+### Permissions
+
+- **download-updater volumes** (`tiles/`, `download/content/`, `download/nginx_conf/`, `download/hash_cache/`): Must be owned by UID 1001 (`appuser` inside the container). The setup script runs `chown 1001:1001` on these after creation.
+- **nginx writable volumes** (`cache/`, `nginx-log/`): nginx master starts as root and manages file ownership internally. `cache/` is a tmpfs mount recreated on each boot.
+- **certbot volumes** (`certbot-cert/`, `certbot-www/`): Certbot runs as root — default ownership works.
+- **Host-written volumes** (`frontend/`, `nginx-cert/`): Written by host scripts (running as root), mounted read-only in containers.
+
+### Troubleshooting
+
+If download-updater fails with `EACCES` errors, fix ownership:
+```bash
+chown 1001:1001 volumes/tiles volumes/download/content \
+    volumes/download/nginx_conf volumes/download/hash_cache
+```
+
+Run `./bin/verify.sh` to check all volume directories exist and have correct ownership.
+
 ## Server Installation
 
 ### 1. Install Dependencies (Debian/Ubuntu)
@@ -73,14 +109,14 @@ This runs preflight checks and then sets up everything: volumes, RAM disk, front
 
 Edit `.env` to configure:
 
-| Variable          | Description                    | Example                 |
-|-------------------|--------------------------------|-------------------------|
-| `DOMAIN_NAME`     | Tiles domain                   | tiles.versatiles.org    |
-| `DOWNLOAD_DOMAIN` | Downloads domain               | download.versatiles.org |
-| `RAM_DISK_GB`     | RAM disk size for caching      | 4                       |
-| `EMAIL`           | Email for Let's Encrypt        | mail@versatiles.org     |
-| `STORAGE_URL`     | Storage box SSH URL            | user@host.de            |
-| `STORAGE_PASS`    | Storage box password (WebDAV)  | (password)              |
+| Variable          | Description                   | Example                 |
+|-------------------|-------------------------------|-------------------------|
+| `DOMAIN_NAME`     | Tiles domain                  | tiles.versatiles.org    |
+| `DOWNLOAD_DOMAIN` | Downloads domain              | download.versatiles.org |
+| `RAM_DISK_GB`     | RAM disk size for caching     | 4                       |
+| `EMAIL`           | Email for Let's Encrypt       | mail@versatiles.org     |
+| `STORAGE_URL`     | Storage box SSH URL           | user@host.de            |
+| `STORAGE_PASS`    | Storage box password (WebDAV) | (password)              |
 
 ## Operations
 
