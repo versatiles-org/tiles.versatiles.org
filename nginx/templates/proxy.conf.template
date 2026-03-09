@@ -59,7 +59,7 @@ server {
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
    etag off;
-   access_log /var/log/nginx/access.log.gz anonymized gzip if=$loggable;
+   access_log /var/log/nginx/access.tsv.gz anonymized gzip if=$loggable;
    access_log /var/log/nginx/referer_stats.tsv.gz referer_stats gzip if=$successful;
    error_log  /var/log/nginx/error.log;
 
