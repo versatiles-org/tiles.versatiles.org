@@ -105,6 +105,8 @@ echo "Creating volume directories..."
 mkdir -p volumes/tiles volumes/frontend volumes/cache \
 	volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache \
 	volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log
+chown 1001:1001 volumes/tiles volumes/download/content \
+	volumes/download/nginx_conf volumes/download/hash_cache
 
 # 2. Initialize RAM disk
 echo "Initializing RAM disk..."
