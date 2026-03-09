@@ -10,6 +10,7 @@ cd "$(dirname "$0")/../.."
 if [ -d "./volumes/cache" ]; then
     echo "Clearing cache..."
     find ./volumes/cache -mindepth 1 -delete 2>/dev/null || true
+    docker compose exec nginx nginx -s reload
     echo "Cache cleared successfully."
 else
     echo "Cache directory not found."
