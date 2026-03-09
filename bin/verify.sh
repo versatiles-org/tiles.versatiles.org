@@ -227,9 +227,40 @@ else
     echo "     → Run: ./bin/log/setup_rotation.sh"
 fi
 
+# Check volume directories
+echo ""
+echo "14. Checking volume directories..."
+VOLUME_DIRS="volumes/tiles volumes/frontend volumes/cache volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log"
+for dir in $VOLUME_DIRS; do
+    if [ -d "$dir" ]; then
+        pass "$dir exists"
+    else
+        fail "$dir is missing"
+    fi
+done
+
+# Check download-updater volumes are writable by UID 1001
+for dir in volumes/tiles volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache; do
+    OWNER=$(stat -c '%u' "$dir" 2>/dev/null || stat -f '%u' "$dir" 2>/dev/null || echo "unknown")
+    if [ "$OWNER" = "1001" ]; then
+        pass "$dir owned by appuser (1001)"
+    else
+        warn "$dir owned by UID $OWNER (expected 1001)"
+        echo "     → Run: chown 1001:1001 $dir"
+    fi
+done
+
+# Check RAM disk
+if mountpoint -q volumes/cache 2>/dev/null; then
+    pass "volumes/cache is a mounted filesystem (RAM disk)"
+else
+    warn "volumes/cache is not a separate mount (RAM disk not configured?)"
+    echo "     → Run: ./bin/ramdisk/init.sh"
+fi
+
 # Check nginx rate limit configuration
 echo ""
-echo "14. Checking nginx rate limit configuration..."
+echo "15. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then
