@@ -8,6 +8,7 @@ map $http_accept_encoding $accept_encoding {
 
 map $status $loggable {
    ~^[2] 0;
+   499 0;
    default 1;
 }
 
