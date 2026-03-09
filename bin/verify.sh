@@ -162,24 +162,24 @@ for path in "${CORS_PATHS[@]}"; do
     fi
 done
 
-# Test download file (local file)
+# Test download files (local files)
 echo ""
 echo "9. Testing download endpoints..."
-echo "   Testing local file (osm.versatiles)..."
-LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/osm.versatiles" 2>/dev/null || echo "000")
-if [ "$LOCAL_CODE" = "200" ]; then
-    pass "Local file endpoint working"
-else
-    warn "Local file returned $LOCAL_CODE"
-fi
+for tileset in osm satellite elevation; do
+    LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/${tileset}.versatiles" 2>/dev/null || echo "000")
+    if [ "$LOCAL_CODE" = "200" ]; then
+        pass "Local file endpoint working: ${tileset}"
+    else
+        warn "Local file ${tileset} returned $LOCAL_CODE"
+    fi
 
-echo "   Testing checksum file..."
-CHECKSUM_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/osm.versatiles.md5" 2>/dev/null || echo "000")
-if [ "$CHECKSUM_CODE" = "200" ]; then
-    pass "Checksum endpoint working"
-else
-    warn "Checksum endpoint returned $CHECKSUM_CODE"
-fi
+    CHECKSUM_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${tileset}.versatiles.md5" 2>/dev/null || echo "000")
+    if [ "$CHECKSUM_CODE" = "200" ]; then
+        pass "Checksum endpoint working: ${tileset}"
+    else
+        warn "Checksum endpoint ${tileset} returned $CHECKSUM_CODE"
+    fi
+done
 
 # Test WebDAV proxy (remote versioned file)
 echo ""
