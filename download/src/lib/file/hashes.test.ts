@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
 
 vi.mock('fs', () => ({
 	existsSync: vi.fn(),
@@ -10,13 +11,13 @@ vi.mock('fs', () => ({
 	rmSync: vi.fn(),
 }));
 vi.mock('child_process', () => ({
-	spawnSync: vi.fn(),
+	spawn: vi.fn(),
 }));
 
 import { generateHashes } from './hashes.js';
 import { FileRef } from './file_ref.js';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const FAKE_MD5 = 'd41d8cd98f00b204e9800998ecf8427e'; // 32 chars
 const FAKE_SHA = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'; // 64 chars
@@ -26,6 +27,18 @@ function createFileRef(filename: string, remotePath: string): FileRef {
 	ref.filename = filename;
 	ref.url = '/' + filename;
 	return ref;
+}
+
+/** Creates a mock child process that emits stdout data and closes with given code */
+function mockProcess(stdout: string, code: number) {
+	const proc = new EventEmitter();
+	(proc as any).stdout = new EventEmitter();
+	(proc as any).stderr = new EventEmitter();
+	process.nextTick(() => {
+		if (stdout) (proc as any).stdout.emit('data', Buffer.from(stdout));
+		proc.emit('close', code);
+	});
+	return proc;
 }
 
 describe('generateHashes', () => {
@@ -48,7 +61,7 @@ describe('generateHashes', () => {
 
 		await generateHashes([file]);
 
-		expect(spawnSync).not.toHaveBeenCalled();
+		expect(spawn).not.toHaveBeenCalled();
 		expect(file.hashes).toEqual({ md5: FAKE_MD5, sha256: FAKE_SHA });
 	});
 
@@ -60,17 +73,17 @@ describe('generateHashes', () => {
 			return true;
 		});
 
-		vi.mocked(spawnSync).mockImplementation((_cmd: any, args: any) => {
+		vi.mocked(spawn).mockImplementation((_cmd: any, args: any) => {
 			if (args && Array.isArray(args) && args.includes('cat')) {
 				const hashPath = args[args.length - 1] as string;
 				if (hashPath.endsWith('.md5')) {
-					return { status: 0, stdout: Buffer.from(`${FAKE_MD5}  test.versatiles\n`) } as any;
+					return mockProcess(`${FAKE_MD5}  test.versatiles\n`, 0) as any;
 				}
 				if (hashPath.endsWith('.sha256')) {
-					return { status: 0, stdout: Buffer.from(`${FAKE_SHA}  test.versatiles\n`) } as any;
+					return mockProcess(`${FAKE_SHA}  test.versatiles\n`, 0) as any;
 				}
 			}
-			return { status: 1, stdout: Buffer.from('') } as any;
+			return mockProcess('', 1) as any;
 		});
 
 		vi.mocked(readFileSync).mockImplementation((p: any) => {
@@ -93,22 +106,22 @@ describe('generateHashes', () => {
 			return true;
 		});
 
-		vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+		vi.mocked(spawn).mockImplementation((cmd: any, args: any) => {
 			if (cmd === 'scp') {
-				return { status: 0, stdout: Buffer.from('') } as any;
+				return mockProcess('', 0) as any;
 			}
 			if (args && Array.isArray(args)) {
 				if (args.includes('cat')) {
-					return { status: 1, stdout: Buffer.from('') } as any;
+					return mockProcess('', 1) as any;
 				}
 				if (args.includes('md5sum')) {
-					return { status: 0, stdout: Buffer.from(`${FAKE_MD5}  /home/data/test.versatiles\n`) } as any;
+					return mockProcess(`${FAKE_MD5}  /home/data/test.versatiles\n`, 0) as any;
 				}
 				if (args.includes('sha256sum')) {
-					return { status: 0, stdout: Buffer.from(`${FAKE_SHA}  /home/data/test.versatiles\n`) } as any;
+					return mockProcess(`${FAKE_SHA}  /home/data/test.versatiles\n`, 0) as any;
 				}
 			}
-			return { status: 1, stdout: Buffer.from('') } as any;
+			return mockProcess('', 1) as any;
 		});
 
 		vi.mocked(readFileSync).mockImplementation((p: any) => {
@@ -124,7 +137,7 @@ describe('generateHashes', () => {
 		expect(file.hashes).toEqual({ md5: FAKE_MD5, sha256: FAKE_SHA });
 
 		// Verify SCP was called to upload hash files to remote
-		const scpCalls = vi.mocked(spawnSync).mock.calls.filter(([cmd]) => cmd === 'scp');
+		const scpCalls = vi.mocked(spawn).mock.calls.filter(([cmd]) => cmd === 'scp');
 		expect(scpCalls).toHaveLength(2);
 	});
 
@@ -136,10 +149,9 @@ describe('generateHashes', () => {
 			return true;
 		});
 
-		vi.mocked(spawnSync).mockReturnValue({
-			status: 1,
-			stdout: Buffer.from(''),
-		} as any);
+		vi.mocked(spawn).mockImplementation(() => {
+			return mockProcess('', 1) as any;
+		});
 
 		await expect(generateHashes([file])).rejects.toThrow(
 			'Failed to calculate md5 for /home/data/test.versatiles on remote',

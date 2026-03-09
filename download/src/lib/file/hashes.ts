@@ -9,13 +9,16 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlink
 import { basename, dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { FileRef } from './file_ref.js';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 
 /** Shared SSH connection options (without port flag, since SSH uses -p and SCP uses -P) */
 const SSH_COMMON_OPTIONS = ['-i', '/app/.ssh/storage', '-oBatchMode=yes', '-oStrictHostKeyChecking=accept-new'];
 
 /** Local cache directory for downloaded hash files */
 const DOWNLOAD_HASH_CACHE_DIR = '/volumes/download/hash_cache';
+
+/** Maximum number of concurrent SSH operations */
+const SSH_CONCURRENCY = 8;
 
 /**
  * Gets the local cache path for a hash file.
@@ -36,33 +39,38 @@ function ensureCacheDir(cachePath: string): void {
 }
 
 /**
- * Runs an SSH command and returns stdout, ignoring common warnings.
+ * Runs an SSH command asynchronously and returns stdout.
  */
-function sshCommand(args: string[]): { success: boolean; stdout: string } {
+function sshCommand(args: string[]): Promise<{ success: boolean; stdout: string }> {
 	const storageUrl = process.env['STORAGE_URL'];
 	if (!storageUrl) throw new Error('STORAGE_URL not set');
 
 	const fullArgs = [storageUrl, '-p', '23', ...SSH_COMMON_OPTIONS, ...args];
 
-	const result = spawnSync('ssh', fullArgs);
+	return new Promise((resolve) => {
+		const proc = spawn('ssh', fullArgs);
+		const chunks: Buffer[] = [];
 
-	if (result.status === null) {
-		return { success: false, stdout: '' };
-	}
+		proc.stdout.on('data', (data: Buffer) => chunks.push(data));
+		proc.stderr.on('data', () => { /* ignore */ });
 
-	return {
-		success: result.status === 0,
-		stdout: result.stdout.toString().trim(),
-	};
+		proc.on('error', () => resolve({ success: false, stdout: '' }));
+		proc.on('close', (code) => {
+			resolve({
+				success: code === 0,
+				stdout: Buffer.concat(chunks).toString().trim(),
+			});
+		});
+	});
 }
 
 /**
  * Downloads a hash file from remote storage via SSH.
  * Returns the hash string or null if not found.
  */
-function downloadHashFile(remotePath: string, hashType: string): string | null {
+async function downloadHashFile(remotePath: string, hashType: string): Promise<string | null> {
 	const remoteHashPath = `${remotePath}.${hashType}`;
-	const result = sshCommand(['cat', remoteHashPath]);
+	const result = await sshCommand(['cat', remoteHashPath]);
 
 	if (!result.success || result.stdout.length === 0) {
 		return null;
@@ -76,22 +84,25 @@ function downloadHashFile(remotePath: string, hashType: string): string | null {
 /**
  * Uploads a file to remote storage via SCP.
  */
-function scpUpload(localPath: string, remotePath: string): boolean {
+function scpUpload(localPath: string, remotePath: string): Promise<boolean> {
 	const storageUrl = process.env['STORAGE_URL'];
 	if (!storageUrl) throw new Error('STORAGE_URL not set');
 
-	const result = spawnSync('scp', ['-P', '23', ...SSH_COMMON_OPTIONS, localPath, `${storageUrl}:${remotePath}`]);
+	return new Promise((resolve) => {
+		const proc = spawn('scp', ['-P', '23', ...SSH_COMMON_OPTIONS, localPath, `${storageUrl}:${remotePath}`]);
 
-	return result.status === 0;
+		proc.on('error', () => resolve(false));
+		proc.on('close', (code) => resolve(code === 0));
+	});
 }
 
 /**
  * Calculates a hash on the remote server via SSH and stores it on remote via SCP.
  * Returns the hash string or throws on failure.
  */
-function calculateHashRemote(remotePath: string, hashType: string): string {
+async function calculateHashRemote(remotePath: string, hashType: string): Promise<string> {
 	console.log(`   Calculating ${hashType} for ${basename(remotePath)} on remote...`);
-	const result = sshCommand([`${hashType}sum`, remotePath]);
+	const result = await sshCommand([`${hashType}sum`, remotePath]);
 
 	if (!result.success || result.stdout.length === 0) {
 		throw new Error(`Failed to calculate ${hashType} for ${remotePath} on remote`);
@@ -105,10 +116,10 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
 
 	// Store the hash file on remote via SCP for future runs
 	const hashContent = `${hash}  ${basename(remotePath)}\n`;
-	const tmpFile = join(tmpdir(), `hash-${Date.now()}-${hashType}`);
+	const tmpFile = join(tmpdir(), `hash-${Date.now()}-${Math.random().toString(36).slice(2)}-${hashType}`);
 	writeFileSync(tmpFile, hashContent);
 	try {
-		const uploaded = scpUpload(tmpFile, `${remotePath}.${hashType}`);
+		const uploaded = await scpUpload(tmpFile, `${remotePath}.${hashType}`);
 		if (!uploaded) {
 			throw new Error(`Failed to upload ${hashType} hash to remote for ${basename(remotePath)}`);
 		}
@@ -117,6 +128,56 @@ function calculateHashRemote(remotePath: string, hashType: string): string {
 	}
 
 	return hash;
+}
+
+/**
+ * Processes a single hash (download or calculate) for a file.
+ */
+async function processHash(
+	file: FileRef,
+	hashType: 'md5' | 'sha256',
+	stats: { downloaded: number; calculated: number; cached: number },
+): Promise<void> {
+	const cachePath = getHashCachePath(file.remotePath, hashType);
+
+	if (existsSync(cachePath)) {
+		stats.cached++;
+		return;
+	}
+
+	ensureCacheDir(cachePath);
+
+	// Try download first, then calculate
+	let hash = await downloadHashFile(file.remotePath, hashType);
+	console.log(
+		` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`,
+	);
+	if (hash) {
+		stats.downloaded++;
+	} else {
+		hash = await calculateHashRemote(file.remotePath, hashType);
+		stats.calculated++;
+	}
+
+	writeFileSync(cachePath, `${hash} ${basename(file.remotePath)}\n`);
+}
+
+/**
+ * Runs async tasks with a concurrency limit.
+ */
+async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+	const results: T[] = [];
+	let index = 0;
+
+	async function worker(): Promise<void> {
+		while (index < tasks.length) {
+			const i = index++;
+			results[i] = await tasks[i]();
+		}
+	}
+
+	await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, () => worker()));
+	return results;
 }
 
 /**
@@ -135,38 +196,15 @@ export async function generateHashes(files: FileRef[]) {
 
 	console.log('Fetching hashes from remote storage...');
 
-	let downloaded = 0;
-	let calculated = 0;
-	let cached = 0;
+	const stats = { downloaded: 0, calculated: 0, cached: 0 };
 
-	for (const file of files) {
-		for (const hashType of ['md5', 'sha256'] as const) {
-			const cachePath = getHashCachePath(file.remotePath, hashType);
+	const tasks = files.flatMap((file) =>
+		(['md5', 'sha256'] as const).map((hashType) => () => processHash(file, hashType, stats)),
+	);
 
-			if (existsSync(cachePath)) {
-				cached++;
-				continue;
-			}
+	await runWithConcurrency(tasks, SSH_CONCURRENCY);
 
-			ensureCacheDir(cachePath);
-
-			// Try download first, then calculate
-			let hash = downloadHashFile(file.remotePath, hashType);
-			console.log(
-				` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`,
-			);
-			if (hash) {
-				downloaded++;
-			} else {
-				hash = calculateHashRemote(file.remotePath, hashType);
-				calculated++;
-			}
-
-			writeFileSync(cachePath, `${hash} ${basename(file.remotePath)}\n`);
-		}
-	}
-
-	console.log(` - ${downloaded} downloaded, ${calculated} calculated, ${cached} cached`);
+	console.log(` - ${stats.downloaded} downloaded, ${stats.calculated} calculated, ${stats.cached} cached`);
 
 	// Read all hashes from cache
 	console.log('Reading hashes from cache...');
