@@ -129,11 +129,27 @@ When the repository code has been updated (e.g., new features, bug fixes):
 ```
 
 This will:
+- Ensure infrastructure (volumes, RAM disk, cron jobs)
 - Pull latest changes from Git
 - Update frontend assets
 - Download latest tile data
 - Rebuild and restart all Docker containers
 - Regenerate download nginx configuration
+
+### Ensure Infrastructure Only
+
+To re-apply infrastructure prerequisites without a full update (e.g., after changing volume config or cron jobs):
+
+```bash
+./bin/deploy/ensure.sh
+```
+
+This is idempotent and safe to run repeatedly. It ensures:
+- All volume directories exist with correct ownership
+- RAM disk is mounted
+- Cron jobs (cert renewal, log rotation) are configured
+
+Both `bin/deploy/setup.sh` and `bin/update.sh` call this automatically.
 
 ### Update After Remote Storage Changes
 

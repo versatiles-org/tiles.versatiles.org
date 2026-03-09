@@ -100,63 +100,50 @@ wait_for_healthy() {
 echo "Starting deployment..."
 echo ""
 
-# 1. Create volume directories
-echo "Creating volume directories..."
-mkdir -p volumes/tiles volumes/frontend volumes/cache \
-	volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache \
-	volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log
-chown 1001:1001 volumes/tiles volumes/download/content \
-	volumes/download/nginx_conf volumes/download/hash_cache
+# 1. Ensure infrastructure (volumes, RAM disk, cron jobs)
+./bin/deploy/ensure.sh
 
-# 2. Initialize RAM disk
-echo "Initializing RAM disk..."
-./bin/ramdisk/init.sh
-
-# 3. Fetch frontend
+# 2. Fetch frontend
 echo "Fetching frontend..."
 ./bin/frontend/update.sh
 
-# 4. Fetch styles
+# 3. Fetch styles
 echo "Fetching styles..."
 ./bin/styles/update.sh
 
-# 5. Pull Docker images
+# 4. Pull Docker images
 echo "Pulling Docker images..."
 docker compose pull
 
-# 6. Build custom images
+# 5. Build custom images
 echo "Building Docker images..."
 docker compose build
 docker compose build download-updater
 
-# 7. Create dummy SSL certificates
+# 6. Create dummy SSL certificates
 echo "Creating dummy SSL certificates..."
 ./bin/cert/create_dummy.sh "$DOMAIN_NAME"
 ./bin/cert/create_dummy.sh "$DOWNLOAD_DOMAIN"
 
-# 8. Start services
+# 7. Start services
 echo "Starting services..."
 docker compose up --detach
 wait_for_healthy nginx
 
-# 9. Run download pipeline
+# 8. Run download pipeline
 echo "Running download pipeline..."
 docker compose run --rm download-updater
 
-# 10. Reload nginx
+# 9. Reload nginx
 echo "Reloading nginx..."
 docker compose exec nginx nginx -s reload
 
-# 11. Create valid Let's Encrypt certificates
+# 10. Create valid Let's Encrypt certificates
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 ./bin/cert/create_valid.sh "$DOWNLOAD_DOMAIN"
 
-# 12. Set up log rotation cron job
-echo "Setting up log rotation..."
-./bin/log/setup_rotation.sh
-
-# 13. Verify deployment
+# 11. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh

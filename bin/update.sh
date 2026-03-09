@@ -32,6 +32,9 @@ wait_for_healthy() {
 echo "Updating repository from Git..."
 git pull
 
+# Ensure infrastructure (volumes, RAM disk, cron jobs)
+./bin/deploy/ensure.sh
+
 # Update frontend
 echo "Fetching frontend..."
 ./bin/frontend/update.sh
