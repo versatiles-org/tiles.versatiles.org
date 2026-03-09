@@ -23,7 +23,7 @@ mkdir -p \
    volumes/tiles
 
 echo "Ensuring volume ownership..."
-chown 1001:1001 \
+chown -R 1001:1001 \
 	volumes/download/hash_cache \
 	volumes/download/nginx_conf \
    volumes/download/content \
