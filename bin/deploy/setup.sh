@@ -117,7 +117,6 @@ docker compose pull
 
 # 5. Build custom images
 echo "Building Docker images..."
-docker compose build
 docker compose build download-updater
 
 # 6. Create dummy SSL certificates

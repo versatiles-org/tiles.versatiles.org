@@ -49,7 +49,6 @@ docker compose pull
 
 # Build all custom images (old containers keep serving traffic)
 echo "Building Docker images..."
-docker compose build
 docker compose build download-updater
 
 # Run download pipeline to fetch latest data
