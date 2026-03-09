@@ -52,7 +52,9 @@ function sshCommand(args: string[]): Promise<{ success: boolean; stdout: string 
 		const chunks: Buffer[] = [];
 
 		proc.stdout.on('data', (data: Buffer) => chunks.push(data));
-		proc.stderr.on('data', () => { /* ignore */ });
+		proc.stderr.on('data', () => {
+			/* ignore */
+		});
 
 		proc.on('error', () => resolve({ success: false, stdout: '' }));
 		proc.on('close', (code) => {
@@ -149,9 +151,7 @@ async function processHash(
 
 	// Try download first, then calculate
 	let hash = await downloadHashFile(file.remotePath, hashType);
-	console.log(
-		` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`,
-	);
+	console.log(` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`);
 	if (hash) {
 		stats.downloaded++;
 	} else {
