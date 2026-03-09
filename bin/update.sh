@@ -63,9 +63,8 @@ wait_for_healthy versatiles
 
 # Recreate nginx last (backends are already up and healthy)
 echo "Updating nginx..."
-docker compose up --detach nginx
+docker compose up --detach --force-recreate nginx
 wait_for_healthy nginx
-docker compose exec nginx nginx -s reload
 
 # Clear cache data
 echo "Clearing cache data..."
