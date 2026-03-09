@@ -12,6 +12,11 @@ map $status $loggable {
    default 1;
 }
 
+map $status $successful {
+   ~^[2] 1;
+   default 0;
+}
+
 upstream versatiles_backend {
    server versatiles:8080;
    keepalive 16;
@@ -55,6 +60,7 @@ server {
 
    etag off;
    access_log /var/log/nginx/access.log.gz anonymized gzip if=$loggable;
+   access_log /var/log/nginx/referer_stats.log referer_stats if=$successful;
    error_log  /var/log/nginx/error.log;
 
    autoindex off;
