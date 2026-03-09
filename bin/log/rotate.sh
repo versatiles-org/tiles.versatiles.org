@@ -7,7 +7,7 @@ LOG_DIR="./volumes/nginx-log"
 MONTH=$(date -d "yesterday" +%Y-%m 2>/dev/null || date -v-1d +%Y-%m)
 
 # Rotate current logs
-for log in access.log.gz error.log; do
+for log in access.log.gz referer_stats.tsv.gz error.log; do
     [ -f "$LOG_DIR/$log" ] || continue
     mv "$LOG_DIR/$log" "$LOG_DIR/${log%.log*}.$MONTH.log${log#*.log}"
 done
