@@ -39,7 +39,7 @@ export function generateSite(fileGroups: FileGroup[], contentFolder: string): { 
 	// 2. Run vite build (SvelteKit static adapter)
 	console.log(' - Running vite build...');
 	execSync('npx svelte-kit sync', { stdio: 'inherit' });
-	execSync('npx vite build', { stdio: 'inherit' });
+	execSync('npx vite build --logLevel warn', { stdio: 'inherit' });
 
 	// 3. Copy build output to content folder
 	const buildDir = resolve('build');

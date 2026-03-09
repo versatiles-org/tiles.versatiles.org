@@ -59,7 +59,7 @@ describe('generateSite', () => {
 		generateSite(groups, '/output');
 
 		expect(execSync).toHaveBeenCalledWith('npx svelte-kit sync', { stdio: 'inherit' });
-		expect(execSync).toHaveBeenCalledWith('npx vite build', { stdio: 'inherit' });
+		expect(execSync).toHaveBeenCalledWith('npx vite build --logLevel warn', { stdio: 'inherit' });
 
 		consoleSpy.mockRestore();
 	});
