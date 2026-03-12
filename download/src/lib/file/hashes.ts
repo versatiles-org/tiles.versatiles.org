@@ -17,8 +17,11 @@ const SSH_COMMON_OPTIONS = ['-i', '/app/.ssh/storage', '-oBatchMode=yes', '-oStr
 /** Local cache directory for downloaded hash files */
 const DOWNLOAD_HASH_CACHE_DIR = '/volumes/download/hash_cache';
 
-/** Maximum number of concurrent SSH operations */
-const SSH_CONCURRENCY = 8;
+/** Maximum number of concurrent SSH download operations */
+const SSH_DOWNLOAD_CONCURRENCY = 8;
+
+/** Maximum number of concurrent SSH computation operations (heavy, one at a time) */
+const SSH_COMPUTE_CONCURRENCY = 1;
 
 /**
  * Gets the local cache path for a hash file.
@@ -132,34 +135,41 @@ async function calculateHashRemote(remotePath: string, hashType: string): Promis
 	return hash;
 }
 
+interface HashTask {
+	file: FileRef;
+	hashType: 'md5' | 'sha256';
+	cachePath: string;
+}
+
 /**
- * Processes a single hash (download or calculate) for a file.
+ * Tries to download a hash file from remote. Returns the hash or null.
+ * Writes to local cache on success.
  */
-async function processHash(
-	file: FileRef,
-	hashType: 'md5' | 'sha256',
+async function tryDownloadHash(
+	task: HashTask,
+	stats: { downloaded: number; calculated: number; cached: number },
+): Promise<boolean> {
+	const hash = await downloadHashFile(task.file.remotePath, task.hashType);
+	if (hash) {
+		console.log(` - ${task.hashType} for ${basename(task.file.remotePath)}: downloaded`);
+		writeFileSync(task.cachePath, `${hash} ${basename(task.file.remotePath)}\n`);
+		stats.downloaded++;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Calculates a hash on the remote server and writes to local cache.
+ */
+async function computeAndCacheHash(
+	task: HashTask,
 	stats: { downloaded: number; calculated: number; cached: number },
 ): Promise<void> {
-	const cachePath = getHashCachePath(file.remotePath, hashType);
-
-	if (existsSync(cachePath)) {
-		stats.cached++;
-		return;
-	}
-
-	ensureCacheDir(cachePath);
-
-	// Try download first, then calculate
-	let hash = await downloadHashFile(file.remotePath, hashType);
-	console.log(` - ${hashType} for ${basename(file.remotePath)}: ${hash ? 'downloaded' : 'not found, calculating...'}`);
-	if (hash) {
-		stats.downloaded++;
-	} else {
-		hash = await calculateHashRemote(file.remotePath, hashType);
-		stats.calculated++;
-	}
-
-	writeFileSync(cachePath, `${hash} ${basename(file.remotePath)}\n`);
+	console.log(` - ${task.hashType} for ${basename(task.file.remotePath)}: not found, calculating...`);
+	const hash = await calculateHashRemote(task.file.remotePath, task.hashType);
+	writeFileSync(task.cachePath, `${hash} ${basename(task.file.remotePath)}\n`);
+	stats.calculated++;
 }
 
 /**
@@ -198,11 +208,35 @@ export async function generateHashes(files: FileRef[]) {
 
 	const stats = { downloaded: 0, calculated: 0, cached: 0 };
 
-	const tasks = files.flatMap((file) =>
-		(['md5', 'sha256'] as const).map((hashType) => () => processHash(file, hashType, stats)),
+	// Build task list, filtering out already-cached hashes
+	const allTasks: HashTask[] = [];
+	for (const file of files) {
+		for (const hashType of ['md5', 'sha256'] as const) {
+			const cachePath = getHashCachePath(file.remotePath, hashType);
+			if (existsSync(cachePath)) {
+				stats.cached++;
+				continue;
+			}
+			ensureCacheDir(cachePath);
+			allTasks.push({ file, hashType, cachePath });
+		}
+	}
+
+	// Phase 1: Try downloading existing hash files in parallel (lightweight)
+	const needsComputation: HashTask[] = [];
+	await runWithConcurrency(
+		allTasks.map((task) => async () => {
+			const found = await tryDownloadHash(task, stats);
+			if (!found) needsComputation.push(task);
+		}),
+		SSH_DOWNLOAD_CONCURRENCY,
 	);
 
-	await runWithConcurrency(tasks, SSH_CONCURRENCY);
+	// Phase 2: Compute missing hashes sequentially (heavy remote operations)
+	await runWithConcurrency(
+		needsComputation.map((task) => () => computeAndCacheHash(task, stats)),
+		SSH_COMPUTE_CONCURRENCY,
+	);
 
 	console.log(` - ${stats.downloaded} downloaded, ${stats.calculated} calculated, ${stats.cached} cached`);
 
