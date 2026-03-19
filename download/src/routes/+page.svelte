@@ -11,12 +11,12 @@
 	<meta name="viewport" content="width=device-width" />
 	<meta
 		name="description"
-		content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers."
+		content="Download open map data as VersaTiles containers — OpenStreetMap, satellite imagery, elevation, landcover, hillshading, and bathymetry."
 	/>
 	<meta property="og:title" content="VersaTiles Downloads" />
 	<meta
 		property="og:description"
-		content="Download VersaTiles map data — OpenStreetMap, hillshading, landcover, bathymetry, and satellite imagery as .versatiles containers."
+		content="Download open map data as VersaTiles containers — OpenStreetMap, satellite imagery, elevation, landcover, hillshading, and bathymetry."
 	/>
 	<meta property="og:type" content="website" />
 
