@@ -45,6 +45,13 @@ export class FileGroup {
 	local: boolean;
 
 	/**
+	 * The type of tiles contained in this group's files.
+	 * - `'vector'`: Protocol Buffer encoded vector tiles (e.g. MVT/PBF)
+	 * - `'raster'`: Image-based raster tiles (e.g. PNG, JPEG, WebP)
+	 */
+	tileType: 'raster' | 'vector';
+
+	/**
 	 * The current default file for this group.
 	 * Set by `groupFiles()` based on the most recent file name.
 	 */
@@ -61,6 +68,7 @@ export class FileGroup {
 		desc: string;
 		order: number;
 		local?: boolean;
+		tileType?: 'raster' | 'vector';
 		latestFile?: FileRef;
 		olderFiles?: FileRef[];
 	}) {
@@ -69,6 +77,7 @@ export class FileGroup {
 		this.desc = options.desc;
 		this.order = options.order;
 		this.local = options.local ?? false;
+		this.tileType = options.tileType ?? 'vector';
 		this.latestFile = options.latestFile;
 		this.olderFiles = options.olderFiles ?? [];
 	}
@@ -142,7 +151,8 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 			let title = '???',
 				desc: string[] = [],
 				order = 10000,
-				local = false;
+				local = false,
+				tileType: 'raster' | 'vector' = 'vector';
 			switch (slug) {
 				case 'osm':
 					title = 'OpenStreetMap as vector tiles';
@@ -158,12 +168,14 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 					desc = ['Satellite imagery from various sources.'];
 					order = 10;
 					local = true;
+					tileType = 'raster';
 					break;
 				case 'elevation':
 					title = 'Elevation data (Beta)';
 					desc = ['Elevation data from various sources.'];
 					order = 20;
 					local = true;
+					tileType = 'raster';
 					break;
 				case 'landcover-vectors':
 					title = 'Landcover as vector tiles';
@@ -195,7 +207,7 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 					console.error(`Unknown group "${slug}"`);
 			}
 
-			group = new FileGroup({ slug, title, desc: desc.join('<br>'), order, local });
+			group = new FileGroup({ slug, title, desc: desc.join('<br>'), order, local, tileType });
 			groupMap.set(slug, group);
 		}
 
