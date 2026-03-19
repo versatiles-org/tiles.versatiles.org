@@ -28,6 +28,7 @@ export interface FileGroupData {
 	desc: string;
 	order: number;
 	local: boolean;
+	tileType: 'raster' | 'vector';
 	latestFile?: FileRefData;
 	olderFiles: FileRefData[];
 }
