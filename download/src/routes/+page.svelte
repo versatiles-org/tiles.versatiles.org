@@ -57,7 +57,7 @@
 		</header>
 
 		{#each data.fileGroups as group}
-			<h2>{group.title}</h2>
+			<h2>{group.title} <span class="tile-type {group.tileType}">{group.tileType}</span></h2>
 			<div class="small group-desc">
 				{@html group.desc}
 				<p class="group-links small">
@@ -156,6 +156,27 @@
 
 	h2 {
 		margin: 5em 0 0.5em;
+	}
+
+	.tile-type {
+		display: inline-block;
+		font-size: 0.45em;
+		font-weight: 500;
+		padding: 0.15em 0.5em;
+		border-radius: 0.3em;
+		vertical-align: middle;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.tile-type.vector {
+		background-color: #2a5a3a;
+		color: #8fd4a4;
+	}
+
+	.tile-type.raster {
+		background-color: #4a3a2a;
+		color: #d4a88f;
 	}
 
 	.row {
