@@ -155,50 +155,52 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 				tileType: 'raster' | 'vector' = 'vector';
 			switch (slug) {
 				case 'osm':
-					title = 'OpenStreetMap as vector tiles';
+					title = 'OpenStreetMap';
 					desc = [
-						'The full <a href="https://www.openstreetmap.org/">OpenStreetMap</a> planet as vector tilesets with zoom levels 0-14 in <a href="https://shortbread-tiles.org/schema/">Shortbread Schema</a>.',
-						'Map Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap Contributors</a> available under <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>',
+						'Full planet tileset with zoom levels 0-14 in <a href="https://shortbread-tiles.org/schema/">Shortbread Schema</a>.',
+						'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap Contributors</a>, available under <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>',
 					];
 					order = 0;
 					local = true;
 					break;
 				case 'satellite':
-					title = 'Satellite imagery (Beta)';
-					desc = ['Satellite imagery from various sources.'];
+					title = 'Satellite Imagery (Beta)';
+					desc = [
+						'Global satellite imagery composited from <a href="https://versatiles.org/sources/">open data sources</a>.',
+					];
 					order = 10;
 					local = true;
 					tileType = 'raster';
 					break;
 				case 'elevation':
-					title = 'Elevation data (Beta)';
-					desc = ['Elevation data from various sources.'];
+					title = 'Elevation Data (Beta)';
+					desc = ['Global elevation data encoded as raster tiles.'];
 					order = 20;
 					local = true;
 					tileType = 'raster';
 					break;
 				case 'landcover-vectors':
-					title = 'Landcover as vector tiles';
+					title = 'Landcover';
 					desc = [
-						'Landcover vector tiles based on <a href="https://esa-worldcover.org/en/data-access">ESA Worldcover 2021</a>.',
-						'Map Data © <a href="https://esa-worldcover.org/en/data-access">ESA WorldCover project 2021</a> / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium, available under <a href="http://creativecommons.org/licenses/by/4.0/"> CC-BY 4.0 International</a>',
+						'Global landcover classification based on <a href="https://esa-worldcover.org/en/data-access">ESA WorldCover 2021</a>.',
+						'© <a href="https://esa-worldcover.org/en/data-access">ESA WorldCover project 2021</a> / Contains modified Copernicus Sentinel data (2021), available under <a href="http://creativecommons.org/licenses/by/4.0/">CC-BY 4.0</a>',
 					];
 					order = 30;
 					local = true;
 					break;
 				case 'hillshade-vectors':
-					title = 'Hillshading as vector tiles';
+					title = 'Hillshading';
 					desc = [
-						'Hillshade vector tiles based on <a href="https://github.com/tilezen/joerd">Mapzen Jörð Terrain Tiles</a>.',
-						'Map Data © <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Mapzen Terrain Tiles, DEM Sources</a>',
+						'Hillshade contours based on <a href="https://github.com/tilezen/joerd">Mapzen Terrain Tiles</a>.',
+						'© <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Mapzen Terrain Tiles, DEM Sources</a>',
 					];
 					order = 40;
 					local = true;
 					break;
 				case 'bathymetry-vectors':
-					title = 'Bathymetry as vector tiles';
+					title = 'Bathymetry';
 					desc = [
-						'Bathymetry Vectors, derived from the <a href="https://www.gebco.net/data_and_products/historical_data_sets/#gebco_2021">GEBCO 2021 Grid</a>, made with <a href="https://www.naturalearthdata.com/">NaturalEarth</a> by <a href="https://opendem.info">OpenDEM</a>',
+						'Ocean depth contours derived from the <a href="https://www.gebco.net/data_and_products/historical_data_sets/#gebco_2021">GEBCO 2021 Grid</a>, processed with <a href="https://www.naturalearthdata.com/">Natural Earth</a> by <a href="https://opendem.info">OpenDEM</a>.',
 					];
 					order = 50;
 					local = true;

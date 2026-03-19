@@ -101,7 +101,7 @@ describe('groupFiles', () => {
 
 		const groups = groupFiles(files);
 
-		expect(groups[0].title).toBe('OpenStreetMap as vector tiles');
+		expect(groups[0].title).toBe('OpenStreetMap');
 		expect(groups[0].local).toBe(true);
 		expect(groups[0].order).toBe(0);
 	});
