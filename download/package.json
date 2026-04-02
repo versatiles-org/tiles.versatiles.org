@@ -29,7 +29,7 @@
     "@sveltejs/kit": "^2.55.0",
     "svelte": "^5.55.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vite": "^8.0.3",
     "vitest": "^4.1.2"
   },
