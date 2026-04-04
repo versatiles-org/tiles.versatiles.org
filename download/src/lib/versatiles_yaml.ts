@@ -40,9 +40,7 @@ export function buildVersatilesYaml(fileGroups: FileGroup[]): string {
 		.filter((g) => g.local && g.latestFile)
 		.map((g) => {
 			const file = g.latestFile!;
-			const src = file.isRemote
-				? `${webdavBaseUrl}${file.webdavPath}`
-				: `/data/tiles/${file.filename}`;
+			const src = file.isRemote ? `${webdavBaseUrl}${file.webdavPath}` : `/data/tiles/${file.filename}`;
 			return `  - name: ${g.slug}\n    src: ${src}`;
 		})
 		.join('\n');
