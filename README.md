@@ -30,6 +30,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 | Directory                      | Purpose                               | Mode  | Owner       | Writer           | Reader(s)         |
 |--------------------------------|---------------------------------------|-------|-------------|------------------|-------------------|
 | `volumes/tiles/`               | Downloaded `.versatiles` tile files   | rw/ro | `1001:1001` | download-updater | versatiles, nginx |
+| `volumes/versatiles_conf/`     | Generated `versatiles.yaml` config    | rw/ro | `1001:1001` | download-updater | versatiles        |
 | `volumes/frontend/`            | Built frontend assets (HTML, JS, CSS) | ro    | root        | Host scripts     | versatiles        |
 | `volumes/cache/`               | Nginx tile cache (RAM disk / tmpfs)   | rw    | root        | nginx (UID 101)  | nginx             |
 | `volumes/download/content/`    | Generated download page (HTML, RSS)   | rw/ro | `1001:1001` | download-updater | nginx             |
@@ -128,13 +129,61 @@ When the repository code has been updated (e.g., new features, bug fixes):
 ./bin/update.sh
 ```
 
-This will:
-- Ensure infrastructure (volumes, RAM disk, cron jobs)
-- Pull latest changes from Git
-- Update frontend assets
-- Download latest tile data
-- Rebuild and restart all Docker containers
-- Regenerate download nginx configuration
+The script runs a safe two-phase update that keeps the tile server available throughout. Here are all the steps in order:
+
+**1. `git pull`** — pull the latest code.
+
+**2. `bin/deploy/build.sh`**
+- `bin/deploy/ensure.sh` — create volume directories, fix ownership, init RAM disk, configure cron jobs
+- `bin/frontend/update.sh` — fetch latest frontend assets
+- `bin/styles/update.sh` — fetch latest map styles
+- `docker compose pull` — pull latest Docker images
+- `docker compose build download-updater` — rebuild the download-updater image
+
+**3. download-updater `--mode=prepare`** (Phase 1 — no downloads, no deletions)
+- SSH into remote storage and list all `.versatiles` files
+- Generate/load MD5+SHA256 hashes (cached in `volumes/download/hash_cache/`)
+- Group files into datasets (osm, satellite, elevation, …)
+- For each local dataset: compare local MD5 against remote hash
+  - Hash matches → mark as local (keep local path)
+  - Missing or hash mismatch → mark as remote (will fall back to WebDAV)
+- Generate static site HTML + RSS into `volumes/download/content/`
+- Write `volumes/download/nginx_conf/download.conf` — stale datasets go into WebDAV proxy blocks
+- Write `volumes/versatiles_conf/versatiles.yaml` — stale/missing datasets get a `src: https://…` WebDAV URL
+- **Exits 0** if any dataset needs updating; **exits 2** if everything is already current (next step is skipped)
+
+**4. *(only if prepare exited 0)* Restart tile server — WebDAV fallback**
+```bash
+docker compose up --detach versatiles
+```
+VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from remote WebDAV — slower, but no downtime. Old local files can now be safely deleted.
+
+**5. download-updater `--mode=finalize`** (Phase 2 — delete stale files, download new ones)
+- SSH scan + hash generation (same as prepare)
+- Delete local tile files that are no longer wanted (e.g. old date-versioned filenames)
+- Download missing or hash-mismatched files via SCP (atomic: temp file → rename on success)
+- Write local `.md5` / `.sha256` files for future comparisons
+- Generate static site HTML + RSS
+- Write `download.conf` — all datasets now in local alias blocks
+- Write `versatiles.yaml` — all datasets point to `/data/tiles/…`
+
+**6. Restart tile server — local files**
+```bash
+docker compose up --detach versatiles
+```
+VersaTiles reloads `versatiles.yaml`. All datasets now served from local disk at full speed.
+
+**7. Restart nginx**
+```bash
+docker compose up --detach --force-recreate nginx
+```
+Picks up the updated `download.conf`.
+
+**8. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
+
+**9. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
+
+The tile server is always serving valid data: between steps 3 and 4 stale datasets come from WebDAV; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
 
 ### Ensure Infrastructure Only
 
