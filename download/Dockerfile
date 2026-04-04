@@ -22,5 +22,6 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 \
 
 USER appuser
 
-# Run the pipeline
-CMD ["npx", "tsx", "src/run_once.ts"]
+# Run the pipeline (ENTRYPOINT so extra args like --mode=prepare are passed
+# to the script, not interpreted by the node docker-entrypoint.sh wrapper)
+ENTRYPOINT ["npx", "tsx", "src/run_once.ts"]
