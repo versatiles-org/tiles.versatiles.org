@@ -12,7 +12,10 @@ const config = {
 		}),
 		prerender: {
 			entries: ['*'],
-			handleHttpError: 'ignore',
+			// File download endpoints (.versatiles, .md5, .tsv, …) are served by
+			// nginx in production but don't exist during the vite prerender crawl.
+			// Suppress those 404 logs with a no-op handler.
+			handleHttpError: () => {},
 		},
 	},
 };
