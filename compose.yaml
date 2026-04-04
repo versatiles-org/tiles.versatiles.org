@@ -5,7 +5,7 @@ services:
     restart: always
     networks: [docker_network]
     expose: [8080]
-    command: ["serve", "-c", "/config.yaml"]
+    command: ["serve", "-c", "/config_dir/versatiles.yaml"]
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -17,7 +17,7 @@ services:
     volumes:
       - ./volumes/tiles/:/data/tiles/:ro
       - ./volumes/frontend/:/data/frontend/:ro
-      - ./versatiles.yaml:/config.yaml:ro
+      - ./volumes/versatiles_conf/:/config_dir/:ro
 
   download-updater:
     container_name: download-updater
@@ -37,6 +37,7 @@ services:
       - ./volumes/download/content:/volumes/content:rw
       - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
       - ./volumes/download/hash_cache:/volumes/download/hash_cache:rw
+      - ./volumes/versatiles_conf:/volumes/versatiles_conf:rw
       - ./.ssh:/app/.ssh:ro
 
   nginx:

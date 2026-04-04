@@ -90,6 +90,47 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
 }
 
 /**
+ * Checks which "latest local" files of all `FileGroup`s are already present
+ * and up-to-date on disk, without downloading or deleting anything.
+ *
+ * For every group with `local === true` and a `latestFile`:
+ * - If the file exists locally with a matching MD5 hash:
+ *   sets `latestFile.isRemote = false` and updates `fullname` to the local path.
+ * - Otherwise: leaves `latestFile.isRemote = true` (file will be served from
+ *   remote WebDAV until the next finalize run).
+ *
+ * Returns `true` if any file needs updating (i.e., at least one latestFile
+ * remains remote), `false` if everything is already current.
+ */
+export function checkLocalFiles(fileGroups: FileGroup[], localFolder: string): boolean {
+	if (!existsSync(localFolder)) {
+		mkdirSync(localFolder, { recursive: true });
+	}
+
+	let needsUpdate = false;
+
+	for (const group of fileGroups) {
+		if (!group.local || !group.latestFile) continue;
+
+		const file = group.latestFile;
+		const localPath = resolve(localFolder, file.filename);
+		const fileExistsOnDisk = existsSync(localPath);
+		const localHash = fileExistsOnDisk ? readLocalHash(localFolder, file.filename, 'md5') : null;
+		const remoteHash = file.hashes?.md5 ?? null;
+
+		if (fileExistsOnDisk && localHash && remoteHash && localHash === remoteHash) {
+			file.fullname = localPath;
+			file.isRemote = false;
+		} else {
+			needsUpdate = true;
+			// Leave isRemote = true so nginx/versatiles.yaml use WebDAV as fallback
+		}
+	}
+
+	return needsUpdate;
+}
+
+/**
  * Mirrors the "latest local" files of all `FileGroup`s into the local folder.
  *
  * For every group:
