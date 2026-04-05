@@ -38,7 +38,7 @@ fi
 if [ $PREPARE_EXIT -eq 0 ]; then
   # Files need updating — restart tile server to serve stale tilesets from WebDAV
   echo "Restarting tile server with WebDAV fallback..."
-  docker compose up --detach versatiles
+  docker compose up --detach --force-recreate versatiles
   wait_for_healthy versatiles
 fi
 # Exit code 2 means nothing to update — skip intermediate restart
@@ -49,7 +49,7 @@ docker compose run --rm download-updater --mode=finalize
 
 # Restart tile server with final local-disk config
 echo "Restarting tile server with local files..."
-docker compose up --detach versatiles
+docker compose up --detach --force-recreate versatiles
 wait_for_healthy versatiles
 
 # Recreate nginx last (backends are already up and healthy)
