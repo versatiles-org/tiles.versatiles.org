@@ -57,7 +57,10 @@
 		</header>
 
 		{#each data.fileGroups as group}
-			<h2>{group.title} <span class="tile-type {group.tileType}">{group.tileType}</span></h2>
+			<h2 id={group.slug}>
+				<a href="#{group.slug}" class="anchor">#</a>{group.title}
+				<span class="tile-type {group.tileType}">{group.tileType}</span>
+			</h2>
 			<div class="small group-desc">
 				{@html group.desc}
 				<p class="group-links small">
@@ -156,6 +159,18 @@
 
 	h2 {
 		margin: 5em 0 0.5em;
+
+		.anchor {
+			opacity: 0;
+			font-size: 0.6em;
+			margin-right: 0.4em;
+			vertical-align: middle;
+			transition: opacity 0.2s;
+		}
+
+		&:hover .anchor {
+			opacity: 0.5;
+		}
 	}
 
 	.tile-type {
