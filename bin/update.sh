@@ -15,15 +15,18 @@ set -euo pipefail
 # Steps (top to bottom in this script):
 #
 #   1. git pull
-#        Pull the latest code from the repository. Records the HEAD before
-#        and after to decide whether step 2 is needed.
+#        Pull the latest code from the repository.
 #
-#   2. ./bin/deploy/build.sh   (only when step 1 pulled new commits)
+#   2. ./bin/deploy/build.sh
 #        - ensure infrastructure (volumes, RAM disk, cron jobs)
-#        - fetch frontend + styles
-#        - docker compose pull / build
-#        Skipped when HEAD is unchanged: docker images, frontend assets,
-#        and styles only change via committed code.
+#        - fetch latest versatiles-frontend release (HEAD-checked)
+#        - fetch latest versatiles-style release (HEAD-checked)
+#        - docker compose pull (versatiles, nginx base images)
+#        - docker compose build download-updater (uses layer cache)
+#        Always runs: each sub-step has its own idempotent freshness check.
+#        We can't condition on "no new git commits" because frontend, styles,
+#        and the published Docker images all release independently of this
+#        repo's HEAD.
 #
 #   3. download-updater --mode=prepare   (Phase 1)
 #        Scans remote storage via SSH, hashes files, compares with local
@@ -71,22 +74,21 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 #
 #   Path A — files changed (prepare exits 0):
-#     1 → [2] → 3 → 4 → 5 → 6 → 7 → 8 → 9
-#     Step 2 runs only if step 1 pulled new commits. The tile server is
-#     restarted twice (transitional config, then final). During the gap
-#     between restarts, stale tilesets are served via WebDAV proxy so
-#     there is no outage.
+#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+#     The tile server is restarted twice (transitional config, then final).
+#     During the gap between restarts, stale tilesets are served via WebDAV
+#     proxy so there is no outage.
 #
 #   Path B — nothing changed (prepare exits 2):
-#     1 → [2] → 3 → 9
-#     The script exits early after prepare when no remote files are
-#     newer than what is already on disk. Step 2 still runs if there
-#     were code changes, but steps 4–8 are skipped — the existing
-#     healthy state and warm cache are preserved. Verification (9)
-#     still runs to catch infrastructure drift (expired certs, etc).
+#     1 → 2 → 3 → 9
+#     Steps 4–8 are skipped: tile data is already current and the existing
+#     healthy state and warm cache are preserved. Steps 1 and 2 still run
+#     so frontend / styles / Docker image updates are picked up even when
+#     no tile data needs refreshing. Verification (9) catches infra drift
+#     (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
-#     1 → [2] → 3 → abort. No restart, no config change.
+#     1 → 2 → 3 → abort. No restart, no config change.
 # =============================================================================
 
 cd "$(dirname "$0")/.."
@@ -142,20 +144,21 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
-# 1. Pull latest code. Skip the rebuild step when nothing was pulled —
-#    docker images, frontend assets, and styles only change via committed
-#    code, so an unchanged HEAD means there is nothing new to build.
+# 1. Pull latest code from the repository.
 echo "Updating repository from Git..."
-PRE_PULL_HEAD=$(git rev-parse HEAD)
 git pull
-POST_PULL_HEAD=$(git rev-parse HEAD)
 
-if [ "$PRE_PULL_HEAD" = "$POST_PULL_HEAD" ]; then
-  echo "No new commits — skipping build."
-else
-  echo "New commits pulled (${PRE_PULL_HEAD:0:7} → ${POST_PULL_HEAD:0:7}). Building..."
-  ./bin/deploy/build.sh
-fi
+# 2. Always run build.sh. Each of its steps is independently idempotent and
+#    cheap when nothing has changed:
+#      - bin/frontend/update.sh and bin/styles/update.sh check the latest
+#        GitHub release tag via a HEAD request and only download on a change
+#      - `docker compose pull` is a no-op when the registry hasn't moved
+#      - `docker compose build download-updater` uses the layer cache
+#    None of these track this repo's git HEAD, so we cannot use "no new
+#    commits" as a skip signal — that would miss external releases of
+#    versatiles-frontend, versatiles-style, the versatiles binary image,
+#    and the nginx base image.
+./bin/deploy/build.sh
 
 # Phase 1: check what needs updating; generate transitional configs
 echo "Running download pipeline (prepare)..."
