@@ -64,17 +64,20 @@
 			<div class="small group-desc">
 				{@html group.desc}
 				<p class="group-links small">
-					<a href="/urllist_{group.slug}.tsv">URL list</a>
+					<!-- rel="external": served as static files by nginx in production,
+					     so no SvelteKit route exists. Tells the prerender crawler
+					     not to follow them and emit spurious 404 logs. -->
+					<a rel="external" href="/urllist_{group.slug}.tsv">URL list</a>
 					<a href="/feed-{group.slug}.xml">RSS</a>
 				</p>
 			</div>
 
 			{#if group.latestFile}
 				<div class="row">
-					<a href={group.latestFile.url}>{group.latestFile.filename}</a>
-					<a href="{group.latestFile.url}.md5" class="small">md5</a>
-					<a href="{group.latestFile.url}.sha256" class="small">sha256</a>
-					<a href={group.latestFile.url}>{group.latestFile.sizeString}</a>
+					<a rel="external" href={group.latestFile.url}>{group.latestFile.filename}</a>
+					<a rel="external" href="{group.latestFile.url}.md5" class="small">md5</a>
+					<a rel="external" href="{group.latestFile.url}.sha256" class="small">sha256</a>
+					<a rel="external" href={group.latestFile.url}>{group.latestFile.sizeString}</a>
 					<ConvertHelper file={group.latestFile} />
 				</div>
 			{/if}
@@ -83,10 +86,10 @@
 					<summary class="small">Show all versions</summary>
 					{#each group.olderFiles as file}
 						<div class="row">
-							<a href={file.url}>{file.filename}</a>
-							<a href="{file.url}.md5" class="small">md5</a>
-							<a href="{file.url}.sha256" class="small">sha256</a>
-							<a href={file.url}>{file.sizeString}</a>
+							<a rel="external" href={file.url}>{file.filename}</a>
+							<a rel="external" href="{file.url}.md5" class="small">md5</a>
+							<a rel="external" href="{file.url}.sha256" class="small">sha256</a>
+							<a rel="external" href={file.url}>{file.sizeString}</a>
 							<ConvertHelper {file} />
 						</div>
 					{/each}

@@ -12,9 +12,12 @@ const config = {
 		}),
 		prerender: {
 			entries: ['*'],
-			// File download endpoints (.versatiles, .md5, .tsv, …) are served by
-			// nginx in production but don't exist during the vite prerender crawl.
-			// Suppress those 404 logs with a no-op handler.
+			// Safety net: don't fail the build on prerender HTTP errors. Static
+			// download files (.versatiles, .md5, .tsv, …) are served by nginx in
+			// production and have no SvelteKit route — their <a> tags use
+			// rel="external" so the prerender crawler skips them, but if one is
+			// ever added without the attribute we don't want the whole build to
+			// crash on it.
 			handleHttpError: () => {},
 		},
 	},
