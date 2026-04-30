@@ -8,15 +8,15 @@ set -euo pipefail
 # Steps (top to bottom in this script):
 #
 #   1. git pull
-#        Pull the latest code from the repository.
+#        Pull the latest code from the repository. Records the HEAD before
+#        and after to decide whether step 2 is needed.
 #
-#   2. ./bin/deploy/build.sh
+#   2. ./bin/deploy/build.sh   (only when step 1 pulled new commits)
 #        - ensure infrastructure (volumes, RAM disk, cron jobs)
 #        - fetch frontend + styles
 #        - docker compose pull / build
-#        NOTE: build.sh currently *also* runs the download pipeline in
-#        finalize mode. That call short-circuits the prepare/finalize design
-#        below and should be moved to setup.sh — see the improvement plan.
+#        Skipped when HEAD is unchanged: docker images, frontend assets,
+#        and styles only change via committed code.
 #
 #   3. download-updater --mode=prepare   (Phase 1)
 #        Scans remote storage via SSH, hashes files, compares with local
@@ -59,33 +59,41 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 #
 #   Path A — files changed (prepare exits 0):
-#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
-#     Tile server is restarted twice (transitional config, then final).
-#     During the gap between restarts, stale tilesets are served via
-#     WebDAV proxy so there is no outage.
+#     1 → [2] → 3 → 4 → 5 → 6 → 7 → 8 → 9
+#     Step 2 runs only if step 1 pulled new commits. The tile server is
+#     restarted twice (transitional config, then final). During the gap
+#     between restarts, stale tilesets are served via WebDAV proxy so
+#     there is no outage.
 #
 #   Path B — nothing changed (prepare exits 2):
-#     1 → 2 → 3 → 5 → 6 → 7 → 8 → 9
-#     The intermediate restart at step 4 is skipped, but steps 5–8 still
-#     run today. They are effectively no-ops on data but still:
-#       - rescan remote storage (step 5)
-#       - force-recreate both containers (steps 6, 7)
-#       - flush a warm cache (step 8)
-#     Improving this is tracked in the update.sh improvement plan.
+#     1 → [2] → 3 → 9
+#     The script exits early after prepare when no remote files are
+#     newer than what is already on disk. Step 2 still runs if there
+#     were code changes, but steps 4–8 are skipped — the existing
+#     healthy state and warm cache are preserved. Verification (9)
+#     still runs to catch infrastructure drift (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
-#     1 → 2 → 3 → abort. No restart, no config change.
+#     1 → [2] → 3 → abort. No restart, no config change.
 # =============================================================================
 
 cd "$(dirname "$0")/.."
 source bin/deploy/helpers.sh
 
-# Update the repository with the latest changes from Git
+# 1. Pull latest code. Skip the rebuild step when nothing was pulled —
+#    docker images, frontend assets, and styles only change via committed
+#    code, so an unchanged HEAD means there is nothing new to build.
 echo "Updating repository from Git..."
+PRE_PULL_HEAD=$(git rev-parse HEAD)
 git pull
+POST_PULL_HEAD=$(git rev-parse HEAD)
 
-# Build (ensure, fetch assets, pull/build images)
-./bin/deploy/build.sh
+if [ "$PRE_PULL_HEAD" = "$POST_PULL_HEAD" ]; then
+  echo "No new commits — skipping build."
+else
+  echo "New commits pulled (${PRE_PULL_HEAD:0:7} → ${POST_PULL_HEAD:0:7}). Building..."
+  ./bin/deploy/build.sh
+fi
 
 # Phase 1: check what needs updating; generate transitional configs
 echo "Running download pipeline (prepare)..."
@@ -99,13 +107,24 @@ if [ $PREPARE_EXIT -eq 1 ]; then
   exit 1
 fi
 
-if [ $PREPARE_EXIT -eq 0 ]; then
-  # Files need updating — restart tile server to serve stale tilesets from WebDAV
-  echo "Restarting tile server with WebDAV fallback..."
-  docker compose up --detach --force-recreate versatiles
-  wait_for_healthy versatiles
+if [ $PREPARE_EXIT -eq 2 ]; then
+  # Nothing to update — local tiles are already current and configs already
+  # point to local disk. Skip finalize, restarts, and cache clear; still run
+  # verify.sh as a smoke test in case infra has drifted independently.
+  echo "Nothing to update — skipping finalize, restart, and cache clear."
+  echo ""
+  echo "Running verification..."
+  ./bin/verify.sh
+  echo "Operations completed successfully."
+  exit 0
 fi
-# Exit code 2 means nothing to update — skip intermediate restart
+
+# Files need updating — restart tile server so it picks up the transitional
+# config and serves stale tilesets through the WebDAV fallback while we
+# download the new files.
+echo "Restarting tile server with WebDAV fallback..."
+docker compose up --detach --force-recreate versatiles
+wait_for_healthy versatiles
 
 # Phase 2: delete stale files, download new ones, generate final configs
 echo "Running download pipeline (finalize)..."

@@ -76,29 +76,33 @@ echo ""
 echo "Starting deployment..."
 echo ""
 
-# 1. Build (ensure, fetch assets, pull/build images, download pipeline)
+# 1. Build (ensure, fetch assets, pull/build images)
 ./bin/deploy/build.sh
 
-# 2. Create dummy SSL certificates
+# 2. Run download pipeline (initial population — fresh server has no local files)
+echo "Running download pipeline..."
+docker compose run --rm download-updater
+
+# 3. Create dummy SSL certificates
 echo "Creating dummy SSL certificates..."
 ./bin/cert/create_dummy.sh "$DOMAIN_NAME"
 ./bin/cert/create_dummy.sh "$DOWNLOAD_DOMAIN"
 
-# 3. Start services
+# 4. Start services
 echo "Starting services..."
 docker compose up --detach
 wait_for_healthy nginx
 
-# 4. Reload nginx (pick up download config from pipeline)
+# 5. Reload nginx (pick up download config from pipeline)
 echo "Reloading nginx..."
 docker compose exec nginx nginx -s reload
 
-# 5. Create valid Let's Encrypt certificates
+# 6. Create valid Let's Encrypt certificates
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 ./bin/cert/create_valid.sh "$DOWNLOAD_DOMAIN"
 
-# 6. Verify deployment
+# 7. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh
