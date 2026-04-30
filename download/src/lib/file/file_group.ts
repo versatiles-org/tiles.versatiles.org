@@ -174,7 +174,10 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 					break;
 				case 'elevation':
 					title = 'Elevation Data (Beta)';
-					desc = ['Global elevation data encoded as raster tiles.'];
+					desc = [
+						'Global elevation data encoded as raster tiles.',
+						'© <a href=\"https://mapterhorn.com/attribution\">Mapterhorn</a>',
+					];
 					order = 20;
 					local = true;
 					tileType = 'raster';
