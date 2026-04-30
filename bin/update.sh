@@ -5,6 +5,13 @@ set -euo pipefail
 # update.sh — pull latest code, rebuild, refresh tile data, rolling restart.
 # =============================================================================
 #
+# Usage:
+#   update.sh             Run the full update pipeline (paths A/B/C below).
+#   update.sh --dry-run   Read-only check: fetch git (no pull), run the
+#                         download pipeline in check mode, report what
+#                         would change. Touches no configs, no containers,
+#                         no cache. Safe to run from cron.
+#
 # Steps (top to bottom in this script):
 #
 #   1. git pull
@@ -84,6 +91,56 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 source bin/deploy/helpers.sh
+
+# Argument parsing
+DRY_RUN=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    -h|--help)
+      sed -n '4,18p' "$0"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $arg"
+      echo "Usage: $0 [--dry-run]"
+      exit 1
+      ;;
+  esac
+done
+
+# Dry-run: report what *would* happen without changing anything. Runs
+# `git fetch` (no pull) to detect pending commits, then runs the download
+# pipeline in `check` mode (no downloads, no config writes, no static site).
+if [ "$DRY_RUN" = "true" ]; then
+  echo "DRY RUN — no changes will be applied."
+  echo ""
+
+  echo "Checking for new commits..."
+  git fetch --quiet
+  AHEAD=$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo "0")
+  if [ "$AHEAD" -gt 0 ]; then
+    echo "  $AHEAD commit(s) pending on upstream:"
+    git log --oneline 'HEAD..@{u}' | sed 's/^/    /'
+  else
+    echo "  Code is up to date."
+  fi
+  echo ""
+
+  echo "Checking remote tile data..."
+  set +e
+  docker compose run --rm download-updater --mode=check
+  CHECK_EXIT=$?
+  set -e
+  echo ""
+
+  case $CHECK_EXIT in
+    0) echo "Result: tile data updates available — run 'update.sh' to apply." ;;
+    2) echo "Result: tile data is up to date." ;;
+    *) echo "Result: check failed (exit $CHECK_EXIT)."; exit 1 ;;
+  esac
+  exit 0
+fi
 
 # 1. Pull latest code. Skip the rebuild step when nothing was pulled —
 #    docker images, frontend assets, and styles only change via committed

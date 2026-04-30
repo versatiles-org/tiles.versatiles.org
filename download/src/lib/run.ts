@@ -42,7 +42,11 @@ import { FileResponse } from './file/file_response.js';
  *   - `nginx_conf/` — output location for the generated NGINX config
  *   - `versatiles_conf/` — output location for the generated versatiles.yaml
  * - `mode`: controls which phase of the safe update pipeline to run.
- *   - `'prepare'`: check local state, generate transitional configs (no download).
+ *   - `'check'`:    read-only — discover files, check local state, return
+ *                   whether anything needs updating. No downloads, no
+ *                   config writes, no static site generation.
+ *   - `'prepare'`:  check local state, generate transitional configs
+ *                   (no download). Used by update.sh phase 1.
  *   - `'finalize'`: download updates, generate final configs. (default)
  *
  * When `volumeFolder` is not provided, a default `/volumes/` folder is used
@@ -51,19 +55,23 @@ import { FileResponse } from './file/file_response.js';
 export interface Options {
 	domain?: string;
 	volumeFolder?: string;
-	mode?: 'prepare' | 'finalize';
+	mode?: 'check' | 'prepare' | 'finalize';
 }
 
 /**
  * Executes the site update pipeline.
  *
- * In **prepare** mode:
+ * In **check** mode:
  * 1. Resolve folder paths and domain.
  * 2. Discover all `.versatiles` files in remote storage via SSH.
  * 3. Generate or load MD5/SHA256 hashes.
  * 4. Group files into `FileGroup`s.
- * 5. Check which local files are current (`checkLocalFiles`); stale/missing
- *    files keep `isRemote = true`.
+ * 5. Check which local files are current (`checkLocalFiles`).
+ * Returns `true` if any file needs updating, `false` if all are current.
+ * Writes nothing (no static site, no nginx conf, no versatiles.yaml).
+ *
+ * In **prepare** mode:
+ * 1–5. Same as check.
  * 6. Generate static site (HTML + RSS).
  * 7. Build public file list and inline responses.
  * 8. Write NGINX config (stale files → WebDAV proxy).
@@ -71,10 +79,9 @@ export interface Options {
  * Returns `true` if any file needs updating, `false` if all are current.
  *
  * In **finalize** mode (default):
- * 1–4. Same as prepare.
+ * 1–4. Same as check.
  * 5. Download stale/missing files (`downloadLocalFiles`); all end up local.
- * 6–8. Same as prepare.
- * 9. Write `versatiles.yaml` (all files → local paths).
+ * 6–9. Same as prepare, but configs reference local files only.
  * Returns `false` (always produces final local state).
  *
  * Throws:
@@ -110,13 +117,17 @@ export async function run(options: Options = {}): Promise<boolean> {
 
 	let needsUpdate = false;
 
-	if (mode === 'prepare') {
+	if (mode === 'check' || mode === 'prepare') {
 		// Check local state without downloading; stale files stay isRemote=true
 		needsUpdate = checkLocalFiles(fileGroups, tilesFolder);
 	} else {
 		// Download stale/missing files; all end up with isRemote=false
 		await downloadLocalFiles(fileGroups, tilesFolder);
 	}
+
+	// Read-only check mode: report status without writing any configs.
+	// Used by update.sh --dry-run.
+	if (mode === 'check') return needsUpdate;
 
 	// Generate static site (HTML + RSS feeds)
 	const { htmlRef, rssRefs } = generateSite(fileGroups, contentFolder);
