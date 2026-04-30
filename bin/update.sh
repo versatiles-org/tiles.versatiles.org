@@ -40,12 +40,17 @@ set -euo pipefail
 #        regenerates the static site (HTML + RSS), and rewrites
 #        versatiles.yaml + download.conf to point entirely to local disk.
 #
-#   6. restart versatiles
-#        Tile server picks up the final local-disk config.
+#   6. restart versatiles (config-aware)
+#        Tile server picks up the final local-disk config. Recreates the
+#        container only when compose-level state changed (new image, env,
+#        mounts); otherwise issues a lighter `docker compose restart` so
+#        the existing container re-reads the new versatiles.yaml.
 #
-#   7. recreate nginx
-#        Picks up the regenerated download.conf. Done last so the public
-#        edge only flips after both backends are healthy.
+#   7. reload nginx (config-aware)
+#        Picks up the regenerated download.conf. Recreates the container
+#        only when compose-level state changed; otherwise sends a graceful
+#        SIGHUP via `nginx -s reload`, preserving warm connections.
+#        Done last so the public edge only flips after backends are healthy.
 #
 #   8. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
@@ -121,23 +126,26 @@ fi
 
 # Files need updating — restart tile server so it picks up the transitional
 # config and serves stale tilesets through the WebDAV fallback while we
-# download the new files.
+# download the new files. Use `restart` fallback so we only recreate the
+# container if compose state changed; otherwise just re-read the new yaml.
 echo "Restarting tile server with WebDAV fallback..."
-docker compose up --detach --force-recreate versatiles
+up_with_config_fallback versatiles restart
 wait_for_healthy versatiles
 
 # Phase 2: delete stale files, download new ones, generate final configs
 echo "Running download pipeline (finalize)..."
 docker compose run --rm download-updater --mode=finalize
 
-# Restart tile server with final local-disk config
+# Tile server picks up the final local-disk config.
 echo "Restarting tile server with local files..."
-docker compose up --detach --force-recreate versatiles
+up_with_config_fallback versatiles restart
 wait_for_healthy versatiles
 
-# Recreate nginx last (backends are already up and healthy)
+# Nginx picks up the regenerated download.conf. Use `reload` fallback so we
+# send a graceful SIGHUP when only the conf changed; recreate only when the
+# compose state itself changed (new image, new env, new mounts).
 echo "Updating nginx..."
-docker compose up --detach --force-recreate nginx
+up_with_config_fallback nginx reload
 wait_for_healthy nginx
 
 # Clear cache data
