@@ -1,4 +1,4 @@
-FROM node:25-alpine
+FROM node:26-alpine
 
 # Install openssh-client for remote hash generation and update npm
 RUN apk add --no-cache openssh-client && npm install -g npm@latest
