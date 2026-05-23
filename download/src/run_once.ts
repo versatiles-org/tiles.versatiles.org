@@ -1,10 +1,7 @@
 import { run } from './lib/run.js';
 
 const modeArg = process.argv.find((a) => a.startsWith('--mode='));
-const mode =
-	modeArg === '--mode=check' ? 'check'
-	: modeArg === '--mode=prepare' ? 'prepare'
-	: 'finalize';
+const mode = modeArg === '--mode=check' ? 'check' : modeArg === '--mode=prepare' ? 'prepare' : 'finalize';
 
 try {
 	const needsUpdate = await run({ mode });
