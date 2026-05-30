@@ -77,7 +77,18 @@ echo "Starting deployment..."
 echo ""
 
 # 1. Build (ensure, fetch assets, pull/build images)
+# build.sh exits 10 when it downloaded a new frontend/styles bundle. On a fresh
+# server that always happens, and there is nothing running yet to restart or
+# cache to clear, so treat 10 the same as success here. Any other non-zero exit
+# is a real failure.
+set +e
 ./bin/deploy/build.sh
+BUILD_EXIT=$?
+set -e
+if [ $BUILD_EXIT -ne 0 ] && [ $BUILD_EXIT -ne 10 ]; then
+	echo "ERROR: build.sh failed (exit $BUILD_EXIT)."
+	exit 1
+fi
 
 # 2. Run download pipeline (initial population — fresh server has no local files)
 echo "Running download pipeline..."

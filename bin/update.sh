@@ -158,7 +158,25 @@ git pull
 #    commits" as a skip signal — that would miss external releases of
 #    versatiles-frontend, versatiles-style, the versatiles binary image,
 #    and the nginx base image.
+#
+#    build.sh exits 10 when it actually refreshed the frontend and/or styles.
+#    Those assets are served by the versatiles container from a tar it loads at
+#    startup and are cached by nginx, so a download alone is not enough — the
+#    container must be restarted and the cache cleared. In Path A both happen
+#    anyway; in Path B (no tile changes) they are otherwise skipped, so we use
+#    this flag to force them. See the Path B branch below.
+set +e
 ./bin/deploy/build.sh
+BUILD_EXIT=$?
+set -e
+if [ $BUILD_EXIT -eq 10 ]; then
+  ASSETS_CHANGED=true
+elif [ $BUILD_EXIT -ne 0 ]; then
+  echo "ERROR: build.sh failed (exit $BUILD_EXIT)."
+  exit 1
+else
+  ASSETS_CHANGED=false
+fi
 
 # Phase 1: check what needs updating; generate transitional configs
 echo "Running download pipeline (prepare)..."
@@ -173,10 +191,23 @@ if [ $PREPARE_EXIT -eq 1 ]; then
 fi
 
 if [ $PREPARE_EXIT -eq 2 ]; then
-  # Nothing to update — local tiles are already current and configs already
-  # point to local disk. Skip finalize, restarts, and cache clear; still run
-  # verify.sh as a smoke test in case infra has drifted independently.
-  echo "Nothing to update — skipping finalize, restart, and cache clear."
+  # Nothing in the tile data needs updating — local tiles are already current
+  # and configs already point to local disk. Skip finalize and the tile-driven
+  # restarts.
+  #
+  # BUT: build.sh may still have pulled a new frontend/styles bundle. Those are
+  # loaded by the versatiles container at startup and cached by nginx, so the
+  # download alone does nothing visible — without a restart and cache clear the
+  # old frontend keeps being served. So when assets changed we restart the tile
+  # server and clear the cache here even though no tile data moved.
+  if [ "$ASSETS_CHANGED" = "true" ]; then
+    echo "Tile data unchanged, but frontend/styles changed — restarting tile server and clearing cache."
+    up_with_config_fallback versatiles restart
+    wait_for_healthy versatiles
+    ./bin/ramdisk/clear.sh
+  else
+    echo "Nothing to update — skipping finalize, restart, and cache clear."
+  fi
   echo ""
   echo "Running verification..."
   ./bin/verify.sh

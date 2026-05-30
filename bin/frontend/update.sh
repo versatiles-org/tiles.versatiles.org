@@ -2,6 +2,11 @@
 set -euo pipefail
 
 # This script downloads the frontend for VersaTiles, but only if a newer version is available.
+#
+# Exit codes:
+#   0  → frontend already up to date (no download)
+#   10 → frontend was downloaded/updated (the caller must restart versatiles and
+#        clear the nginx cache, otherwise the old frontend keeps being served)
 
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
@@ -32,3 +37,6 @@ echo "Downloading frontend $LATEST_TAG (was: ${CURRENT_TAG:-none})..."
 curl -fLs "https://github.com/versatiles-org/versatiles-frontend/releases/download/$LATEST_TAG/frontend.br.tar.gz" | gzip -d >"$FRONTEND_FILE"
 echo "$LATEST_TAG" >"$TAG_FILE"
 echo "Frontend updated to $LATEST_TAG"
+
+# Signal to the caller that the frontend changed and a restart + cache clear is needed.
+exit 10
