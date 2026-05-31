@@ -51,8 +51,9 @@ server {
    ssl_protocols TLSv1.2 TLSv1.3;
    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM';
    ssl_session_cache shared:SSL:10m;
-   ssl_stapling on;
-   ssl_stapling_verify on;
+   # OCSP stapling removed: Let's Encrypt no longer includes an OCSP responder
+   # URL in issued certificates, so these directives were ignored and only
+   # produced "ssl_stapling ignored" warnings on every reload.
    resolver 8.8.8.8 8.8.4.4 valid=300s;
    resolver_timeout 5s;
 
