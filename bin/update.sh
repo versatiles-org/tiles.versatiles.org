@@ -53,11 +53,17 @@ set -euo pipefail
 #        mounts); otherwise issues a lighter `docker compose restart` so
 #        the existing container re-reads the new versatiles.yaml.
 #
-#   7. ./bin/ramdisk/clear.sh
+#   7. reload nginx (config-aware)
+#        Re-resolves the versatiles upstream in case the tile server container
+#        was recreated above (new IP); nginx caches upstream IPs from config
+#        load until reloaded. Recreates the nginx container only when its
+#        compose state changed; otherwise sends a graceful `nginx -s reload`.
+#
+#   8. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
 #        tiles whose underlying file has just been replaced.
 #
-#   8. ./bin/verify.sh
+#   9. ./bin/verify.sh
 #        Post-deploy smoke test (HTTP/HTTPS endpoints, certs, configs).
 #
 # -----------------------------------------------------------------------------
@@ -65,17 +71,17 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 #
 #   Path A — files changed (prepare exits 0):
-#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
 #     The tile server is restarted twice (transitional config, then final).
 #     During the gap between restarts, stale tilesets are served via WebDAV
 #     fallback so there is no outage.
 #
 #   Path B — nothing changed (prepare exits 2):
-#     1 → 2 → 3 → 8
-#     Steps 4–7 are skipped: tile data is already current and the existing
+#     1 → 2 → 3 → 9
+#     Steps 4–8 are skipped: tile data is already current and the existing
 #     healthy state and warm cache are preserved. Steps 1 and 2 still run
 #     so frontend / styles / Docker image updates are picked up even when
-#     no tile data needs refreshing. Verification (8) catches infra drift
+#     no tile data needs refreshing. Verification (9) catches infra drift
 #     (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
@@ -222,6 +228,14 @@ docker compose run --rm download-updater --mode=finalize
 echo "Restarting tile server with local files..."
 up_with_config_fallback versatiles restart
 wait_for_healthy versatiles
+
+# Reload nginx so it re-resolves the versatiles upstream. If the tile server
+# container was recreated above (e.g. after an image update via `compose pull`),
+# its IP may have changed, and nginx caches upstream IPs from config-load time
+# until reloaded — without this it would keep proxying to the old IP (502s).
+echo "Reloading nginx..."
+up_with_config_fallback nginx reload
+wait_for_healthy nginx
 
 # Clear cache data
 echo "Clearing cache data..."
