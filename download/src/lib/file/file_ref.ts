@@ -1,7 +1,6 @@
 import { spawnSync } from 'child_process';
 import { basename, join, relative } from 'path';
 import { statSync } from 'fs';
-import { FileResponse } from './file_response.js';
 
 /**
  * Represents a single file that is part of the download.versatiles.org catalog.
@@ -103,16 +102,6 @@ export class FileRef {
 	get sha256(): string {
 		if (!this.hashes) throw Error(`SHA256 hash is missing for file "${this.filename}"`);
 		return this.hashes.sha256;
-	}
-
-	/** Builds a virtual `.md5` checksum file for this file. */
-	getResponseMd5File(): FileResponse {
-		return new FileResponse(`${this.url}.md5`, `${this.md5} ${basename(this.url)}\n`);
-	}
-
-	/** Builds a virtual `.sha256` checksum file for this file. */
-	getResponseSha256File(): FileResponse {
-		return new FileResponse(`${this.url}.sha256`, `${this.sha256} ${basename(this.url)}\n`);
 	}
 
 	/** Creates a shallow copy of this FileRef. */

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FileResponse } from './file_response.js';
 
 // Mock child_process and fs before importing
 vi.mock('child_process', () => ({
@@ -109,28 +108,6 @@ describe('FileRef', () => {
 			const f = new FileRef('/data/test.versatiles', 100);
 			f.hashes = { md5: 'abc123', sha256: 'def456' };
 			expect(f.sha256).toBe('def456');
-		});
-	});
-
-	describe('getResponseMd5File', () => {
-		it('returns a FileResponse with correct url and content', () => {
-			const f = new FileRef('/data/test.versatiles', 100);
-			f.hashes = { md5: 'abc123', sha256: 'def456' };
-			const resp = f.getResponseMd5File();
-			expect(resp).toBeInstanceOf(FileResponse);
-			expect(resp.url).toBe('/test.versatiles.md5');
-			expect(resp.content).toBe('abc123 test.versatiles\\n');
-		});
-	});
-
-	describe('getResponseSha256File', () => {
-		it('returns a FileResponse with correct url and content', () => {
-			const f = new FileRef('/data/test.versatiles', 100);
-			f.hashes = { md5: 'abc123', sha256: 'def456' };
-			const resp = f.getResponseSha256File();
-			expect(resp).toBeInstanceOf(FileResponse);
-			expect(resp.url).toBe('/test.versatiles.sha256');
-			expect(resp.content).toBe('def456 test.versatiles\\n');
 		});
 	});
 

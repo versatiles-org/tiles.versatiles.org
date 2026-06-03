@@ -44,51 +44,27 @@ else
     docker compose exec -T nginx nginx -t 2>&1 | head -5
 fi
 
-# Check generated download config
-echo ""
-echo "3. Checking download nginx config..."
-if [ -f "./volumes/download/nginx_conf/download.conf" ]; then
-    pass "download.conf exists"
-
-    if grep -q "server_name ${DOWNLOAD_DOMAIN}" ./volumes/download/nginx_conf/download.conf; then
-        pass "download.conf contains correct domain"
-    else
-        fail "download.conf has wrong domain"
-    fi
-
-    # Check for WebDAV proxy configuration
-    if grep -q "proxy_pass https://" ./volumes/download/nginx_conf/download.conf; then
-        pass "download.conf contains WebDAV proxy configuration"
-    else
-        warn "download.conf missing WebDAV proxy (may be OK if all files are local)"
-    fi
-else
-    fail "download.conf not found - run: ./bin/download-updater/update.sh"
-fi
-
 # Check SSL certificates
 echo ""
-echo "4. Checking SSL certificates..."
-for domain in "${DOMAIN_NAME}" "${DOWNLOAD_DOMAIN}"; do
-    CERT_PATH="./volumes/nginx-cert/live/${domain}/fullchain.pem"
-    if [ -f "$CERT_PATH" ]; then
-        # Check if it's a real cert or dummy
-        ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
-        if echo "$ISSUER" | grep -qi "Let's Encrypt\|R3\|E1\|R10\|R11"; then
-            EXPIRY=$(openssl x509 -in "$CERT_PATH" -noout -enddate 2>/dev/null | cut -d= -f2)
-            pass "$domain has valid Let's Encrypt certificate (expires: $EXPIRY)"
-        else
-            warn "$domain has dummy/self-signed certificate"
-            echo "     → Run: ./bin/cert/create_valid.sh $domain"
-        fi
+echo "3. Checking SSL certificates..."
+CERT_PATH="./volumes/nginx-cert/live/${DOMAIN_NAME}/fullchain.pem"
+if [ -f "$CERT_PATH" ]; then
+    # Check if it's a real cert or dummy
+    ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
+    if echo "$ISSUER" | grep -qi "Let's Encrypt\|R3\|E1\|R10\|R11"; then
+        EXPIRY=$(openssl x509 -in "$CERT_PATH" -noout -enddate 2>/dev/null | cut -d= -f2)
+        pass "${DOMAIN_NAME} has valid Let's Encrypt certificate (expires: $EXPIRY)"
     else
-        fail "$domain certificate not found"
+        warn "${DOMAIN_NAME} has dummy/self-signed certificate"
+        echo "     → Run: ./bin/cert/create_valid.sh ${DOMAIN_NAME}"
     fi
-done
+else
+    fail "${DOMAIN_NAME} certificate not found"
+fi
 
 # Test HTTP endpoints
 echo ""
-echo "5. Testing HTTP endpoints..."
+echo "4. Testing HTTP endpoints..."
 
 # Tiles domain
 echo "   Testing ${DOMAIN_NAME}..."
@@ -106,25 +82,9 @@ else
     warn "HTTPS returned $HTTPS_CODE (expected 200)"
 fi
 
-# Download domain
-echo "   Testing ${DOWNLOAD_DOMAIN}..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${DOWNLOAD_DOMAIN}/" 2>/dev/null || echo "000")
-if [ "$HTTP_CODE" = "301" ]; then
-    pass "HTTP redirect working (301)"
-else
-    warn "HTTP returned $HTTP_CODE (expected 301)"
-fi
-
-HTTPS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/" 2>/dev/null || echo "000")
-if [ "$HTTPS_CODE" = "200" ]; then
-    pass "HTTPS working (200)"
-else
-    warn "HTTPS returned $HTTPS_CODE (expected 200)"
-fi
-
 # Test tile endpoints
 echo ""
-echo "6. Testing tile endpoints..."
+echo "5. Testing tile endpoints..."
 for tileset in osm satellite elevation; do
     TILE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOMAIN_NAME}/tiles/${tileset}/0/0/0" 2>/dev/null || echo "000")
     if [ "$TILE_CODE" = "200" ]; then
@@ -136,7 +96,7 @@ done
 
 # Test style JSON
 echo ""
-echo "7. Testing style JSON..."
+echo "6. Testing style JSON..."
 STYLE_URL="https://${DOMAIN_NAME}/assets/styles/colorful/style.json"
 if curl -sk "$STYLE_URL" 2>/dev/null | python3 -m json.tool >/dev/null 2>&1; then
     pass "Style JSON is valid"
@@ -146,7 +106,7 @@ fi
 
 # Test CORS headers on various endpoints
 echo ""
-echo "8. Checking CORS headers..."
+echo "7. Checking CORS headers..."
 CORS_PATHS=(
     "/tiles/osm/0/0/0"
     "/assets/sprites/basics/sprites.json"
@@ -162,54 +122,9 @@ for path in "${CORS_PATHS[@]}"; do
     fi
 done
 
-# Test download files (local files)
-echo ""
-echo "9. Testing download endpoints..."
-for tileset in osm satellite elevation; do
-    LOCAL_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/${tileset}.versatiles" 2>/dev/null || echo "000")
-    if [ "$LOCAL_CODE" = "200" ]; then
-        pass "Local file endpoint working: ${tileset}"
-    else
-        warn "Local file ${tileset} returned $LOCAL_CODE"
-    fi
-
-    CHECKSUM_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/${tileset}.versatiles.md5" 2>/dev/null || echo "000")
-    if [ "$CHECKSUM_CODE" = "200" ]; then
-        pass "Checksum endpoint working: ${tileset}"
-    else
-        warn "Checksum endpoint ${tileset} returned $CHECKSUM_CODE"
-    fi
-done
-
-# Test WebDAV proxy (remote versioned file)
-echo ""
-echo "10. Testing WebDAV proxy for remote files..."
-# Find a versioned remote file (e.g. osm.20250728.versatiles) from the nginx config
-REMOTE_FILE=$(grep -oP 'location = /\K[^{ ]*\.\d{8}\.versatiles' ./volumes/download/nginx_conf/download.conf 2>/dev/null | head -1 || echo "")
-if [ -n "$REMOTE_FILE" ]; then
-    REMOTE_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -I "https://${DOWNLOAD_DOMAIN}/${REMOTE_FILE}" 2>/dev/null || echo "000")
-    if [ "$REMOTE_CODE" = "200" ]; then
-        pass "WebDAV proxy working (${REMOTE_FILE})"
-    else
-        fail "WebDAV proxy returned $REMOTE_CODE for ${REMOTE_FILE}"
-    fi
-else
-    warn "No versioned remote files found to test"
-fi
-
-# Test RSS feed
-echo ""
-echo "11. Testing RSS feeds..."
-RSS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://${DOWNLOAD_DOMAIN}/feed-osm.xml" 2>/dev/null || echo "000")
-if [ "$RSS_CODE" = "200" ]; then
-    pass "RSS feed working"
-else
-    warn "RSS feed returned $RSS_CODE"
-fi
-
 # Check cron job
 echo ""
-echo "12. Checking certificate renewal cron job..."
+echo "8. Checking certificate renewal cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
     pass "Certificate renewal cron job is configured"
 else
@@ -219,7 +134,7 @@ fi
 
 # Check log rotation cron job
 echo ""
-echo "13. Checking log rotation cron job..."
+echo "9. Checking log rotation cron job..."
 if crontab -l 2>/dev/null | grep -q "bin/log/rotate.sh"; then
     pass "Log rotation cron job is configured"
 else
@@ -229,8 +144,8 @@ fi
 
 # Check volume directories
 echo ""
-echo "14. Checking volume directories..."
-VOLUME_DIRS="volumes/tiles volumes/frontend volumes/cache volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log"
+echo "10. Checking volume directories..."
+VOLUME_DIRS="volumes/tiles volumes/frontend volumes/cache volumes/download/hash_cache volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log volumes/versatiles_conf"
 for dir in $VOLUME_DIRS; do
     if [ -d "$dir" ]; then
         pass "$dir exists"
@@ -239,8 +154,8 @@ for dir in $VOLUME_DIRS; do
     fi
 done
 
-# Check download-updater volumes are writable by UID 1001
-for dir in volumes/tiles volumes/download/content volumes/download/nginx_conf volumes/download/hash_cache; do
+# Check updater-written volumes are writable by UID 1001
+for dir in volumes/tiles volumes/download/hash_cache volumes/versatiles_conf; do
     OWNER=$(stat -c '%u' "$dir" 2>/dev/null || stat -f '%u' "$dir" 2>/dev/null || echo "unknown")
     if [ "$OWNER" = "1001" ]; then
         pass "$dir owned by appuser (1001)"
@@ -260,7 +175,7 @@ fi
 
 # Check nginx rate limit configuration
 echo ""
-echo "15. Checking nginx rate limit configuration..."
+echo "11. Checking nginx rate limit configuration..."
 RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then

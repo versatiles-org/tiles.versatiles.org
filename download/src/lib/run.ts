@@ -1,91 +1,80 @@
 /**
- * Orchestrates the full update pipeline for download.versatiles.org.
+ * Orchestrates the tile-data update pipeline for the VersaTiles tile server.
  *
- * The `run()` function supports two modes:
+ * Mirrors the `.versatiles` files from the remote Hetzner storage box into the
+ * local `tiles/` volume and (re)generates `versatiles.yaml` so the tile server
+ * always has a current config. The public download site that used to live here
+ * has moved to download.versatiles.org (served from Cloudflare R2); this
+ * pipeline no longer generates any website or nginx download config.
+ *
+ * The `run()` function supports three modes:
  *
  * **prepare** (safe update phase 1):
  * - Discovers files and checks local state without downloading anything.
- * - Generates `versatiles.yaml` with WebDAV URLs for stale/missing files
- *   and local paths for files that are already current.
- * - Generates the NGINX configuration with the same local/remote split.
- * - Returns `true` if any files need updating (caller should restart
- *   VersaTiles so it serves stale tilesets from WebDAV, then call finalize).
- * - Returns `false` if everything is already up-to-date.
+ * - Generates `versatiles.yaml` with WebDAV URLs for stale/missing files and
+ *   local paths for files that are already current, so the tile server can
+ *   keep serving stale tilesets from WebDAV while finalize downloads them.
+ * - Returns `true` if any files need updating, `false` otherwise.
  *
  * **finalize** (safe update phase 2, default):
  * - Deletes stale local files, downloads missing or changed files.
- * - Generates `versatiles.yaml` and NGINX config pointing entirely to
- *   local disk.
- * - Generates the static site (HTML + RSS feeds).
+ * - Generates `versatiles.yaml` pointing entirely to local disk.
  *
- * This module is the single entry point for both one-shot updates (`run_once.ts`)
- * and the HTTP-triggered update endpoint (`server.ts`).
+ * **check**: read-only — discover files, check local state, return whether
+ * anything needs updating. Writes nothing.
  */
 import { resolve } from 'path';
 import { getRemoteFilesViaSSH } from './file/file_ref.js';
-import { collectFiles, groupFiles } from './file/file_group.js';
+import { groupFiles } from './file/file_group.js';
 import { generateHashes } from './file/hashes.js';
 import { checkLocalFiles, downloadLocalFiles } from './file/sync.js';
-import { generateSite } from './template/template.js';
-import { generateNginxConf } from './nginx/nginx.js';
 import { generateVersatilesYaml } from './versatiles_yaml.js';
-import { FileResponse } from './file/file_response.js';
 
 /**
  * Configuration options for the `run()` pipeline.
  *
- * - `domain`: public domain name used to construct absolute URLs
- *   (falls back to the `DOMAIN` environment variable when omitted).
  * - `volumeFolder`: root folder containing the expected subdirectories:
  *   - `tiles/` — tile data (*.versatiles files)
- *   - `content/` — generated HTML and RSS feeds
- *   - `nginx_conf/` — output location for the generated NGINX config
  *   - `versatiles_conf/` — output location for the generated versatiles.yaml
  * - `mode`: controls which phase of the safe update pipeline to run.
  *   - `'check'`:    read-only — discover files, check local state, return
  *                   whether anything needs updating. No downloads, no
- *                   config writes, no static site generation.
- *   - `'prepare'`:  check local state, generate transitional configs
+ *                   config writes.
+ *   - `'prepare'`:  check local state, generate transitional versatiles.yaml
  *                   (no download). Used by update.sh phase 1.
- *   - `'finalize'`: download updates, generate final configs. (default)
+ *   - `'finalize'`: download updates, generate final versatiles.yaml. (default)
  *
  * When `volumeFolder` is not provided, a default `/volumes/` folder is used
  * (this is the standard mount point inside the Docker container).
  */
 export interface Options {
-	domain?: string;
 	volumeFolder?: string;
 	mode?: 'check' | 'prepare' | 'finalize';
 }
 
 /**
- * Executes the site update pipeline.
+ * Executes the tile-data update pipeline.
  *
  * In **check** mode:
- * 1. Resolve folder paths and domain.
- * 2. Discover all `.versatiles` files in remote storage via SSH.
- * 3. Generate or load MD5/SHA256 hashes.
- * 4. Group files into `FileGroup`s.
- * 5. Check which local files are current (`checkLocalFiles`).
+ * 1. Discover all `.versatiles` files in remote storage via SSH.
+ * 2. Generate or load MD5/SHA256 hashes.
+ * 3. Group files into `FileGroup`s.
+ * 4. Check which local files are current (`checkLocalFiles`).
  * Returns `true` if any file needs updating, `false` if all are current.
- * Writes nothing (no static site, no nginx conf, no versatiles.yaml).
+ * Writes nothing.
  *
  * In **prepare** mode:
- * 1–5. Same as check.
- * 6. Generate static site (HTML + RSS).
- * 7. Build public file list and inline responses.
- * 8. Write NGINX config (stale files → WebDAV proxy).
- * 9. Write `versatiles.yaml` (stale files → WebDAV URL).
+ * 1–4. Same as check.
+ * 5. Write `versatiles.yaml` (stale files → WebDAV URL, current files → local).
  * Returns `true` if any file needs updating, `false` if all are current.
  *
  * In **finalize** mode (default):
- * 1–4. Same as check.
- * 5. Download stale/missing files (`downloadLocalFiles`); all end up local.
- * 6–9. Same as prepare, but configs reference local files only.
+ * 1–3. Same as check.
+ * 4. Download stale/missing files (`downloadLocalFiles`); all end up local.
+ * 5. Write `versatiles.yaml` referencing local files only.
  * Returns `false` (always produces final local state).
  *
  * Throws:
- * - If `domain` is missing (no `DOMAIN` env and no `options.domain` provided).
  * - If no remote files are found.
  * - If any downstream step fails.
  */
@@ -93,16 +82,9 @@ export async function run(options: Options = {}): Promise<boolean> {
 	// Define key folder paths
 	const volumeFolder = options.volumeFolder ?? '/volumes';
 	const tilesFolder = resolve(volumeFolder, 'tiles');
-	const contentFolder = resolve(volumeFolder, 'content');
-	const nginxFolder = resolve(volumeFolder, 'nginx_conf');
 	const versatilesConfFolder = resolve(volumeFolder, 'versatiles_conf');
 
 	const mode = options.mode ?? 'finalize';
-
-	// Get the domain from environment variables
-	const domain = options.domain ?? process.env['DOMAIN'];
-	if (domain == null) throw Error('missing $DOMAIN');
-	const baseURL = `https://${domain}/`;
 
 	// Scan remote storage via SSH to get list of all .versatiles files
 	const files = getRemoteFilesViaSSH();
@@ -125,30 +107,9 @@ export async function run(options: Options = {}): Promise<boolean> {
 		await downloadLocalFiles(fileGroups, tilesFolder);
 	}
 
-	// Read-only check mode: report status without writing any configs.
+	// Read-only check mode: report status without writing any config.
 	// Used by update.sh --dry-run.
 	if (mode === 'check') return needsUpdate;
-
-	// Generate static site (HTML + RSS feeds)
-	const { htmlRef, rssRefs } = generateSite(fileGroups, contentFolder);
-
-	// Collect all files for nginx configuration
-	// - Local files (synced to tiles/ or content/) use alias
-	// - Remote files use WebDAV proxy
-	const publicFiles = collectFiles(fileGroups, htmlRef, rssRefs).map((f) => {
-		const cloned = f.clone();
-		// Update fullname for local files to container path
-		if (!cloned.isRemote) {
-			cloned.fullname = cloned.fullname.replace(volumeFolder, '/volumes');
-		}
-		return cloned;
-	});
-
-	const publicResponses: FileResponse[] = fileGroups.flatMap((f) => f.getResponses(baseURL));
-
-	// Generate NGINX configuration with WebDAV proxy support
-	const confFilename = resolve(nginxFolder, 'download.conf');
-	generateNginxConf(publicFiles, publicResponses, confFilename);
 
 	// Generate versatiles.yaml for the tile server
 	const versatilesYamlPath = resolve(versatilesConfFolder, 'versatiles.yaml');

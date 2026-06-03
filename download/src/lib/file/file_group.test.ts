@@ -1,23 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { hex2base64, groupFiles, collectFiles, FileGroup } from './file_group.js';
+import { groupFiles, FileGroup } from './file_group.js';
 import { FileRef } from './file_ref.js';
-
-describe('hex2base64', () => {
-	it('converts hex to base64url with padding', () => {
-		// "Hello" in hex is 48656c6c6f
-		expect(hex2base64('48656c6c6f')).toBe('SGVsbG8=');
-	});
-
-	it('handles empty string', () => {
-		expect(hex2base64('')).toBe('');
-	});
-
-	it('converts md5-like hex strings', () => {
-		// d41d8cd98f00b204e9800998ecf8427e is md5 of empty string
-		const result = hex2base64('d41d8cd98f00b204e9800998ecf8427e');
-		expect(result).toBe('1B2M2Y8AsgTpgAmY7PhCfg==');
-	});
-});
 
 describe('FileGroup', () => {
 	describe('constructor', () => {
@@ -48,19 +31,6 @@ describe('FileGroup', () => {
 			});
 
 			expect(group.local).toBe(true);
-		});
-	});
-
-	describe('getResponseUrlList', () => {
-		it('throws when no latestFile is set', () => {
-			const group = new FileGroup({
-				slug: 'test',
-				title: 'Test',
-				desc: 'Test',
-				order: 1,
-			});
-
-			expect(() => group.getResponseUrlList('https://example.com')).toThrow();
 		});
 	});
 });
@@ -145,71 +115,5 @@ describe('groupFiles', () => {
 		expect(consoleSpy).toHaveBeenCalledWith('Unknown group "unknown-dataset"');
 
 		consoleSpy.mockRestore();
-	});
-});
-
-describe('collectFiles', () => {
-	function createMockFileRef(url: string): FileRef {
-		const ref = Object.create(FileRef.prototype);
-		ref.url = url;
-		ref.fullname = url;
-		ref.filename = url.slice(1);
-		ref.size = 1000;
-		ref.sizeString = '0.0 GB';
-		ref.isRemote = false;
-		ref.remotePath = '';
-		ref.webdavPath = '';
-		return ref;
-	}
-
-	it('collects files from FileRef array', () => {
-		const files = [createMockFileRef('/file1.txt'), createMockFileRef('/file2.txt')];
-
-		const result = collectFiles(files);
-
-		expect(result.length).toBe(2);
-	});
-
-	it('deduplicates files by url', () => {
-		const files = [createMockFileRef('/file1.txt'), createMockFileRef('/file1.txt'), createMockFileRef('/file2.txt')];
-
-		const result = collectFiles(files);
-
-		expect(result.length).toBe(2);
-	});
-
-	it('collects files from FileGroup', () => {
-		const file1 = createMockFileRef('/latest.txt');
-		const file2 = createMockFileRef('/older.txt');
-
-		const group = new FileGroup({
-			slug: 'test',
-			title: 'Test',
-			desc: 'Test',
-			order: 1,
-			latestFile: file1,
-			olderFiles: [file2],
-		});
-
-		const result = collectFiles(group);
-
-		expect(result.length).toBe(2);
-	});
-
-	it('handles mixed inputs', () => {
-		const file1 = createMockFileRef('/file1.txt');
-		const file2 = createMockFileRef('/file2.txt');
-
-		const group = new FileGroup({
-			slug: 'test',
-			title: 'Test',
-			desc: 'Test',
-			order: 1,
-			latestFile: file1,
-		});
-
-		const result = collectFiles(group, [file2]);
-
-		expect(result.length).toBe(2);
 	});
 });

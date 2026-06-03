@@ -14,9 +14,7 @@ echo "Ensuring volume directories exist..."
 mkdir -p \
 	volumes/certbot-cert \
 	volumes/certbot-www \
-	volumes/download/content \
 	volumes/download/hash_cache \
-	volumes/download/nginx_conf \
 	volumes/nginx-cert \
 	volumes/nginx-log \
 	volumes/frontend volumes/cache \
@@ -26,8 +24,6 @@ mkdir -p \
 echo "Ensuring volume ownership..."
 chown -R 1001:1001 \
 	volumes/download/hash_cache \
-	volumes/download/nginx_conf \
-	volumes/download/content \
 	volumes/tiles \
 	volumes/versatiles_conf
 

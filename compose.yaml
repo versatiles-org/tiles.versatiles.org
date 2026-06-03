@@ -27,15 +27,12 @@ services:
     profiles: [donotstart]
     networks: [docker_network]
     environment:
-      - DOMAIN=${DOWNLOAD_DOMAIN}
       - STORAGE_URL=${STORAGE_URL}
       - STORAGE_PASS=${STORAGE_PASS}
     security_opt:
       - no-new-privileges:true
     volumes:
       - ./volumes/tiles:/volumes/tiles:rw
-      - ./volumes/download/content:/volumes/content:rw
-      - ./volumes/download/nginx_conf:/volumes/nginx_conf:rw
       - ./volumes/download/hash_cache:/volumes/download/hash_cache:rw
       - ./volumes/versatiles_conf:/volumes/versatiles_conf:rw
       - ./.ssh:/app/.ssh:ro
@@ -56,9 +53,6 @@ services:
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
-      - ./volumes/download/nginx_conf/:/etc/nginx/sites/:ro
-      - ./volumes/tiles/:/volumes/tiles/:ro
-      - ./volumes/download/content/:/volumes/content/:ro
       - ./nginx/docker-entrypoint.d/10-compute-cache-size.envsh:/docker-entrypoint.d/10-compute-cache-size.envsh:ro
     security_opt:
       - no-new-privileges:true

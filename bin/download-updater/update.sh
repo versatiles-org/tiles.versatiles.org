@@ -9,10 +9,10 @@ cd "$(dirname "$0")/../.."
 echo "Building download-updater image..."
 docker compose build download-updater
 
-echo "Running download pipeline update..."
+echo "Running tile data update..."
 docker compose run --rm download-updater
 
-echo "Reloading nginx to pick up new configuration..."
-docker compose exec nginx nginx -s reload
+echo "Restarting versatiles to pick up the new versatiles.yaml..."
+docker compose restart versatiles
 
-echo "Download pipeline update completed successfully."
+echo "Tile data update completed successfully."

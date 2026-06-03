@@ -30,11 +30,9 @@ set -euo pipefail
 #
 #   3. download-updater --mode=prepare   (Phase 1)
 #        Scans remote storage via SSH, hashes files, compares with local
-#        state. Writes transitional configs:
-#          - versatiles.yaml  → local paths for current files,
-#                               WebDAV URLs for stale/missing files
-#          - download.conf    → local alias for current files,
-#                               WebDAV proxy for stale/missing files
+#        state. Writes a transitional versatiles.yaml:
+#          - local paths for current files
+#          - WebDAV URLs for stale/missing files
 #        Does NOT download. Exit codes:
 #          0 → at least one file needs updating
 #          1 → pipeline error (abort)
@@ -46,9 +44,8 @@ set -euo pipefail
 #        while step 5 downloads the new files.
 #
 #   5. download-updater --mode=finalize  (Phase 2)
-#        Deletes stale local files, downloads missing/changed files,
-#        regenerates the static site (HTML + RSS), and rewrites
-#        versatiles.yaml + download.conf to point entirely to local disk.
+#        Deletes stale local files, downloads missing/changed files, and
+#        rewrites versatiles.yaml to point entirely to local disk.
 #
 #   6. restart versatiles (config-aware)
 #        Tile server picks up the final local-disk config. Recreates the
@@ -56,17 +53,11 @@ set -euo pipefail
 #        mounts); otherwise issues a lighter `docker compose restart` so
 #        the existing container re-reads the new versatiles.yaml.
 #
-#   7. reload nginx (config-aware)
-#        Picks up the regenerated download.conf. Recreates the container
-#        only when compose-level state changed; otherwise sends a graceful
-#        SIGHUP via `nginx -s reload`, preserving warm connections.
-#        Done last so the public edge only flips after backends are healthy.
-#
-#   8. ./bin/ramdisk/clear.sh
+#   7. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
 #        tiles whose underlying file has just been replaced.
 #
-#   9. ./bin/verify.sh
+#   8. ./bin/verify.sh
 #        Post-deploy smoke test (HTTP/HTTPS endpoints, certs, configs).
 #
 # -----------------------------------------------------------------------------
@@ -74,17 +65,17 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 #
 #   Path A — files changed (prepare exits 0):
-#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 #     The tile server is restarted twice (transitional config, then final).
 #     During the gap between restarts, stale tilesets are served via WebDAV
-#     proxy so there is no outage.
+#     fallback so there is no outage.
 #
 #   Path B — nothing changed (prepare exits 2):
-#     1 → 2 → 3 → 9
-#     Steps 4–8 are skipped: tile data is already current and the existing
+#     1 → 2 → 3 → 8
+#     Steps 4–7 are skipped: tile data is already current and the existing
 #     healthy state and warm cache are preserved. Steps 1 and 2 still run
 #     so frontend / styles / Docker image updates are picked up even when
-#     no tile data needs refreshing. Verification (9) catches infra drift
+#     no tile data needs refreshing. Verification (8) catches infra drift
 #     (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
@@ -231,13 +222,6 @@ docker compose run --rm download-updater --mode=finalize
 echo "Restarting tile server with local files..."
 up_with_config_fallback versatiles restart
 wait_for_healthy versatiles
-
-# Nginx picks up the regenerated download.conf. Use `reload` fallback so we
-# send a graceful SIGHUP when only the conf changed; recreate only when the
-# compose state itself changed (new image, new env, new mounts).
-echo "Updating nginx..."
-up_with_config_fallback nginx reload
-wait_for_healthy nginx
 
 # Clear cache data
 echo "Clearing cache data..."

@@ -1,6 +1,5 @@
 import { basename } from 'path';
 import { FileRef } from './file_ref.js';
-import { FileResponse } from './file_response.js';
 
 /**
  * Represents a logical group of related files (typically different versions of
@@ -80,45 +79,6 @@ export class FileGroup {
 		this.tileType = options.tileType ?? 'vector';
 		this.latestFile = options.latestFile;
 		this.olderFiles = options.olderFiles ?? [];
-	}
-	/**
-	 * Builds a `FileResponse` representing a TSV url list for the latest file
-	 * in this group. The format follows the "TsvHttpData-1.0" specification:
-	 *
-	 *   TsvHttpData-1.0
-	 *   <url>\t<size>\t<base64url(md5)>\n
-	 *
-	 * The `baseURL` parameter is used to turn the file's relative `url` into
-	 * an absolute URL.
-	 *
-	 * Throws if no `latestFile` has been assigned to this group.
-	 */
-	getResponseUrlList(baseURL: string): FileResponse {
-		const file = this.latestFile;
-		if (file == null) throw Error(`no latest file found in group "${this.slug}"`);
-		const url = new URL(file.url, baseURL).href;
-
-		return new FileResponse(
-			`/urllist_${this.slug}.tsv`,
-			`TsvHttpData-1.0\n${url}\t${file.size}\t${hex2base64(file.md5)}\n`,
-		);
-	}
-	/**
-	 * Returns all virtual responses associated with this group:
-	 *
-	 * - `.md5` and `.sha256` checksum files for all versions
-	 * - a TSV url list (`/urllist_<slug>.tsv`) for the latest version
-	 */
-	getResponses(baseURL: string): FileResponse[] {
-		const result: FileResponse[] = this.olderFiles.flatMap((f) => [f.getResponseMd5File(), f.getResponseSha256File()]);
-		if (this.latestFile) {
-			result.push(
-				this.latestFile.getResponseMd5File(),
-				this.latestFile.getResponseSha256File(),
-				this.getResponseUrlList(baseURL),
-			);
-		}
-		return result;
 	}
 }
 
@@ -236,39 +196,4 @@ export function groupFiles(files: FileRef[]): FileGroup[] {
 	});
 
 	return groupList;
-}
-
-/**
- * Collects all `FileRef`s from one or more `FileGroup` / `FileRef` inputs,
- * flattening nested arrays and deduplicating by `url`.
- *
- * This is used to build the final list of files that should be exposed by
- * nginx (e.g. all data files plus generated HTML / RSS).
- */
-export function collectFiles(...entries: (FileGroup | FileGroup[] | FileRef | FileRef[])[]): FileRef[] {
-	const files = new Map<string, FileRef>();
-	for (const entry of entries) addEntry(entry);
-	return Array.from(files.values());
-
-	function addEntry(entry: FileGroup | FileGroup[] | FileRef | FileRef[]) {
-		if (Array.isArray(entry)) {
-			entry.forEach(addEntry);
-		} else if (entry instanceof FileGroup) {
-			addEntry(entry.olderFiles);
-			if (entry.latestFile) addEntry(entry.latestFile);
-		} else if (entry instanceof FileRef) {
-			files.set(entry.url, entry);
-		} else {
-			throw new Error('Unsupported entry type in collectFiles; expected FileGroup, FileRef or arrays of those.');
-		}
-	}
-}
-
-/**
- * Converts a hexadecimal hash string into a standard base64-encoded string.
- *
- * This is used for the TsvHttpData-1.0 format which expects standard base64.
- */
-export function hex2base64(hex: string): string {
-	return Buffer.from(hex, 'hex').toString('base64');
 }

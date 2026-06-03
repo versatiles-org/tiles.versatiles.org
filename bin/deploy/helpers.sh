@@ -23,7 +23,7 @@ wait_for_healthy() {
 #
 # `docker compose up --detach SERVICE` already recreates the container when
 # the image, environment, or mount definitions have changed. But the contents
-# of files inside a mounted volume (versatiles.yaml, download.conf) are
+# of files inside a mounted volume (e.g. versatiles.yaml) are
 # invisible to compose — when only file *content* changes, `up` is a no-op
 # and the running container keeps using the stale config it read at startup.
 #

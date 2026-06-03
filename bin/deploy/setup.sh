@@ -36,7 +36,7 @@ else
 fi
 
 # Check .env file and required variables
-REQUIRED_VARS="DOMAIN_NAME DOWNLOAD_DOMAIN RAM_DISK_GB EMAIL STORAGE_URL STORAGE_PASS"
+REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL STORAGE_URL STORAGE_PASS"
 for var in $REQUIRED_VARS; do
 	if [ -n "${!var:-}" ]; then
 		pass "$var is set"
@@ -97,21 +97,15 @@ docker compose run --rm download-updater
 # 3. Create dummy SSL certificates
 echo "Creating dummy SSL certificates..."
 ./bin/cert/create_dummy.sh "$DOMAIN_NAME"
-./bin/cert/create_dummy.sh "$DOWNLOAD_DOMAIN"
 
 # 4. Start services
 echo "Starting services..."
 docker compose up --detach
 wait_for_healthy nginx
 
-# 5. Reload nginx (pick up download config from pipeline)
-echo "Reloading nginx..."
-docker compose exec nginx nginx -s reload
-
-# 6. Create valid Let's Encrypt certificates
+# 5. Create valid Let's Encrypt certificates
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
-./bin/cert/create_valid.sh "$DOWNLOAD_DOMAIN"
 
 # 7. Verify deployment
 echo ""
