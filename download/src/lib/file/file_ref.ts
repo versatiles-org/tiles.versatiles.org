@@ -6,11 +6,11 @@ import { statSync } from 'fs';
  * Represents a single file that is part of the download.versatiles.org catalog.
  *
  * A `FileRef` tracks:
- * - `fullname`: path for nginx (local files) or relative path for WebDAV (remote files)
+ * - `fullname`: local filesystem path (local files) or the remote path (remote files)
  * - `filename`: the basename or path relative to the "root" directory
  * - `url`: the path as it will be exposed via HTTP
- * - `isRemote`: whether this file should be served via WebDAV proxy
- * - `remotePath`: the path on the remote storage (for WebDAV URL construction)
+ * - `isRemote`: whether the file still needs to be fetched from remote storage
+ * - `remotePath`: the path on the remote storage box (used for the SCP download)
  */
 export class FileRef {
 	/** Path for nginx alias (local) or relative path on remote storage (remote). */
@@ -28,14 +28,11 @@ export class FileRef {
 	/** Human-readable size string (e.g. `"1.2 GB"`). */
 	public readonly sizeString: string;
 
-	/** Whether this file is served via WebDAV proxy (true) or local alias (false). */
+	/** Whether the file still needs fetching from remote storage (true) or is available locally (false). */
 	public isRemote: boolean;
 
-	/** Full path on remote storage (e.g., /home/osm/file.versatiles). */
+	/** Full path on the remote storage box (e.g., /home/osm/file.versatiles). */
 	public remotePath: string;
-
-	/** Path for WebDAV URL (without /home prefix). */
-	public webdavPath: string;
 
 	/** Optional precomputed hashes for integrity / checksum files. */
 	public hashes?: { md5: string; sha256: string };
@@ -54,21 +51,18 @@ export class FileRef {
 				this.size = statSync(a).size;
 				this.isRemote = false;
 				this.remotePath = '';
-				this.webdavPath = '';
 			} else if (typeof b === 'number' && typeof c === 'string') {
 				// (fullname, size, remotePath) - remote file
 				this.url = '/' + this.filename;
 				this.size = b;
 				this.isRemote = true;
 				this.remotePath = c;
-				this.webdavPath = c.replace(/^\/home/, '');
 			} else if (typeof b === 'number') {
 				// (fullname, size) - local file with known size
 				this.url = '/' + this.filename;
 				this.size = b;
 				this.isRemote = false;
 				this.remotePath = '';
-				this.webdavPath = '';
 			} else {
 				throw new Error('Invalid FileRef constructor arguments.');
 			}
@@ -79,7 +73,6 @@ export class FileRef {
 			this.size = a.size;
 			this.isRemote = a.isRemote;
 			this.remotePath = a.remotePath;
-			this.webdavPath = a.webdavPath;
 			this.hashes = a.hashes;
 		} else {
 			throw new Error('Invalid FileRef constructor arguments.');

@@ -28,7 +28,6 @@ describe('FileRef', () => {
 			expect(f.size).toBe(999);
 			expect(f.isRemote).toBe(false);
 			expect(f.remotePath).toBe('');
-			expect(f.webdavPath).toBe('');
 		});
 	});
 
@@ -41,7 +40,6 @@ describe('FileRef', () => {
 			expect(f.size).toBe(5000);
 			expect(f.isRemote).toBe(false);
 			expect(f.remotePath).toBe('');
-			expect(f.webdavPath).toBe('');
 			expect(f.sizeString).toBe('0.0 GB');
 		});
 	});
@@ -55,7 +53,6 @@ describe('FileRef', () => {
 			expect(f.size).toBe(1e10);
 			expect(f.isRemote).toBe(true);
 			expect(f.remotePath).toBe('/home/osm/data.versatiles');
-			expect(f.webdavPath).toBe('/osm/data.versatiles');
 		});
 	});
 
@@ -71,7 +68,6 @@ describe('FileRef', () => {
 			expect(copy.size).toBe(original.size);
 			expect(copy.isRemote).toBe(original.isRemote);
 			expect(copy.remotePath).toBe(original.remotePath);
-			expect(copy.webdavPath).toBe(original.webdavPath);
 			expect(copy.hashes).toBe(original.hashes);
 		});
 	});

@@ -32,7 +32,7 @@ set -euo pipefail
 #        Scans remote storage via SSH, hashes files, compares with local
 #        state. Writes a transitional versatiles.yaml:
 #          - local paths for current files
-#          - WebDAV URLs for stale/missing files
+#          - download.versatiles.org URLs for stale/missing files
 #        Does NOT download. Exit codes:
 #          0 → at least one file needs updating
 #          1 → pipeline error (abort)
@@ -40,7 +40,7 @@ set -euo pipefail
 #
 #   4. (only if step 3 returned 0) restart versatiles
 #        Tile server picks up the transitional config and serves stale
-#        tilesets through the WebDAV fallback so it stays available
+#        tilesets from download.versatiles.org so it stays available
 #        while step 5 downloads the new files.
 #
 #   5. download-updater --mode=finalize  (Phase 2)
@@ -73,8 +73,8 @@ set -euo pipefail
 #   Path A — files changed (prepare exits 0):
 #     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
 #     The tile server is restarted twice (transitional config, then final).
-#     During the gap between restarts, stale tilesets are served via WebDAV
-#     fallback so there is no outage.
+#     During the gap between restarts, stale tilesets are served from
+#     download.versatiles.org so there is no outage.
 #
 #   Path B — nothing changed (prepare exits 2):
 #     1 → 2 → 3 → 9
@@ -213,10 +213,10 @@ if [ $PREPARE_EXIT -eq 2 ]; then
 fi
 
 # Files need updating — restart tile server so it picks up the transitional
-# config and serves stale tilesets through the WebDAV fallback while we
+# config and serves stale tilesets from download.versatiles.org while we
 # download the new files. Use `restart` fallback so we only recreate the
 # container if compose state changed; otherwise just re-read the new yaml.
-echo "Restarting tile server with WebDAV fallback..."
+echo "Restarting tile server with download.versatiles.org fallback..."
 up_with_config_fallback versatiles restart
 wait_for_healthy versatiles
 

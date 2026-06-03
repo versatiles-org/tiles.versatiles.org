@@ -11,9 +11,10 @@
  *
  * **prepare** (safe update phase 1):
  * - Discovers files and checks local state without downloading anything.
- * - Generates `versatiles.yaml` with WebDAV URLs for stale/missing files and
- *   local paths for files that are already current, so the tile server can
- *   keep serving stale tilesets from WebDAV while finalize downloads them.
+ * - Generates `versatiles.yaml` with download.versatiles.org URLs for
+ *   stale/missing files and local paths for files that are already current, so
+ *   the tile server can keep serving stale tilesets from the public download
+ *   site while finalize downloads them.
  * - Returns `true` if any files need updating, `false` otherwise.
  *
  * **finalize** (safe update phase 2, default):
@@ -65,7 +66,7 @@ export interface Options {
  *
  * In **prepare** mode:
  * 1–4. Same as check.
- * 5. Write `versatiles.yaml` (stale files → WebDAV URL, current files → local).
+ * 5. Write `versatiles.yaml` (stale files → download.versatiles.org URL, current files → local).
  * Returns `true` if any file needs updating, `false` if all are current.
  *
  * In **finalize** mode (default):

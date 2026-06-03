@@ -22,7 +22,7 @@ This repository serves **tiles.versatiles.org** (tile serving). The file downloa
 - **nginx**: Reverse proxy in front of the tile server (TLS termination, caching, rate limiting)
 - **certbot**: SSL certificate management
 
-The remote Hetzner storage box remains the source of truth for the tile data. The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it from the storage box over WebDAV so there is no downtime.
+The remote Hetzner storage box remains the source of truth for the tile data. The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it from the public download site (download.versatiles.org, served from Cloudflare R2) so there is no downtime — and no storage credentials end up in `versatiles.yaml`.
 
 ## Volume Directories
 
@@ -108,13 +108,15 @@ This runs preflight checks and then sets up everything: volumes, RAM disk, front
 
 Edit `.env` to configure:
 
-| Variable       | Description                   | Example              |
-|----------------|-------------------------------|----------------------|
-| `DOMAIN_NAME`  | Tiles domain                  | tiles.versatiles.org |
-| `RAM_DISK_GB`  | RAM disk size for caching     | 4                    |
-| `EMAIL`        | Email for Let's Encrypt       | mail@versatiles.org  |
-| `STORAGE_URL`  | Storage box SSH URL           | user@host.de         |
-| `STORAGE_PASS` | Storage box password (WebDAV) | (password)           |
+| Variable            | Description                                     | Example                         |
+|---------------------|-------------------------------------------------|---------------------------------|
+| `DOMAIN_NAME`       | Tiles domain                                    | tiles.versatiles.org            |
+| `RAM_DISK_GB`       | RAM disk size for caching                       | 4                               |
+| `EMAIL`             | Email for Let's Encrypt                         | mail@versatiles.org             |
+| `STORAGE_URL`       | Storage box SSH URL (tile data source)          | user@host.de                    |
+| `DOWNLOAD_BASE_URL` | Fallback download site (optional, has default)  | https://download.versatiles.org |
+
+Authentication to the storage box uses the SSH key at `.ssh/storage` (no password in `.env`).
 
 ## Operations
 
@@ -143,15 +145,15 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - Group files into datasets (osm, satellite, elevation, …)
 - For each local dataset: compare local MD5 against remote hash
   - Hash matches → mark as local (keep local path)
-  - Missing or hash mismatch → mark as remote (will fall back to WebDAV)
-- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://…` WebDAV URL
+  - Missing or hash mismatch → mark as remote (will fall back to download.versatiles.org)
+- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://download.versatiles.org/…` URL
 - **Exits 0** if any dataset needs updating; **exits 2** if everything is already current (next step is skipped)
 
-**4. *(only if prepare exited 0)* Restart tile server — WebDAV fallback**
+**4. *(only if prepare exited 0)* Restart tile server — download.versatiles.org fallback**
 ```bash
 docker compose up --detach versatiles
 ```
-VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from remote WebDAV — slower, but no downtime. Old local files can now be safely deleted.
+VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from download.versatiles.org — slower, but no downtime. Old local files can now be safely deleted.
 
 **5. download-updater `--mode=finalize`** (Phase 2 — delete stale files, download new ones)
 - SSH scan + hash generation (same as prepare)
@@ -170,7 +172,7 @@ VersaTiles reloads `versatiles.yaml`. All datasets now served from local disk at
 
 **8. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
 
-The tile server is always serving valid data: between steps 3 and 4 stale datasets come from WebDAV; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
+The tile server is always serving valid data: between steps 3 and 4 stale datasets come from download.versatiles.org; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
 
 ### Ensure Infrastructure Only
 

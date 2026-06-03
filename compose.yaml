@@ -28,7 +28,7 @@ services:
     networks: [docker_network]
     environment:
       - STORAGE_URL=${STORAGE_URL}
-      - STORAGE_PASS=${STORAGE_PASS}
+      - DOWNLOAD_BASE_URL=${DOWNLOAD_BASE_URL:-https://download.versatiles.org}
     security_opt:
       - no-new-privileges:true
     volumes:

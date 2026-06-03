@@ -46,7 +46,6 @@ describe('groupFiles', () => {
 		ref.sizeString = (size / 2 ** 30).toFixed(1) + ' GB';
 		ref.isRemote = true;
 		ref.remotePath = `/home/test/${filename}`;
-		ref.webdavPath = `/test/${filename}`;
 		ref.clone = function () {
 			return createMockFileRef(this.filename, this.size);
 		};

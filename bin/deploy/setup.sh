@@ -36,7 +36,7 @@ else
 fi
 
 # Check .env file and required variables
-REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL STORAGE_URL STORAGE_PASS"
+REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL STORAGE_URL"
 for var in $REQUIRED_VARS; do
 	if [ -n "${!var:-}" ]; then
 		pass "$var is set"

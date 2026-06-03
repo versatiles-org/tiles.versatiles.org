@@ -97,7 +97,7 @@ function downloadViaSCP(remotePath: string, localPath: string): void {
  * - If the file exists locally with a matching MD5 hash:
  *   sets `latestFile.isRemote = false` and updates `fullname` to the local path.
  * - Otherwise: leaves `latestFile.isRemote = true` (file will be served from
- *   remote WebDAV until the next finalize run).
+ *   download.versatiles.org until the next finalize run).
  *
  * Returns `true` if any file needs updating (i.e., at least one latestFile
  * remains remote), `false` if everything is already current.
@@ -123,7 +123,7 @@ export function checkLocalFiles(fileGroups: FileGroup[], localFolder: string): b
 			file.isRemote = false;
 		} else {
 			needsUpdate = true;
-			// Leave isRemote = true so nginx/versatiles.yaml use WebDAV as fallback
+			// Leave isRemote = true so versatiles.yaml uses download.versatiles.org as fallback
 		}
 	}
 
