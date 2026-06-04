@@ -11,17 +11,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: npm
-    directory: /download
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      all-npm:
-        patterns:
-          - "*"
-
   - package-ecosystem: docker
     directory: /download
     schedule:
