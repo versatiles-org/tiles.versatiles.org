@@ -1,25 +1,21 @@
-FROM node:26-alpine
+FROM alpine:3
 
-# Install aria2 for fast parallel CDN downloads and update npm
-RUN apk add --no-cache aria2 && npm install -g npm@latest
+# aria2 for fast parallel CDN downloads; curl for fetching the .md5 sidecars;
+# bash for the update script.
+RUN apk add --no-cache aria2 curl bash
 
 WORKDIR /app
 
-# Copy package files first for better layer caching
-COPY package*.json ./
+# Copy the pipeline script
+COPY update-tiles.sh ./
 
-# Install dependencies
-RUN npm ci --omit=dev
-
-# Copy source code
-COPY . .
-
-# Create non-root user that owns the working directory
-RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 \
+# Create non-root user that owns the working directory (matches the UID expected
+# on the mounted volumes)
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser \
     && chown appuser:appuser /app
 
 USER appuser
 
 # Run the pipeline (ENTRYPOINT so extra args like --mode=prepare are passed
-# to the script, not interpreted by the node docker-entrypoint.sh wrapper)
-ENTRYPOINT ["npx", "tsx", "src/run_once.ts"]
+# straight to the script)
+ENTRYPOINT ["/app/update-tiles.sh"]

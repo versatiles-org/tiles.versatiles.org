@@ -18,6 +18,7 @@ jobs:
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./bin
+          additional_files: update-tiles.sh
 
   docker:
     runs-on: ubuntu-latest
@@ -40,30 +41,3 @@ jobs:
             extends: relaxed
             rules:
               line-length: disable
-
-  typescript:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./download
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: download/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: TypeScript type check
-        run: npm run typecheck
-
-      - name: ESLint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm run test

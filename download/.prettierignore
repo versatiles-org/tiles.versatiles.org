@@ -1,6 +1,0 @@
-.svelte-kit
-package*.json
-build
-coverage
-dist
-node_modules
