@@ -27,15 +27,12 @@ services:
     profiles: [donotstart]
     networks: [docker_network]
     environment:
-      - STORAGE_URL=${STORAGE_URL}
-      - DOWNLOAD_BASE_URL=${DOWNLOAD_BASE_URL:-https://download.versatiles.org}
+      - CDN_BASE_URL=${CDN_BASE_URL:-https://cdn.versatiles.cloud}
     security_opt:
       - no-new-privileges:true
     volumes:
       - ./volumes/tiles:/volumes/tiles:rw
-      - ./volumes/download/hash_cache:/volumes/download/hash_cache:rw
       - ./volumes/versatiles_conf:/volumes/versatiles_conf:rw
-      - ./.ssh:/app/.ssh:ro
 
   nginx:
     container_name: nginx

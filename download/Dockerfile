@@ -1,7 +1,7 @@
 FROM node:26-alpine
 
-# Install openssh-client for remote hash generation and update npm
-RUN apk add --no-cache openssh-client && npm install -g npm@latest
+# Install aria2 for fast parallel CDN downloads and update npm
+RUN apk add --no-cache aria2 && npm install -g npm@latest
 
 WORKDIR /app
 
@@ -14,11 +14,9 @@ RUN npm ci --omit=dev
 # Copy source code
 COPY . .
 
-# Create non-root user with write access to directories needed by vite build
+# Create non-root user that owns the working directory
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 \
-    && chown appuser:appuser /app \
-    && mkdir -p /app/data /app/build /app/.svelte-kit \
-    && chown appuser:appuser /app/data /app/build /app/.svelte-kit
+    && chown appuser:appuser /app
 
 USER appuser
 

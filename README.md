@@ -18,11 +18,11 @@ This repository serves **tiles.versatiles.org** (tile serving). The file downloa
 ## Architecture
 
 - **versatiles**: Tile server serving `.versatiles` files from local disk
-- **download-updater**: One-shot pipeline that scans the remote storage box via SSH, mirrors the `.versatiles` files into `volumes/tiles/`, and generates `versatiles.yaml` for the tile server
+- **download-updater**: One-shot pipeline that downloads the `.versatiles` files from the CDN (cdn.versatiles.cloud) into `volumes/tiles/` using aria2c (parallel connections), and generates `versatiles.yaml` for the tile server
 - **nginx**: Reverse proxy in front of the tile server (TLS termination, caching, rate limiting)
 - **certbot**: SSL certificate management
 
-The remote Hetzner storage box remains the source of truth for the tile data. The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it from the public download site (download.versatiles.org, served from Cloudflare R2) so there is no downtime — and no storage credentials end up in `versatiles.yaml`.
+The `.versatiles` files are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each dataset is a stable `<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it directly from the CDN so there is no downtime. No credentials are involved — the CDN is public.
 
 ## Volume Directories
 
@@ -34,7 +34,6 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 | `volumes/versatiles_conf/`     | Generated `versatiles.yaml` config    | rw/ro | `1001:1001` | download-updater | versatiles        |
 | `volumes/frontend/`            | Built frontend assets (HTML, JS, CSS) | ro    | root        | Host scripts     | versatiles        |
 | `volumes/cache/`               | Nginx tile cache (RAM disk / tmpfs)   | rw    | root        | nginx (UID 101)  | nginx             |
-| `volumes/download/hash_cache/` | Hash cache for the update pipeline    | rw    | `1001:1001` | download-updater | —                 |
 | `volumes/certbot-cert/`        | Let's Encrypt certificates            | rw    | root        | certbot          | —                 |
 | `volumes/certbot-www/`         | ACME challenge files                  | rw/ro | root        | certbot          | nginx             |
 | `volumes/nginx-cert/`          | SSL certs copied for nginx            | ro    | root        | Host scripts     | nginx             |
@@ -44,7 +43,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 
 ### Permissions
 
-- **download-updater volumes** (`tiles/`, `versatiles_conf/`, `download/hash_cache/`): Must be owned by UID 1001 (`appuser` inside the container). The setup script runs `chown 1001:1001` on these after creation.
+- **download-updater volumes** (`tiles/`, `versatiles_conf/`): Must be owned by UID 1001 (`appuser` inside the container). The setup script runs `chown 1001:1001` on these after creation.
 - **nginx writable volumes** (`cache/`, `nginx-log/`): nginx master starts as root and manages file ownership internally. `cache/` is a tmpfs mount recreated on each boot.
 - **certbot volumes** (`certbot-cert/`, `certbot-www/`): Certbot runs as root — default ownership works.
 - **Host-written volumes** (`frontend/`, `nginx-cert/`): Written by host scripts (running as root), mounted read-only in containers.
@@ -53,7 +52,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 
 If download-updater fails with `EACCES` errors, fix ownership:
 ```bash
-chown 1001:1001 volumes/tiles volumes/versatiles_conf volumes/download/hash_cache
+chown 1001:1001 volumes/tiles volumes/versatiles_conf
 ```
 
 Run `./bin/verify.sh` to check all volume directories exist and have correct ownership.
@@ -87,16 +86,7 @@ cp template.env .env
 nano .env
 ```
 
-### 4. Setup SSH Key for Storage Box
-
-```bash
-mkdir -p .ssh
-# Copy your storage box SSH key
-cp /path/to/storage-key .ssh/storage
-chmod 600 .ssh/storage
-```
-
-### 5. Deploy
+### 4. Deploy
 
 ```bash
 ./bin/deploy/setup.sh
@@ -110,13 +100,12 @@ Edit `.env` to configure:
 
 | Variable            | Description                                     | Example                         |
 |---------------------|-------------------------------------------------|---------------------------------|
-| `DOMAIN_NAME`       | Tiles domain                                    | tiles.versatiles.org            |
-| `RAM_DISK_GB`       | RAM disk size for caching                       | 4                               |
-| `EMAIL`             | Email for Let's Encrypt                         | mail@versatiles.org             |
-| `STORAGE_URL`       | Storage box SSH URL (tile data source)          | user@host.de                    |
-| `DOWNLOAD_BASE_URL` | Fallback download site (optional, has default)  | https://download.versatiles.org |
+| `DOMAIN_NAME`  | Tiles domain                                      | tiles.versatiles.org         |
+| `RAM_DISK_GB`  | RAM disk size for caching                         | 4                            |
+| `EMAIL`        | Email for Let's Encrypt                           | mail@versatiles.org          |
+| `CDN_BASE_URL` | CDN hosting the tile data (optional, has default) | https://cdn.versatiles.cloud |
 
-Authentication to the storage box uses the SSH key at `.ssh/storage` (no password in `.env`).
+No credentials are required — the tile data is fetched from the public CDN.
 
 ## Operations
 
@@ -140,26 +129,24 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - `docker compose build download-updater` — rebuild the download-updater image
 
 **3. download-updater `--mode=prepare`** (Phase 1 — no downloads, no deletions)
-- SSH into remote storage and list all `.versatiles` files
-- Generate/load MD5+SHA256 hashes (cached in `volumes/download/hash_cache/`)
-- Group files into datasets (osm, satellite, elevation, …)
-- For each local dataset: compare local MD5 against remote hash
-  - Hash matches → mark as local (keep local path)
-  - Missing or hash mismatch → mark as remote (will fall back to download.versatiles.org)
-- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://download.versatiles.org/…` URL
+- Fetch each dataset's `.md5` from the CDN (`cdn.versatiles.cloud/<slug>.versatiles.md5`)
+- For each dataset: compare the CDN MD5 against the local `<slug>.versatiles.md5`
+  - Match → mark as local (keep local path)
+  - Missing or mismatch → mark as remote (will fall back to cdn.versatiles.cloud)
+- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://cdn.versatiles.cloud/…` URL
 - **Exits 0** if any dataset needs updating; **exits 2** if everything is already current (next step is skipped)
 
-**4. *(only if prepare exited 0)* Restart tile server — download.versatiles.org fallback**
+**4. *(only if prepare exited 0)* Restart tile server — cdn.versatiles.cloud fallback**
 ```bash
 docker compose up --detach versatiles
 ```
-VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from download.versatiles.org — slower, but no downtime. Old local files can now be safely deleted.
+VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from cdn.versatiles.cloud — slower, but no downtime. Old local files can now be safely deleted.
 
 **5. download-updater `--mode=finalize`** (Phase 2 — delete stale files, download new ones)
-- SSH scan + hash generation (same as prepare)
-- Delete local tile files that are no longer wanted (e.g. old date-versioned filenames)
-- Download missing or hash-mismatched files via SCP (atomic: temp file → rename on success)
-- Write local `.md5` / `.sha256` files for future comparisons
+- Fetch each dataset's `.md5` from the CDN (same as prepare)
+- Delete local `.versatiles` files that are no longer listed in `DATASETS`
+- Download missing or mismatched files with **aria2c** (16 parallel connections, inline MD5 verification; atomic temp file → rename on success)
+- Write the local `.md5` sidecar for future comparisons
 - Write `versatiles.yaml` — all datasets point to `/data/tiles/…`
 
 **6. Restart tile server — local files**
@@ -172,7 +159,7 @@ VersaTiles reloads `versatiles.yaml`. All datasets now served from local disk at
 
 **8. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
 
-The tile server is always serving valid data: between steps 3 and 4 stale datasets come from download.versatiles.org; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
+The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
 
 ### Ensure Infrastructure Only
 
@@ -189,17 +176,17 @@ This is idempotent and safe to run repeatedly. It ensures:
 
 Both `bin/deploy/setup.sh` and `bin/update.sh` call this automatically.
 
-### Update After Remote Storage Changes
+### Update Tile Data
 
-When new `.versatiles` files have been added to the remote storage:
+When new `.versatiles` files have been published to the CDN:
 
 ```bash
 ./bin/download-updater/update.sh
 ```
 
 This will:
-- Scan remote storage for new/updated files
-- Mirror new/changed files into `volumes/tiles/`
+- Fetch each dataset's MD5 from the CDN and compare with the local mirror
+- Download new/changed files with aria2c into `volumes/tiles/`
 - Regenerate `versatiles.yaml`
 - Restart the tile server to serve the new files
 

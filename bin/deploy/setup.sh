@@ -36,7 +36,7 @@ else
 fi
 
 # Check .env file and required variables
-REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL STORAGE_URL"
+REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL"
 for var in $REQUIRED_VARS; do
 	if [ -n "${!var:-}" ]; then
 		pass "$var is set"
@@ -44,13 +44,6 @@ for var in $REQUIRED_VARS; do
 		fail "$var is not set in .env"
 	fi
 done
-
-# Check SSH key
-if [ -f .ssh/storage ]; then
-	pass ".ssh/storage key exists"
-else
-	fail ".ssh/storage key not found"
-fi
 
 # Check ports 80 and 443
 for port in 80 443; do
