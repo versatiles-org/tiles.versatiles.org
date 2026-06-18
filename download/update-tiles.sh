@@ -42,6 +42,19 @@ DATASETS=(
 	bathymetry-vectors
 )
 
+# Partial datasets: too large to mirror in full, so we keep only a zoom-limited
+# local subset (z0..maxzoom) and serve the higher zoom levels straight from the
+# CDN via a stacked VPL pipeline. Maps slug -> max local zoom. The satellite
+# dataset is ~2 TB in full but only ~700 GB up to z16, which fits the host disk.
+# See download_local_files (builds the subset with `versatiles convert`) and
+# write_vpl (emits the pipeline).
+declare -A PARTIAL_MAX_ZOOM=(
+	[satellite]=16
+)
+
+# True if the given slug is a partial (zoom-limited local subset) dataset.
+is_partial() { [ -n "${PARTIAL_MAX_ZOOM[$1]:-}" ]; }
+
 VOLUME_FOLDER="${VOLUME_FOLDER:-/volumes}"
 TILES_FOLDER="$VOLUME_FOLDER/tiles"
 CONF_FOLDER="$VOLUME_FOLDER/versatiles_conf"
@@ -121,10 +134,11 @@ check_local_files() {
 	done
 }
 
-# Removes leftover aria2c temp/control files from interrupted downloads.
+# Removes leftover temp/control files from interrupted downloads (aria2c) and
+# subset builds (versatiles convert writes <file>.tmp).
 cleanup_temp_files() {
 	local entry
-	for entry in "$TILES_FOLDER"/*.download "$TILES_FOLDER"/*.aria2; do
+	for entry in "$TILES_FOLDER"/*.download "$TILES_FOLDER"/*.aria2 "$TILES_FOLDER"/*.tmp.versatiles; do
 		[ -e "$entry" ] || continue
 		echo " - Cleaning up temp file: $(basename "$entry")"
 		rm -f "$entry"
@@ -172,25 +186,100 @@ download_local_files() {
 		fi
 
 		local url="$CDN_BASE_URL/$file"
-		echo " - Downloading $file from $url ..."
-		aria2c \
-			--dir="$TILES_FOLDER" \
-			--out="$file.download" \
-			--max-connection-per-server=16 \
-			--split=16 \
-			--min-split-size=10M \
-			--max-tries=5 \
-			--retry-wait=5 \
-			--continue=true \
-			--allow-overwrite=true \
-			--auto-file-renaming=false \
-			--checksum=md5="${MD5S[$i]}" \
-			--console-log-level=warn \
-			--summary-interval=0 \
-			"$url"
-		mv "$path.download" "$path"
+
+		if is_partial "${DATASETS[$i]}"; then
+			local maxzoom="${PARTIAL_MAX_ZOOM[${DATASETS[$i]}]}"
+			# versatiles convert infers the output format from the file extension,
+			# so the temp file must end in .versatiles (not .tmp).
+			local building="${path%.versatiles}.tmp.versatiles"
+			echo " - Building local subset of $file (z0-$maxzoom) from $url ..."
+			# Free the old subset first: it is large (satellite ~700 GB) and the
+			# host filesystem cannot hold two copies. In the two-phase update flow
+			# the tile server is already serving this dataset from the CDN (the
+			# transitional VPL written by prepare), so the local file is not in use
+			# while finalize rebuilds it.
+			rm -f "$path" "$path.md5" "$building"
+			# versatiles convert reads the remote container over range requests,
+			# fetching only the tiles up to maxzoom, and writes them locally. No
+			# --tile-format / --compress so the subset stays byte-format-identical
+			# to the remote (required for from_stacked).
+			versatiles convert --max-zoom="$maxzoom" "$url" "$building"
+			mv "$building" "$path"
+		else
+			echo " - Downloading $file from $url ..."
+			aria2c \
+				--dir="$TILES_FOLDER" \
+				--out="$file.download" \
+				--max-connection-per-server=16 \
+				--split=16 \
+				--min-split-size=10M \
+				--max-tries=5 \
+				--retry-wait=5 \
+				--continue=true \
+				--allow-overwrite=true \
+				--auto-file-renaming=false \
+				--checksum=md5="${MD5S[$i]}" \
+				--console-log-level=warn \
+				--summary-interval=0 \
+				"$url"
+			mv "$path.download" "$path"
+		fi
+
+		# Record the CDN full-file MD5 as the version marker. For partial datasets
+		# this is intentionally NOT the local subset's own hash — it records which
+		# CDN version the subset was derived from, so check_local_files can detect
+		# when the upstream file changes and trigger a rebuild.
 		printf '%s  %s\n' "${MD5S[$i]}" "$file" >"$path.md5"
 		IS_REMOTE[i]=0
+	done
+}
+
+# Writes the VPL pipeline file for a partial dataset (atomically: temp + rename).
+#
+# When the local subset is current (IS_REMOTE=0) it stacks the local low-zoom
+# subset over the full remote file: z0..maxzoom served from local disk, the rest
+# straight from the CDN. from_stacked uses first-match, so the explicit filters
+# enforce the boundary (and stop the remote ever answering a low zoom).
+#
+# When the subset is stale/absent (IS_REMOTE=1, e.g. during prepare or before the
+# first build) it serves the whole dataset from the CDN, so the tile server has
+# no downtime while finalize rebuilds the subset.
+write_vpl() {
+	local i="$1"
+	local slug="${DATASETS[$i]}"
+	local file="$slug.versatiles"
+	local maxzoom="${PARTIAL_MAX_ZOOM[$slug]}"
+	local minremote=$((maxzoom + 1))
+	local remote="$CDN_BASE_URL/$file"
+	local out="$CONF_FOLDER/$slug.vpl"
+	local tmp="$out.tmp"
+
+	if [ "${IS_REMOTE[$i]}" -eq 1 ]; then
+		cat >"$tmp" <<-VPL
+			from_container filename="$remote"
+		VPL
+	else
+		cat >"$tmp" <<-VPL
+			from_stacked [
+			   from_container filename="/data/tiles/$file" | filter level_max=$maxzoom,
+			   from_container filename="$remote" | filter level_min=$minremote
+			]
+		VPL
+	fi
+
+	mv "$tmp" "$out"
+}
+
+# Removes VPL files for datasets that are no longer partial (or removed entirely).
+delete_unknown_vpls() {
+	local entry slug
+	for entry in "$CONF_FOLDER"/*.vpl; do
+		[ -e "$entry" ] || continue
+		slug="$(basename "$entry" .vpl)"
+		if ! is_partial "$slug"; then
+			echo " - Removing stale $slug.vpl"
+			rm -f "$entry"
+		fi
 	done
 }
 
@@ -200,6 +289,15 @@ generate_versatiles_yaml() {
 	mkdir -p "$CONF_FOLDER"
 	local out="$CONF_FOLDER/versatiles.yaml"
 	local tmp="$out.tmp"
+
+	# Write the VPL pipeline files for partial datasets first; the yaml below
+	# references each by its server-side path (/config_dir/<slug>.vpl). Then drop
+	# any stale .vpl files for datasets that are no longer partial.
+	local i
+	for i in "${!DATASETS[@]}"; do
+		is_partial "${DATASETS[$i]}" && write_vpl "$i"
+	done
+	delete_unknown_vpls
 
 	{
 		cat <<-'YAML'
@@ -215,11 +313,13 @@ generate_versatiles_yaml() {
 			tiles:
 		YAML
 
-		local i
 		for i in "${!DATASETS[@]}"; do
 			local file="${DATASETS[$i]}.versatiles"
 			local src
-			if [ "${IS_REMOTE[$i]}" -eq 1 ]; then
+			if is_partial "${DATASETS[$i]}"; then
+				# Served via the stacked/transitional VPL written above.
+				src="/config_dir/${DATASETS[$i]}.vpl"
+			elif [ "${IS_REMOTE[$i]}" -eq 1 ]; then
 				src="$CDN_BASE_URL/$file"
 			else
 				src="/data/tiles/$file"
