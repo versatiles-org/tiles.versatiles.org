@@ -12,7 +12,11 @@ updates:
           - "*"
 
   - package-ecosystem: docker
-    directory: /download
+    # "/" covers the image tags in compose.yaml (nginx, certbot, versatiles);
+    # "/download" covers the download-updater Dockerfile.
+    directories:
+      - "/"
+      - "/download"
     schedule:
       interval: weekly
     commit-message:
