@@ -21,8 +21,10 @@ set -euo pipefail
 #            points stale/missing datasets at the CDN (so the tile server keeps
 #            serving them during the update) and current datasets at local disk.
 #            Downloads nothing.
-#   finalize Download stale/missing datasets, delete datasets no longer listed,
-#            and write a versatiles.yaml pointing entirely to local disk.
+#   finalize Download stale/missing datasets (partial datasets: build their
+#            zoom-limited subset), delete datasets no longer listed, and write a
+#            versatiles.yaml pointing at local disk (partial datasets: a stacked
+#            VPL serving local low zoom + CDN high zoom).
 #
 # Exit codes (consumed by bin/update.sh):
 #   0  at least one dataset needs updating (or finalize completed)
@@ -165,9 +167,10 @@ delete_unknown_files() {
 	done
 }
 
-# Downloads stale/missing datasets from the CDN into TILES_FOLDER and removes
-# any .versatiles files no longer part of DATASETS. Afterwards all datasets are
-# present locally (IS_REMOTE=0).
+# Downloads stale/missing datasets from the CDN into TILES_FOLDER (partial
+# datasets: builds their zoom-limited subset with `versatiles convert`) and
+# removes any .versatiles files no longer part of DATASETS. Afterwards each
+# dataset's local file is present (IS_REMOTE=0).
 download_local_files() {
 	mkdir -p "$TILES_FOLDER"
 	echo "Syncing local files..."

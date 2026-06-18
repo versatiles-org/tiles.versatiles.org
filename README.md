@@ -24,6 +24,8 @@ This repository serves **tiles.versatiles.org** (tile serving). The file downloa
 
 The `.versatiles` files are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each dataset is a stable `<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it directly from the CDN so there is no downtime. No credentials are involved — the CDN is public.
 
+**Partial datasets:** some datasets are too large to mirror in full (satellite is ~2 TB), so only a zoom-limited subset is kept locally and the higher zoom levels are served straight from the CDN via a [VPL](https://docs.versatiles.org) pipeline. For example `/tiles/satellite/` serves z0–16 from the ~700 GB local subset and z17+ from cdn.versatiles.cloud, stacked in `satellite.vpl`. See [`download/README.md` → Partial datasets](download/README.md#partial-datasets).
+
 ## Volume Directories
 
 All persistent data is stored under `./volumes/` and bind-mounted into Docker containers. Created by `bin/deploy/setup.sh`.
@@ -31,7 +33,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 | Directory                      | Purpose                               | Mode  | Owner       | Writer           | Reader(s)         |
 |--------------------------------|---------------------------------------|-------|-------------|------------------|-------------------|
 | `volumes/tiles/`               | Downloaded `.versatiles` tile files   | rw/ro | `1001:1001` | download-updater | versatiles        |
-| `volumes/versatiles_conf/`     | Generated `versatiles.yaml` config    | rw/ro | `1001:1001` | download-updater | versatiles        |
+| `volumes/versatiles_conf/`     | Generated `versatiles.yaml` (+ `.vpl`) | rw/ro | `1001:1001` | download-updater | versatiles        |
 | `volumes/frontend/`            | Built frontend assets (HTML, JS, CSS) | ro    | root        | Host scripts     | versatiles        |
 | `volumes/cache/`               | Nginx tile cache (RAM disk / tmpfs)   | rw    | root        | nginx (UID 101)  | nginx             |
 | `volumes/certbot-cert/`        | Let's Encrypt certificates            | rw    | root        | certbot          | —                 |
@@ -133,7 +135,7 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - For each dataset: compare the CDN MD5 against the local `<slug>.versatiles.md5`
   - Match → mark as local (keep local path)
   - Missing or mismatch → mark as remote (will fall back to cdn.versatiles.cloud)
-- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://cdn.versatiles.cloud/…` URL
+- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://cdn.versatiles.cloud/…` URL (partial datasets get a `.vpl` that serves entirely from the CDN until the subset is rebuilt)
 - **Exits 0** if any dataset needs updating; **exits 2** if everything is already current (next step is skipped)
 
 **4. *(only if prepare exited 0)* Restart tile server — cdn.versatiles.cloud fallback**
@@ -145,21 +147,21 @@ VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served
 **5. download-updater `--mode=finalize`** (Phase 2 — delete stale files, download new ones)
 - Fetch each dataset's `.md5` from the CDN (same as prepare)
 - Delete local `.versatiles` files that are no longer listed in `DATASETS`
-- Download missing or mismatched files with **aria2c** (16 parallel connections, inline MD5 verification; atomic temp file → rename on success)
+- Download missing or mismatched files with **aria2c** (16 parallel connections, inline MD5 verification; atomic temp file → rename on success). Partial datasets (e.g. satellite) instead rebuild their zoom-limited subset with **`versatiles convert`** — see [`download/README.md` → Partial datasets](download/README.md#partial-datasets)
 - Write the local `.md5` sidecar for future comparisons
-- Write `versatiles.yaml` — all datasets point to `/data/tiles/…`
+- Write `versatiles.yaml` — datasets point to `/data/tiles/…` (partial datasets point to their `/config_dir/<slug>.vpl` stacking local z0–N over the CDN)
 
 **6. Restart tile server — local files**
 ```bash
 docker compose up --detach versatiles
 ```
-VersaTiles reloads `versatiles.yaml`. All datasets now served from local disk at full speed.
+VersaTiles reloads `versatiles.yaml`. Datasets are now served from local disk at full speed (partial datasets serve their local zoom range from disk and the higher zoom levels from the CDN).
 
 **7. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
 **8. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
 
-The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 all datasets come from local disk. There is no moment where a tile request can fail.
+The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 each dataset comes from local disk (partial datasets: local subset plus CDN for the higher zoom levels). There is no moment where a tile request can fail.
 
 ### Ensure Infrastructure Only
 

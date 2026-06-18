@@ -44,8 +44,10 @@ set -euo pipefail
 #        while step 5 downloads the new files.
 #
 #   5. download-updater --mode=finalize  (Phase 2)
-#        Deletes stale local files, downloads missing/changed files, and
-#        rewrites versatiles.yaml to point entirely to local disk.
+#        Deletes stale local files, downloads missing/changed files (partial
+#        datasets like satellite: rebuilds their zoom-limited local subset), and
+#        rewrites versatiles.yaml to point at local disk (partial datasets: a
+#        stacked VPL serving local low zoom + CDN high zoom).
 #
 #   6. restart versatiles (config-aware)
 #        Tile server picks up the final local-disk config. Recreates the
