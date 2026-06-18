@@ -206,40 +206,28 @@ docker compose logs -f nginx     # Nginx only
 
 ## Development
 
+This repository is shell scripts (`bin/`, `download/update-tiles.sh`), a Docker
+Compose stack (`compose.yaml`), and nginx config (`nginx/`) — there is no
+Node.js/npm component. The tile-data updater is a single bash script
+(`download/update-tiles.sh`) running in a minimal Alpine container; see
+[`download/README.md`](download/README.md) for its modes and pipeline.
+
 ### Prerequisites
 
-- Node.js 22+
-- npm
+- Docker + Docker Compose plugin
+- [ShellCheck](https://www.shellcheck.net/) (for linting the scripts)
 
-### Setup
-
-```bash
-cd download
-npm install
-```
-
-### Running locally
+### Running the updater locally
 
 ```bash
-npm run once    # Run pipeline once
-```
-
-### Linting and Testing
-
-```bash
-npm run lint       # Check for lint errors
-npm run lint:fix   # Auto-fix lint errors
-npm test           # Run tests
-npm run test:watch # Run tests in watch mode
-npm run typecheck  # TypeScript type checking
+docker compose build download-updater
+docker compose run --rm download-updater --mode=check   # report only, no changes
 ```
 
 ## Contributing
 
-Before submitting a PR, ensure:
+Before submitting a PR, run the same checks as CI (`.github/workflows/ci.yml`):
 
-1. All tests pass: `cd download && npm test`
-2. Linting passes: `npm run lint`
-3. TypeScript compiles: `npm run typecheck`
-4. ShellCheck passes: `shellcheck bin/**/*.sh`
-5. Docker compose validates: `docker compose config --quiet`
+1. ShellCheck passes: `shellcheck bin/**/*.sh download/update-tiles.sh`
+2. Docker compose validates: `cp template.env .env && docker compose config --quiet`
+3. YAML lints cleanly: `yamllint compose.yaml`
