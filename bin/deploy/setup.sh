@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Fresh server setup script for tiles.versatiles.org
-# Run this after: installing Docker, cloning the repo, configuring .env, and copying the SSH key.
+# Run this after: installing Docker, cloning the repo, and configuring .env.
+# No credentials are required — tile data is fetched from the public CDN.
 
 cd "$(dirname "$0")/../.."
 source bin/deploy/helpers.sh
