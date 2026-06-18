@@ -178,6 +178,17 @@ Both `bin/deploy/setup.sh` and `bin/update.sh` call this automatically.
 
 ### Update Tile Data
 
+> **Prefer `./bin/update.sh` for production.** It runs the safe two-phase flow
+> (serve stale datasets from the CDN while the new files download) so the tile
+> server stays available throughout — see [Update After Code Changes](#update-after-code-changes).
+>
+> `bin/download-updater/update.sh` below is a simpler single-shot path intended
+> for manual/dev use. It downloads in `finalize` mode and then restarts the tile
+> server, so there is a **brief non-graceful window**: changed datasets are
+> downloaded directly over the local files (atomic temp→rename, so reads never
+> see a partial file) and the restart drops in-flight connections momentarily.
+> Acceptable for a quick refresh, but not zero-downtime.
+
 When new `.versatiles` files have been published to the CDN:
 
 ```bash
