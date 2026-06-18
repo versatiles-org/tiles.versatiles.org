@@ -130,13 +130,7 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - `docker compose pull` — pull latest Docker images
 - `docker compose build download-updater` — rebuild the download-updater image
 
-**3. download-updater `--mode=prepare`** (Phase 1 — no downloads, no deletions)
-- Fetch each dataset's `.md5` from the CDN (`cdn.versatiles.cloud/<slug>.versatiles.md5`)
-- For each dataset: compare the CDN MD5 against the local `<slug>.versatiles.md5`
-  - Match → mark as local (keep local path)
-  - Missing or mismatch → mark as remote (will fall back to cdn.versatiles.cloud)
-- Write `volumes/versatiles_conf/versatiles.yaml` — current datasets use local paths, stale/missing datasets get a `src: https://cdn.versatiles.cloud/…` URL (partial datasets get a `.vpl` that serves entirely from the CDN until the subset is rebuilt)
-- **Exits 0** if any dataset needs updating; **exits 2** if everything is already current (next step is skipped)
+**3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`: current datasets stay on local disk, stale/missing ones point at the CDN so they keep serving during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if everything is already current (in which case steps 4–7 are skipped). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
 
 **4. *(only if prepare exited 0)* Restart tile server — cdn.versatiles.cloud fallback**
 ```bash
@@ -144,12 +138,7 @@ docker compose up --detach versatiles
 ```
 VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from cdn.versatiles.cloud — slower, but no downtime. Old local files can now be safely deleted.
 
-**5. download-updater `--mode=finalize`** (Phase 2 — delete stale files, download new ones)
-- Fetch each dataset's `.md5` from the CDN (same as prepare)
-- Delete local `.versatiles` files that are no longer listed in `DATASETS`
-- Download missing or mismatched files with **aria2c** (16 parallel connections, inline MD5 verification; atomic temp file → rename on success). Partial datasets (e.g. satellite) instead rebuild their zoom-limited subset with **`versatiles convert`** — see [`download/README.md` → Partial datasets](download/README.md#partial-datasets)
-- Write the local `.md5` sidecar for future comparisons
-- Write `versatiles.yaml` — datasets point to `/data/tiles/…` (partial datasets point to their `/config_dir/<slug>.vpl` stacking local z0–N over the CDN)
+**5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed, downloads new/changed files (partial datasets like satellite rebuild their zoom-limited subset instead), and writes the final `versatiles.yaml` pointing at local disk. How downloads, subsets, and the generated config work: [`download/README.md`](download/README.md).
 
 **6. Restart tile server — local files**
 ```bash
@@ -197,11 +186,7 @@ When new `.versatiles` files have been published to the CDN:
 ./bin/download-updater/update.sh
 ```
 
-This will:
-- Fetch each dataset's MD5 from the CDN and compare with the local mirror
-- Download new/changed files with aria2c into `volumes/tiles/`
-- Regenerate `versatiles.yaml`
-- Restart the tile server to serve the new files
+This builds the updater image, runs it once (finalize) to sync changed files into `volumes/tiles/` and regenerate `versatiles.yaml`, and restarts the tile server. For what the sync actually does, see [`download/README.md`](download/README.md).
 
 ### Certificate Renewal
 
