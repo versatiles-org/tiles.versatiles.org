@@ -1,8 +1,18 @@
+# Source the versatiles binary from the official image. It is a static musl
+# binary, so it runs as-is when copied into the Alpine stage below — no shared
+# libraries to carry over. Used by update-tiles.sh to build the zoom-limited
+# local subset of large datasets (e.g. satellite) via `versatiles convert`.
+FROM versatiles/versatiles:latest AS versatiles
+
 FROM alpine:3
 
 # aria2 for fast parallel CDN downloads; curl for fetching the .md5 sidecars;
 # bash for the update script.
 RUN apk add --no-cache aria2 curl bash
+
+# versatiles CLI for `convert` (zoom-limited subset builds). Static binary, so
+# no runtime dependencies are needed.
+COPY --from=versatiles /app/versatiles /usr/local/bin/versatiles
 
 WORKDIR /app
 
