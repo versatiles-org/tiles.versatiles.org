@@ -22,7 +22,10 @@ if [ -d "./volumes/certbot-cert/live/${DOMAIN_NAME}" ]; then
     fi
 fi
 
-# Reload nginx to apply the new certificates
-docker compose exec nginx nginx -s reload
+# Reload nginx to apply the new certificates.
+# Use -T: this script runs from cron (no TTY), and `docker compose exec` would
+# otherwise try to allocate one and fail with "the input device is not a TTY",
+# leaving the freshly renewed certificate unloaded.
+docker compose exec -T nginx nginx -s reload
 
 echo "Certificate renewal and nginx reload completed successfully."
