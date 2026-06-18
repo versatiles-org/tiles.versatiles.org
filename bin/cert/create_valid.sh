@@ -29,8 +29,9 @@ if [ ! -f "./volumes/nginx-cert/live/${DOMAIN}/fullchain.pem" ]; then
 	exit 1
 fi
 
-# Reload nginx to apply the new certificates using Docker Compose
-docker compose exec nginx nginx -s reload
+# Reload nginx to apply the new certificates using Docker Compose.
+# Use -T for consistency with the cron-run cert scripts and to stay non-interactive.
+docker compose exec -T nginx nginx -s reload
 
 # Set up certificate renewal cron job
 ./bin/cert/setup_renewal.sh
