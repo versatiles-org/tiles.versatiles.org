@@ -34,7 +34,7 @@ set -euo pipefail
 #
 # Pipelines may use the placeholders {CDN} (the CDN base URL) and {LOCAL} (the
 # tile server's local tiles dir, /data/tiles). The .versatiles files live behind
-# a public Cloudflare bucket (cdn.versatiles.cloud); each input is a stable
+# a public Cloudflare bucket (download.versatiles.org); each input is a stable
 # <slug>.versatiles key with a <slug>.versatiles.md5 sidecar. No credentials.
 #
 # Usage: update-tiles.sh [--mode=check|prepare|finalize]   (default: finalize)
@@ -62,7 +62,7 @@ CONF_FOLDER="$VOLUME_FOLDER/versatiles_conf"
 MANIFEST="${MANIFEST:-$(dirname "$0")/sources.json}"
 
 # Base URL of the CDN, with any trailing slashes stripped.
-CDN_BASE_URL="${CDN_BASE_URL:-https://cdn.versatiles.cloud}"
+CDN_BASE_URL="${CDN_BASE_URL:-https://download.versatiles.org}"
 while [ "${CDN_BASE_URL: -1}" = "/" ]; do CDN_BASE_URL="${CDN_BASE_URL%/}"; done
 
 # Paths as seen by the *versatiles* container (not this updater). Used inside the
