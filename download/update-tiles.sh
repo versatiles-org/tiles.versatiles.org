@@ -51,7 +51,7 @@ DATASETS=(
 # See download_local_files (builds the subset with `versatiles convert`) and
 # write_vpl (emits the pipeline).
 declare -A PARTIAL_MAX_ZOOM=(
-	[satellite]=16
+	[satellite]=15
 )
 
 # True if the given slug is a partial (zoom-limited local subset) dataset.
