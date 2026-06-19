@@ -18,13 +18,16 @@ This repository serves **tiles.versatiles.org** (tile serving). The file downloa
 ## Architecture
 
 - **versatiles**: Tile server serving `.versatiles` files from local disk
-- **download-updater**: One-shot pipeline that downloads the `.versatiles` files from the CDN (cdn.versatiles.cloud) into `volumes/tiles/` using aria2c (parallel connections), and generates `versatiles.yaml` for the tile server
+- **download-updater**: One-shot pipeline that produces the local `.versatiles` files in `volumes/tiles/` from the CDN (cdn.versatiles.cloud) and generates `versatiles.yaml` for the tile server. Each dataset is defined declaratively in [`download/sources.json`](download/sources.json) — most are mirrored as-is (aria2c), some are derived with [VPL](https://docs.versatiles.org) via `versatiles convert`
 - **nginx**: Reverse proxy in front of the tile server (TLS termination, caching, rate limiting)
 - **certbot**: SSL certificate management
 
-The `.versatiles` files are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each dataset is a stable `<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local mirror so the tile server reads from fast local disk; while a file is syncing, the tile server temporarily reads it directly from the CDN so there is no downtime. No credentials are involved — the CDN is public.
+The inputs are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each is a stable `<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local copy so the tile server reads from fast local disk; while a dataset is updating, the tile server temporarily reads it from the CDN so there is no downtime. No credentials are involved — the CDN is public.
 
-**Partial datasets:** some datasets are too large to mirror in full (satellite is ~2 TB), so only a zoom-limited subset is kept locally and the higher zoom levels are served straight from the CDN via a [VPL](https://docs.versatiles.org) pipeline. For example `/tiles/satellite/` serves z0–16 from the ~700 GB local subset and z17+ from cdn.versatiles.cloud, stacked in `satellite.vpl`. See [`download/README.md` → Partial datasets](download/README.md#partial-datasets).
+**Derived datasets** (configured in [`download/sources.json`](download/sources.json), see [`download/README.md`](download/README.md)):
+
+- `/tiles/satellite/` — too large to mirror in full (~2 TB), so only z0–15 is kept locally (~700 GB) and z16+ is served straight from the CDN, stacked via a VPL pipeline.
+- `/tiles/osm/` — built by **merging** `osm` + `landcover-vectors` into one container (`from_merged_vector`) with combined attribution (`meta_update`). `landcover-vectors` is **not** served on its own.
 
 ## Volume Directories
 
@@ -138,19 +141,19 @@ docker compose up --detach versatiles
 ```
 VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from cdn.versatiles.cloud — slower, but no downtime. Old local files can now be safely deleted.
 
-**5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed, downloads new/changed files (partial datasets like satellite rebuild their zoom-limited subset instead), and writes the final `versatiles.yaml` pointing at local disk. How downloads, subsets, and the generated config work: [`download/README.md`](download/README.md).
+**5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (satellite, osm) are rebuilt with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
 
 **6. Restart tile server — local files**
 ```bash
 docker compose up --detach versatiles
 ```
-VersaTiles reloads `versatiles.yaml`. Datasets are now served from local disk at full speed (partial datasets serve their local zoom range from disk and the higher zoom levels from the CDN).
+VersaTiles reloads `versatiles.yaml`. Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
 
 **7. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
 **8. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
 
-The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 each dataset comes from local disk (partial datasets: local subset plus CDN for the higher zoom levels). There is no moment where a tile request can fail.
+The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 each dataset comes from local disk (satellite additionally reads its high zoom levels from the CDN). There is no moment where a tile request can fail.
 
 ### Ensure Infrastructure Only
 

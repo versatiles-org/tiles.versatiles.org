@@ -2,29 +2,51 @@
 set -euo pipefail
 
 # =============================================================================
-# update-tiles.sh — mirror the .versatiles tile data from the CDN and (re)generate
-# versatiles.yaml for the VersaTiles tile server.
+# update-tiles.sh — produce the local .versatiles tile data and (re)generate
+# versatiles.yaml for the VersaTiles tile server, driven by a source manifest.
 # =============================================================================
 #
-# The .versatiles files live behind a public Cloudflare bucket
-# (cdn.versatiles.cloud). Each dataset is a stable object key <slug>.versatiles
-# with a small <slug>.versatiles.md5 checksum sidecar. A dataset is "current"
-# when the local file exists and its stored MD5 matches the CDN's. Stale or
-# missing datasets are (re)downloaded with aria2c (parallel connections, inline
-# MD5 verification). No credentials are involved — the CDN is public.
+# Each dataset is described declaratively in sources.json. A dataset is defined
+# by up to four fields (all optional except `name`):
+#
+#   name               Served tile name and local file <name>.versatiles.
+#   build              How to produce the local artifact:
+#                        {kind:"mirror"}                 download <name> as-is
+#                                                        (aria2c, inline MD5).
+#                        {kind:"vpl", pipeline, compress} run the VPL pipeline
+#                                                        through `versatiles
+#                                                        convert` (subset, merge,
+#                                                        meta_update, …).
+#                      Default: {kind:"mirror"}.
+#   serveCurrent       How to serve once the local artifact is fresh:
+#                        {kind:"local"}  serve <name>.versatiles from disk.
+#                        {kind:"vpl", pipeline}  serve a VPL (e.g. a local
+#                                                low-zoom subset stacked over the
+#                                                CDN). Default: {kind:"local"}.
+#   serveTransitional  How to serve while the artifact is being (re)built:
+#                        {kind:"remote"} serve <name>.versatiles from the CDN.
+#                        {kind:"vpl", pipeline}  serve a VPL (pipeline omitted ⇒
+#                                                reuse build.pipeline). Default:
+#                                                {kind:"remote"}.
+#   versionInputs      CDN keys whose MD5s compose the freshness marker.
+#                      Default: [name]. Multiple inputs (e.g. a merge) rebuild
+#                      when ANY input changes.
+#
+# Pipelines may use the placeholders {CDN} (the CDN base URL) and {LOCAL} (the
+# tile server's local tiles dir, /data/tiles). The .versatiles files live behind
+# a public Cloudflare bucket (cdn.versatiles.cloud); each input is a stable
+# <slug>.versatiles key with a <slug>.versatiles.md5 sidecar. No credentials.
 #
 # Usage: update-tiles.sh [--mode=check|prepare|finalize]   (default: finalize)
 #
 #   check    Read-only: fetch MD5s, compare to local state, report whether
 #            anything needs updating. Writes nothing.
 #   prepare  Like check, but also writes a transitional versatiles.yaml that
-#            points stale/missing datasets at the CDN (so the tile server keeps
-#            serving them during the update) and current datasets at local disk.
-#            Downloads nothing.
-#   finalize Download stale/missing datasets (partial datasets: build their
-#            zoom-limited subset), delete datasets no longer listed, and write a
-#            versatiles.yaml pointing at local disk (partial datasets: a stacked
-#            VPL serving local low zoom + CDN high zoom).
+#            serves stale/missing datasets via their serveTransitional (so the
+#            tile server keeps serving during the update) and fresh ones via
+#            serveCurrent. Builds/downloads nothing.
+#   finalize Build/download stale datasets, delete datasets no longer listed,
+#            and write a versatiles.yaml serving everything via serveCurrent.
 #
 # Exit codes (consumed by bin/update.sh):
 #   0  at least one dataset needs updating (or finalize completed)
@@ -32,38 +54,21 @@ set -euo pipefail
 #   2  nothing to update — only emitted in check/prepare
 # =============================================================================
 
-# Datasets to keep in sync. Each slug is the CDN object key (<slug>.versatiles,
-# with a <slug>.versatiles.md5 sidecar) and the tile source `name` in the yaml.
-# The CDN exposes no listing, so this is the authoritative set — add/remove here.
-DATASETS=(
-	osm
-	satellite
-	elevation
-	landcover-vectors
-	hillshade-vectors
-	bathymetry-vectors
-)
-
-# Partial datasets: too large to mirror in full, so we keep only a zoom-limited
-# local subset (z0..maxzoom) and serve the higher zoom levels straight from the
-# CDN via a stacked VPL pipeline. Maps slug -> max local zoom. The satellite
-# dataset is ~2 TB in full but only ~700 GB up to z16, which fits the host disk.
-# See download_local_files (builds the subset with `versatiles convert`) and
-# write_vpl (emits the pipeline).
-declare -A PARTIAL_MAX_ZOOM=(
-	[satellite]=15
-)
-
-# True if the given slug is a partial (zoom-limited local subset) dataset.
-is_partial() { [ -n "${PARTIAL_MAX_ZOOM[$1]:-}" ]; }
-
 VOLUME_FOLDER="${VOLUME_FOLDER:-/volumes}"
 TILES_FOLDER="$VOLUME_FOLDER/tiles"
 CONF_FOLDER="$VOLUME_FOLDER/versatiles_conf"
 
+# Source manifest (defaults to the copy shipped next to this script).
+MANIFEST="${MANIFEST:-$(dirname "$0")/sources.json}"
+
 # Base URL of the CDN, with any trailing slashes stripped.
 CDN_BASE_URL="${CDN_BASE_URL:-https://cdn.versatiles.cloud}"
 while [ "${CDN_BASE_URL: -1}" = "/" ]; do CDN_BASE_URL="${CDN_BASE_URL%/}"; done
+
+# Paths as seen by the *versatiles* container (not this updater). Used inside the
+# generated versatiles.yaml and the {LOCAL} placeholder in pipelines.
+SERVER_TILES_DIR="/data/tiles"
+SERVER_CONF_DIR="/config_dir"
 
 # Parse --mode= from the first argument; default to finalize.
 MODE="finalize"
@@ -76,10 +81,37 @@ for arg in "$@"; do
 	esac
 done
 
-# Per-dataset MD5 reported by the CDN, and whether the dataset is still remote
-# (stale/missing) or already current on local disk. Indexed by array position.
-declare -a MD5S
-declare -a IS_REMOTE
+# ---------------------------------------------------------------------------
+# Manifest accessors (one jq call each; the manifest is tiny)
+# ---------------------------------------------------------------------------
+mapfile -t DATASETS < <(jq -r '.[].name' "$MANIFEST")
+
+# ds_get <name> <jq-filter-relative-to-entry> <default>
+ds_get() {
+	local v
+	v="$(jq -r --arg n "$1" ".[] | select(.name==\$n) | $2 // empty" "$MANIFEST")"
+	printf '%s' "${v:-$3}"
+}
+ds_build_kind()       { ds_get "$1" '.build.kind' 'mirror'; }
+ds_build_pipeline()   { ds_get "$1" '.build.pipeline' ''; }
+ds_build_compress()   { ds_get "$1" '.build.compress' ''; }
+ds_serve_kind()       { ds_get "$1" '.serveCurrent.kind' 'local'; }
+ds_serve_pipeline()   { ds_get "$1" '.serveCurrent.pipeline' ''; }
+ds_trans_kind()       { ds_get "$1" '.serveTransitional.kind' 'remote'; }
+ds_trans_pipeline()   { ds_get "$1" '.serveTransitional.pipeline' ''; }
+ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.name])[]' "$MANIFEST"; }
+
+# Substitutes {CDN} and {LOCAL} placeholders in a pipeline string.
+subst() {
+	local s="$1"
+	s="${s//\{CDN\}/$CDN_BASE_URL}"
+	s="${s//\{LOCAL\}/$SERVER_TILES_DIR}"
+	printf '%s' "$s"
+}
+
+# ---------------------------------------------------------------------------
+# MD5 helpers
+# ---------------------------------------------------------------------------
 
 # Extract the leading hash token from a checksum body ("<hash>  <filename>").
 parse_hash() {
@@ -102,42 +134,73 @@ read_local_md5() {
 	[ "${#hash}" -ge 32 ] && printf '%s' "$hash"
 }
 
-# Fetch the current MD5 of every dataset from the CDN.
-resolve_datasets() {
-	echo "Resolving ${#DATASETS[@]} datasets from $CDN_BASE_URL..."
-	local i body
-	for i in "${!DATASETS[@]}"; do
-		local url="$CDN_BASE_URL/${DATASETS[$i]}.versatiles.md5"
+# Fetch the current CDN MD5 of a slug (memoised).
+declare -A CDN_MD5_CACHE
+cdn_md5() {
+	local slug="$1"
+	if [ -z "${CDN_MD5_CACHE[$slug]:-}" ]; then
+		local url="$CDN_BASE_URL/$slug.versatiles.md5" body
 		if ! body="$(curl -fsS "$url")"; then
 			echo "GET $url failed" >&2
 			exit 1
 		fi
-		MD5S[i]="$(parse_hash "$body")"
-		IS_REMOTE[i]=1
+		CDN_MD5_CACHE[$slug]="$(parse_hash "$body")"
+	fi
+	printf '%s' "${CDN_MD5_CACHE[$slug]}"
+}
+
+# The freshness marker for a dataset: the raw CDN MD5 for a single input
+# (so plain mirror sidecars stay byte-compatible and aria2c can verify against
+# it), or an MD5 of the joined input MD5s for a multi-input (e.g. merged)
+# dataset, so it rebuilds whenever any input changes.
+dataset_marker() {
+	local -a inputs
+	mapfile -t inputs < <(ds_version_inputs "$1")
+	if [ "${#inputs[@]}" -le 1 ]; then
+		cdn_md5 "${inputs[0]}"
+	else
+		local s
+		{ for s in "${inputs[@]}"; do printf '%s\n' "$(cdn_md5 "$s")"; done; } | md5sum | cut -d' ' -f1
+	fi
+}
+
+# ---------------------------------------------------------------------------
+# Resolve / compare
+# ---------------------------------------------------------------------------
+
+# Warm the MD5 cache for every input (fails fast if the CDN is unreachable).
+resolve_datasets() {
+	echo "Resolving ${#DATASETS[@]} datasets from $CDN_BASE_URL..."
+	local name s
+	for name in "${DATASETS[@]}"; do
+		while read -r s; do cdn_md5 "$s" >/dev/null; done < <(ds_version_inputs "$name")
 	done
 }
 
-# Marks each dataset current (IS_REMOTE=0) when the local file exists with a
-# matching MD5, otherwise stale (IS_REMOTE=1). Downloads nothing. Sets the
-# global NEEDS_UPDATE to 1 if any dataset needs updating.
+# Marks each dataset fresh (IS_REMOTE=0) when its local file exists with a
+# matching marker, otherwise stale (IS_REMOTE=1). Sets NEEDS_UPDATE.
+declare -A IS_REMOTE
 NEEDS_UPDATE=0
 check_local_files() {
 	mkdir -p "$TILES_FOLDER"
-	local i
-	for i in "${!DATASETS[@]}"; do
-		local file="${DATASETS[$i]}.versatiles"
-		local path="$TILES_FOLDER/$file"
-		if [ -f "$path" ] && [ "$(read_local_md5 "$path")" = "${MD5S[$i]}" ]; then
-			IS_REMOTE[i]=0
+	local name path
+	for name in "${DATASETS[@]}"; do
+		path="$TILES_FOLDER/$name.versatiles"
+		if [ -f "$path" ] && [ "$(read_local_md5 "$path")" = "$(dataset_marker "$name")" ]; then
+			IS_REMOTE[$name]=0
 		else
-			IS_REMOTE[i]=1
+			IS_REMOTE[$name]=1
 			NEEDS_UPDATE=1
 		fi
 	done
 }
 
+# ---------------------------------------------------------------------------
+# Build (finalize)
+# ---------------------------------------------------------------------------
+
 # Removes leftover temp/control files from interrupted downloads (aria2c) and
-# subset builds (versatiles convert writes <file>.tmp).
+# VPL builds (versatiles convert writes <file>.tmp.versatiles).
 cleanup_temp_files() {
 	local entry
 	for entry in "$TILES_FOLDER"/*.download "$TILES_FOLDER"/*.aria2 "$TILES_FOLDER"/*.tmp.versatiles; do
@@ -147,68 +210,45 @@ cleanup_temp_files() {
 	done
 }
 
-# Deletes .versatiles files (and their .md5) that are not in DATASETS.
+# Deletes .versatiles files (and their .md5) that are not in the manifest.
 delete_unknown_files() {
-	local wanted=""
-	local slug
-	for slug in "${DATASETS[@]}"; do wanted="$wanted $slug.versatiles "; done
-	local entry
+	local wanted="" name
+	for name in "${DATASETS[@]}"; do wanted="$wanted $name.versatiles "; done
+	local entry file
 	for entry in "$TILES_FOLDER"/*.versatiles; do
 		[ -e "$entry" ] || continue
-		local file
 		file="$(basename "$entry")"
 		case "$wanted" in
 			*" $file "*) ;;
-			*)
-				echo " - Deleting $file"
-				rm -f "$entry" "$entry.md5"
-				;;
+			*) echo " - Deleting $file"; rm -f "$entry" "$entry.md5" ;;
 		esac
 	done
 }
 
-# Downloads stale/missing datasets from the CDN into TILES_FOLDER (partial
-# datasets: builds their zoom-limited subset with `versatiles convert`) and
-# removes any .versatiles files no longer part of DATASETS. Afterwards each
-# dataset's local file is present (IS_REMOTE=0).
+# Builds each stale dataset's local file (mirror download or VPL convert) and
+# removes files no longer in the manifest. Afterwards every dataset's local
+# file is present (IS_REMOTE=0).
 download_local_files() {
 	mkdir -p "$TILES_FOLDER"
 	echo "Syncing local files..."
 	cleanup_temp_files
 	delete_unknown_files
 
-	local i
-	for i in "${!DATASETS[@]}"; do
-		local file="${DATASETS[$i]}.versatiles"
-		local path="$TILES_FOLDER/$file"
+	local name file path marker kind
+	for name in "${DATASETS[@]}"; do
+		file="$name.versatiles"
+		path="$TILES_FOLDER/$file"
+		marker="$(dataset_marker "$name")"
 
-		if [ -f "$path" ] && [ "$(read_local_md5 "$path")" = "${MD5S[$i]}" ]; then
+		if [ -f "$path" ] && [ "$(read_local_md5 "$path")" = "$marker" ]; then
 			echo " - Keeping $file (already up to date)"
-			IS_REMOTE[i]=0
+			IS_REMOTE[$name]=0
 			continue
 		fi
 
-		local url="$CDN_BASE_URL/$file"
-
-		if is_partial "${DATASETS[$i]}"; then
-			local maxzoom="${PARTIAL_MAX_ZOOM[${DATASETS[$i]}]}"
-			# versatiles convert infers the output format from the file extension,
-			# so the temp file must end in .versatiles (not .tmp).
-			local building="${path%.versatiles}.tmp.versatiles"
-			echo " - Building local subset of $file (z0-$maxzoom) from $url ..."
-			# Free the old subset first: it is large (satellite ~700 GB) and the
-			# host filesystem cannot hold two copies. In the two-phase update flow
-			# the tile server is already serving this dataset from the CDN (the
-			# transitional VPL written by prepare), so the local file is not in use
-			# while finalize rebuilds it.
-			rm -f "$path" "$path.md5" "$building"
-			# versatiles convert reads the remote container over range requests,
-			# fetching only the tiles up to maxzoom, and writes them locally. No
-			# --tile-format / --compress so the subset stays byte-format-identical
-			# to the remote (required for from_stacked).
-			versatiles convert --max-zoom="$maxzoom" "$url" "$building"
-			mv "$building" "$path"
-		else
+		kind="$(ds_build_kind "$name")"
+		if [ "$kind" = "mirror" ]; then
+			local url="$CDN_BASE_URL/$file"
 			echo " - Downloading $file from $url ..."
 			aria2c \
 				--dir="$TILES_FOLDER" \
@@ -221,86 +261,110 @@ download_local_files() {
 				--continue=true \
 				--allow-overwrite=true \
 				--auto-file-renaming=false \
-				--checksum=md5="${MD5S[$i]}" \
+				--checksum=md5="$marker" \
 				--console-log-level=warn \
 				--summary-interval=0 \
 				"$url"
 			mv "$path.download" "$path"
+		elif [ "$kind" = "vpl" ]; then
+			# versatiles convert infers the output format from the file extension,
+			# so the temp file must end in .versatiles (not .tmp).
+			local building="${path%.versatiles}.tmp.versatiles"
+			local pipeline compress
+			pipeline="$(subst "$(ds_build_pipeline "$name")")"
+			compress="$(ds_build_compress "$name")"
+			echo " - Building $file via VPL ..."
+			# Free the old artifact first: derived files are large and the host
+			# disk cannot hold two copies. In the two-phase update flow the tile
+			# server is already serving this dataset via serveTransitional, so the
+			# local file is not in use while finalize rebuilds it.
+			rm -f "$path" "$path.md5" "$building"
+			if [ -n "$compress" ]; then
+				versatiles convert -c "$compress" "[,vpl]($pipeline)" "$building"
+			else
+				versatiles convert "[,vpl]($pipeline)" "$building"
+			fi
+			mv "$building" "$path"
+		else
+			echo "Unknown build kind '$kind' for $name" >&2
+			exit 1
 		fi
 
-		# Record the CDN full-file MD5 as the version marker. For partial datasets
-		# this is intentionally NOT the local subset's own hash — it records which
-		# CDN version the subset was derived from, so check_local_files can detect
-		# when the upstream file changes and trigger a rebuild.
-		printf '%s  %s\n' "${MD5S[$i]}" "$file" >"$path.md5"
-		IS_REMOTE[i]=0
+		# Record the freshness marker. For derived datasets this is intentionally
+		# NOT the local file's own hash — it records which CDN input version(s) the
+		# artifact was built from, so check_local_files can detect upstream changes.
+		printf '%s  %s\n' "$marker" "$file" >"$path.md5"
+		IS_REMOTE[$name]=0
 	done
 }
 
-# Writes the VPL pipeline file for a partial dataset (atomically: temp + rename).
-#
-# When the local subset is current (IS_REMOTE=0) it stacks the local low-zoom
-# subset over the full remote file: z0..maxzoom served from local disk, the rest
-# straight from the CDN. from_stacked uses first-match, so the explicit filters
-# enforce the boundary (and stop the remote ever answering a low zoom).
-#
-# When the subset is stale/absent (IS_REMOTE=1, e.g. during prepare or before the
-# first build) it serves the whole dataset from the CDN, so the tile server has
-# no downtime while finalize rebuilds the subset.
-write_vpl() {
-	local i="$1"
-	local slug="${DATASETS[$i]}"
-	local file="$slug.versatiles"
-	local maxzoom="${PARTIAL_MAX_ZOOM[$slug]}"
-	local minremote=$((maxzoom + 1))
-	local remote="$CDN_BASE_URL/$file"
-	local out="$CONF_FOLDER/$slug.vpl"
-	local tmp="$out.tmp"
+# ---------------------------------------------------------------------------
+# Generate versatiles.yaml (+ any VPL files)
+# ---------------------------------------------------------------------------
 
-	if [ "${IS_REMOTE[$i]}" -eq 1 ]; then
-		cat >"$tmp" <<-VPL
-			from_container filename="$remote"
-		VPL
-	else
-		cat >"$tmp" <<-VPL
-			from_stacked [
-			   from_container filename="/data/tiles/$file" | filter level_max=$maxzoom,
-			   from_container filename="$remote" | filter level_min=$minremote
-			]
-		VPL
-	fi
-
+# Writes a VPL file atomically: write_vpl_file <basename-without-ext> <content>
+write_vpl_file() {
+	local out="$CONF_FOLDER/$1.vpl" tmp
+	tmp="$out.tmp"
+	printf '%s\n' "$2" >"$tmp"
 	mv "$tmp" "$out"
 }
 
-# Removes VPL files for datasets that are no longer partial (or removed entirely).
-delete_unknown_vpls() {
-	local entry slug
+# Removes .vpl files not in the given wanted list (passed by name).
+prune_vpls() {
+	local -n _wanted="$1"
+	local entry base w keep
 	for entry in "$CONF_FOLDER"/*.vpl; do
 		[ -e "$entry" ] || continue
-		slug="$(basename "$entry" .vpl)"
-		if ! is_partial "$slug"; then
-			echo " - Removing stale $slug.vpl"
+		base="$(basename "$entry" .vpl)"
+		keep=0
+		for w in ${_wanted[@]+"${_wanted[@]}"}; do
+			if [ "$w" = "$base" ]; then keep=1; break; fi
+		done
+		if [ "$keep" -eq 0 ]; then
+			echo " - Removing stale $base.vpl"
 			rm -f "$entry"
 		fi
 	done
 }
 
-# Generates versatiles.yaml and writes it to disk atomically (temp + rename).
 generate_versatiles_yaml() {
 	echo "Generating versatiles.yaml..."
 	mkdir -p "$CONF_FOLDER"
-	local out="$CONF_FOLDER/versatiles.yaml"
-	local tmp="$out.tmp"
+	local out="$CONF_FOLDER/versatiles.yaml" tmp
+	tmp="$out.tmp"
 
-	# Write the VPL pipeline files for partial datasets first; the yaml below
-	# references each by its server-side path (/config_dir/<slug>.vpl). Then drop
-	# any stale .vpl files for datasets that are no longer partial.
-	local i
-	for i in "${!DATASETS[@]}"; do
-		is_partial "${DATASETS[$i]}" && write_vpl "$i"
+	# Resolve each dataset's `src`, writing any serve/transitional .vpl files as a
+	# side effect. Done in the parent shell (NOT a command substitution) so the
+	# wanted-list appends survive; the freshly written .vpl files would otherwise
+	# be pruned below.
+	local -a wanted_vpls=()
+	local -A src=()
+	local name p
+	for name in "${DATASETS[@]}"; do
+		if [ "${IS_REMOTE[$name]}" -eq 0 ]; then
+			# Fresh — serve via serveCurrent.
+			if [ "$(ds_serve_kind "$name")" = "vpl" ]; then
+				write_vpl_file "$name.serve" "$(subst "$(ds_serve_pipeline "$name")")"
+				wanted_vpls+=("$name.serve")
+				src[$name]="$SERVER_CONF_DIR/$name.serve.vpl"
+			else
+				src[$name]="$SERVER_TILES_DIR/$name.versatiles"
+			fi
+		else
+			# Stale/missing — serve via serveTransitional.
+			if [ "$(ds_trans_kind "$name")" = "vpl" ]; then
+				p="$(ds_trans_pipeline "$name")"
+				[ -z "$p" ] && p="$(ds_build_pipeline "$name")"  # default: reuse build pipeline
+				write_vpl_file "$name.transitional" "$(subst "$p")"
+				wanted_vpls+=("$name.transitional")
+				src[$name]="$SERVER_CONF_DIR/$name.transitional.vpl"
+			else
+				src[$name]="$CDN_BASE_URL/$name.versatiles"
+			fi
+		fi
 	done
-	delete_unknown_vpls
+	prune_vpls wanted_vpls
 
 	{
 		cat <<-'YAML'
@@ -315,19 +379,8 @@ generate_versatiles_yaml() {
 
 			tiles:
 		YAML
-
-		for i in "${!DATASETS[@]}"; do
-			local file="${DATASETS[$i]}.versatiles"
-			local src
-			if is_partial "${DATASETS[$i]}"; then
-				# Served via the stacked/transitional VPL written above.
-				src="/config_dir/${DATASETS[$i]}.vpl"
-			elif [ "${IS_REMOTE[$i]}" -eq 1 ]; then
-				src="$CDN_BASE_URL/$file"
-			else
-				src="/data/tiles/$file"
-			fi
-			printf '  - name: %s\n    src: %s\n' "${DATASETS[$i]}" "$src"
+		for name in "${DATASETS[@]}"; do
+			printf '  - name: %s\n    src: %s\n' "$name" "${src[$name]}"
 		done
 	} >"$tmp"
 

@@ -1,0 +1,28 @@
+[
+  { "name": "elevation" },
+  { "name": "hillshade-vectors" },
+  { "name": "bathymetry-vectors" },
+
+  {
+    "name": "satellite",
+    "build": {
+      "kind": "vpl",
+      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=15"
+    },
+    "serveCurrent": {
+      "kind": "vpl",
+      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=15, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=16 ]"
+    }
+  },
+
+  {
+    "name": "osm",
+    "versionInputs": ["osm", "landcover-vectors"],
+    "build": {
+      "kind": "vpl",
+      "compress": "brotli",
+      "pipeline": "from_merged_vector [ from_container filename=\"{CDN}/osm.versatiles\", from_container filename=\"{CDN}/landcover-vectors.versatiles\" ] | meta_update attribution='© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap contributors</a>, <a href=\"https://versatiles.org/sources/\">VersaTiles sources</a>'"
+    },
+    "serveTransitional": { "kind": "vpl" }
+  }
+]
