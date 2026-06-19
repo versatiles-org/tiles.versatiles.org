@@ -4,10 +4,26 @@ set -euo pipefail
 # Fresh server setup script for tiles.versatiles.org
 # Run this after: installing Docker, cloning the repo, and configuring .env.
 # No credentials are required — tile data is fetched from the public CDN.
+#
+# Usage: setup.sh [--fast]
+#   --fast  Bring the server up immediately serving every dataset straight from
+#           the CDN (no tile download — transient config). The server is live in
+#           minutes and uses no tile disk. Run ./bin/update.sh afterwards to
+#           download the data and switch to local-disk serving with no downtime.
 
 cd "$(dirname "$0")/../.."
 source bin/deploy/helpers.sh
 source .env
+
+# Argument parsing
+FAST=false
+for arg in "$@"; do
+	case "$arg" in
+		--fast|--fast-start) FAST=true ;;
+		-h|--help) sed -n '8,12p' "$0"; exit 0 ;;
+		*) echo "Unknown argument: $arg" >&2; echo "Usage: $0 [--fast]" >&2; exit 1 ;;
+	esac
+done
 
 echo "============================================"
 echo "tiles.versatiles.org — Fresh Server Setup"
@@ -84,9 +100,27 @@ if [ $BUILD_EXIT -ne 0 ] && [ $BUILD_EXIT -ne 10 ]; then
 	exit 1
 fi
 
-# 2. Run download pipeline (initial population — fresh server has no local files)
-echo "Running download pipeline..."
-docker compose run --rm download-updater
+# 2. Tile data
+if [ "$FAST" = "true" ]; then
+	# Fast start: write a transient versatiles.yaml that serves every dataset
+	# straight from the CDN (prepare downloads nothing), so the server can come
+	# up right away. Run ./bin/update.sh later to populate local disk.
+	echo "Fast start: writing transient config (serving from the CDN, no download)..."
+	set +e
+	docker compose run --rm download-updater --mode=prepare
+	PREP_EXIT=$?
+	set -e
+	# prepare exits 0 (needs update — always true on a fresh server) or 2
+	# (already current); anything else is a real error.
+	if [ $PREP_EXIT -ne 0 ] && [ $PREP_EXIT -ne 2 ]; then
+		echo "ERROR: download-updater (prepare) failed (exit $PREP_EXIT)."
+		exit 1
+	fi
+else
+	# Full population: download/build all datasets to local disk before starting.
+	echo "Running download pipeline (full local population)..."
+	docker compose run --rm download-updater
+fi
 
 # 3. Create dummy SSL certificates
 echo "Creating dummy SSL certificates..."
@@ -108,3 +142,8 @@ echo "Running verification..."
 
 echo ""
 echo "Setup complete!"
+if [ "$FAST" = "true" ]; then
+	echo ""
+	echo "Fast start: all tiles are currently served from the CDN — no local data yet."
+	echo "Run ./bin/update.sh to download the data and switch to local disk (no downtime)."
+fi

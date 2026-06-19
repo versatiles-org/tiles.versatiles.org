@@ -99,7 +99,17 @@ nano .env
 ./bin/deploy/setup.sh
 ```
 
-This runs preflight checks and then sets up everything: volumes, RAM disk, frontend, styles, Docker images, SSL certificates, and all services.
+This runs preflight checks and then sets up everything: volumes, RAM disk, frontend, styles, Docker images, SSL certificates, and all services. It downloads the full tile data to local disk before starting, which can take a long time.
+
+#### Fast start
+
+To get the server live in minutes without waiting for the (large) tile download:
+
+```bash
+./bin/deploy/setup.sh --fast
+```
+
+This sets up everything as above but writes a **transient config** that serves every dataset straight from the CDN (no tile download, no tile disk used). The server is immediately available — just slower per tile (and `osm` is merged live from the CDN). When ready, run `./bin/update.sh` to download the data and switch to local-disk serving **with no downtime**.
 
 ## Configuration
 
