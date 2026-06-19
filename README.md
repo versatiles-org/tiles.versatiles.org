@@ -46,6 +46,8 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 
 **Mode** shows container mount modes. `rw/ro` means the writer mounts read-write, readers mount read-only.
 
+`volumes/tiles/` can be relocated to another filesystem via the `TILES_DIR` setting — see [Relocating tile storage](#relocating-tile-storage).
+
 ### Permissions
 
 - **download-updater volumes** (`tiles/`, `versatiles_conf/`): Must be owned by UID 1001 (`appuser` inside the container). The setup script runs `chown 1001:1001` on these after creation.
@@ -108,9 +110,14 @@ Edit `.env` to configure:
 | `DOMAIN_NAME`  | Tiles domain                                      | tiles.versatiles.org         |
 | `RAM_DISK_GB`  | RAM disk size for caching                         | 4                            |
 | `EMAIL`        | Email for Let's Encrypt                           | mail@versatiles.org          |
-| `CDN_BASE_URL` | CDN hosting the tile data (optional, has default) | https://cdn.versatiles.cloud |
+| `CDN_BASE_URL` | CDN hosting the tile data (optional, has default) | https://download.versatiles.org |
+| `TILES_DIR`    | Tile data directory — relocate to another filesystem if needed (optional, defaults to `./volumes/tiles`) | /mnt/bigdisk/tiles |
 
 No credentials are required — the tile data is fetched from the public CDN.
+
+### Relocating tile storage
+
+`volumes/tiles/` holds the `.versatiles` files and is by far the largest volume (hundreds of GB). To put it on another filesystem, set `TILES_DIR` in `.env` to an absolute path **before** running `bin/deploy/setup.sh` (or run `bin/deploy/ensure.sh` after changing it — it creates the directory and sets ownership to `1001:1001`). The container-internal paths are unchanged, so nothing else needs adjusting. To migrate an existing install: stop the stack, move the files to the new location, set `TILES_DIR`, then `./bin/deploy/ensure.sh` and restart.
 
 ## Operations
 

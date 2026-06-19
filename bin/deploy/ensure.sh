@@ -7,6 +7,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+# Tile data directory — can be relocated to another filesystem via TILES_DIR in
+# .env (must match the value compose bind-mounts; default ./volumes/tiles).
+[ -f .env ] && source .env
+TILES_DIR="${TILES_DIR:-./volumes/tiles}"
+
 echo "Ensuring infrastructure prerequisites..."
 
 # 1. Volume directories
@@ -17,12 +22,12 @@ mkdir -p \
 	volumes/nginx-cert \
 	volumes/nginx-log \
 	volumes/frontend volumes/cache \
-	volumes/tiles \
-	volumes/versatiles_conf
+	volumes/versatiles_conf \
+	"$TILES_DIR"
 
 echo "Ensuring volume ownership..."
 chown -R 1001:1001 \
-	volumes/tiles \
+	"$TILES_DIR" \
 	volumes/versatiles_conf
 
 # 2. RAM disk

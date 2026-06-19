@@ -15,7 +15,7 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - ./volumes/tiles/:/data/tiles/:ro
+      - ${TILES_DIR:-./volumes/tiles}:/data/tiles/:ro
       - ./volumes/frontend/:/data/frontend/:ro
       - ./volumes/versatiles_conf/:/config_dir/:ro
 
@@ -31,7 +31,7 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./volumes/tiles:/volumes/tiles:rw
+      - ${TILES_DIR:-./volumes/tiles}:/volumes/tiles:rw
       - ./volumes/versatiles_conf:/volumes/versatiles_conf:rw
 
   nginx:

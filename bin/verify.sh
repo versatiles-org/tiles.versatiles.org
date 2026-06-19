@@ -145,7 +145,9 @@ fi
 # Check volume directories
 echo ""
 echo "10. Checking volume directories..."
-VOLUME_DIRS="volumes/tiles volumes/frontend volumes/cache volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log volumes/versatiles_conf"
+# Tile data dir is relocatable via TILES_DIR in .env (default ./volumes/tiles).
+TILES_DIR="${TILES_DIR:-./volumes/tiles}"
+VOLUME_DIRS="$TILES_DIR volumes/frontend volumes/cache volumes/certbot-cert volumes/certbot-www volumes/nginx-cert volumes/nginx-log volumes/versatiles_conf"
 for dir in $VOLUME_DIRS; do
     if [ -d "$dir" ]; then
         pass "$dir exists"
@@ -155,7 +157,7 @@ for dir in $VOLUME_DIRS; do
 done
 
 # Check updater-written volumes are writable by UID 1001
-for dir in volumes/tiles volumes/versatiles_conf; do
+for dir in "$TILES_DIR" volumes/versatiles_conf; do
     OWNER=$(stat -c '%u' "$dir" 2>/dev/null || stat -f '%u' "$dir" 2>/dev/null || echo "unknown")
     if [ "$OWNER" = "1001" ]; then
         pass "$dir owned by appuser (1001)"
