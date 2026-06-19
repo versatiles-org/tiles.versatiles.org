@@ -60,6 +60,9 @@ server's local tiles dir, `/data/tiles`). `vpl` serve/transitional pipelines are
 To **add or finetune a source** (zoom limit, merge, attribution via `meta_update`, …), edit
 `sources.json` — no changes to `update-tiles.sh`.
 
+JSON has no comments, so use a **`"//"` key** for notes (a string or array of strings). The engine
+only reads the fields above, so any extra key is ignored — see the `satellite` and `osm` entries.
+
 > **Freshness marker:** the `<slug>.versatiles.md5` sidecar stores the **marker**, not necessarily the
 > local file's own hash. For a single-input dataset it is the raw CDN MD5 (so mirror downloads can be
 > verified by aria2c). For a derived dataset it records which CDN input version(s) the artifact was

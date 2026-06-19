@@ -4,6 +4,13 @@
   { "name": "bathymetry-vectors" },
 
   {
+    "//": [
+      "Satellite imagery is ~2 TB in full — too large to mirror. Keep only z0-15",
+      "locally (~700 GB) and serve z16+ straight from the CDN, stacked via VPL.",
+      "build: convert only z0-15 from the CDN into the local subset.",
+      "serveCurrent: local subset for z0-15, CDN for z16+ (first-match + filters).",
+      "serveTransitional defaults to remote (whole dataset from the CDN while rebuilding)."
+    ],
     "name": "satellite",
     "build": {
       "kind": "vpl",
@@ -16,6 +23,16 @@
   },
 
   {
+    "//": [
+      "Served osm is osm + landcover-vectors merged into one container",
+      "(from_merged_vector), with combined attribution (meta_update). landcover-vectors",
+      "is therefore NOT served on its own.",
+      "versionInputs: rebuild whenever EITHER osm or landcover-vectors changes upstream.",
+      "build: merge both CDN sources into a brotli local file (attribution baked in).",
+      "serveTransitional: kind vpl with no pipeline ⇒ reuse build.pipeline, i.e. merge",
+      "both CDN sources live (with attribution) while the local file is being rebuilt.",
+      "serveCurrent defaults to local (the baked, merged file)."
+    ],
     "name": "osm",
     "versionInputs": ["osm", "landcover-vectors"],
     "build": {
