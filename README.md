@@ -208,6 +208,20 @@ When new `.versatiles` files have been published to the CDN:
 
 This builds the updater image, runs it once (finalize) to sync changed files into `volumes/tiles/` and regenerate `versatiles.yaml`, and restarts the tile server. For what the sync actually does, see [`download/README.md`](download/README.md).
 
+### Switching serving mode (transient ↔ local)
+
+Manually flip where the tile server reads its data, without downloading, building, or deleting anything. This only rewrites `versatiles.yaml` and restarts the tile server, so it is fast and reversible:
+
+```bash
+./bin/serve-mode.sh transient   # serve every dataset from the CDN
+./bin/serve-mode.sh local       # serve datasets present on local disk from disk
+```
+
+- **`transient`** — serve all datasets straight from the CDN (`osm` is merged live). Local tile files are left untouched, just not used. Useful to free the tile server from local data before moving/repairing the `volumes/tiles` volume, or to keep serving while local data is incomplete.
+- **`local`** — serve each dataset whose local file exists from disk; any missing dataset falls back to the CDN. This is presence-based (it serves whatever is on disk), not a freshness check.
+
+To actually **download or refresh** local data (and switch back to local serving as part of it), use `./bin/update.sh` — that's the full two-phase, no-downtime path. `serve-mode.sh` is only for flipping the active source.
+
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:

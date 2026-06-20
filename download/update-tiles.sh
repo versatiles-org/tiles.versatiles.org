@@ -37,16 +37,24 @@ set -euo pipefail
 # a public Cloudflare bucket (download.versatiles.org); each input is a stable
 # <slug>.versatiles key with a <slug>.versatiles.md5 sidecar. No credentials.
 #
-# Usage: update-tiles.sh [--mode=check|prepare|finalize]   (default: finalize)
+# Usage: update-tiles.sh [--mode=check|prepare|finalize|transient|local]
+#                                                          (default: finalize)
 #
-#   check    Read-only: fetch MD5s, compare to local state, report whether
-#            anything needs updating. Writes nothing.
-#   prepare  Like check, but also writes a transitional versatiles.yaml that
-#            serves stale/missing datasets via their serveTransitional (so the
-#            tile server keeps serving during the update) and fresh ones via
-#            serveCurrent. Builds/downloads nothing.
-#   finalize Build/download stale datasets, delete datasets no longer listed,
-#            and write a versatiles.yaml serving everything via serveCurrent.
+# Update lifecycle:
+#   check     Read-only: fetch MD5s, compare to local state, report whether
+#             anything needs updating. Writes nothing.
+#   prepare   Like check, but also writes a transitional versatiles.yaml that
+#             serves stale/missing datasets via their serveTransitional (so the
+#             tile server keeps serving during the update) and fresh ones via
+#             serveCurrent. Builds/downloads nothing.
+#   finalize  Build/download stale datasets, delete datasets no longer listed,
+#             and write a versatiles.yaml serving everything via serveCurrent.
+#
+# Manual serving-mode switches (only rewrite versatiles.yaml — no resolve, no
+# downloads, local files untouched; see bin/serve-mode.sh):
+#   transient Serve every dataset from the CDN (serveTransitional).
+#   local     Serve datasets present on local disk via serveCurrent; any missing
+#             dataset falls back to the CDN.
 #
 # Exit codes (consumed by bin/update.sh):
 #   0  at least one dataset needs updating (or finalize completed)
@@ -77,6 +85,8 @@ for arg in "$@"; do
 		--mode=check) MODE="check" ;;
 		--mode=prepare) MODE="prepare" ;;
 		--mode=finalize) MODE="finalize" ;;
+		--mode=transient) MODE="transient" ;;
+		--mode=local) MODE="local" ;;
 		*) echo "Unknown argument: $arg" >&2; exit 1 ;;
 	esac
 done
@@ -391,6 +401,27 @@ generate_versatiles_yaml() {
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
+
+# Manual serving-mode switches: just (re)write versatiles.yaml — no resolve, no
+# downloads, no changes to local files. See bin/serve-mode.sh.
+if [ "$MODE" = "transient" ]; then
+	# Serve every dataset from the CDN (serveTransitional), ignoring local files.
+	for name in "${DATASETS[@]}"; do IS_REMOTE[$name]=1; done
+	generate_versatiles_yaml
+	exit 0
+fi
+if [ "$MODE" = "local" ]; then
+	# Serve each dataset that is present on local disk from disk (serveCurrent);
+	# any missing dataset falls back to the CDN. Presence-based, not freshness —
+	# this is a serving switch, not an update.
+	mkdir -p "$TILES_FOLDER"
+	for name in "${DATASETS[@]}"; do
+		if [ -f "$TILES_FOLDER/$name.versatiles" ]; then IS_REMOTE[$name]=0; else IS_REMOTE[$name]=1; fi
+	done
+	generate_versatiles_yaml
+	exit 0
+fi
+
 resolve_datasets
 
 if [ "$MODE" = "finalize" ]; then
