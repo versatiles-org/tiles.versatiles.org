@@ -102,6 +102,10 @@ ds_get() {
 	v="$(jq -r --arg n "$1" ".[] | select(.name==\$n) | $2 // empty" "$MANIFEST")"
 	printf '%s' "${v:-$3}"
 }
+# CDN object key for mirror download / remote serving (without .versatiles).
+# Defaults to the dataset name; set `source` when the served name differs from
+# the CDN file name (e.g. served "osm" sourced from "osm-landcover").
+ds_source()           { ds_get "$1" '.source' "$1"; }
 ds_build_kind()       { ds_get "$1" '.build.kind' 'mirror'; }
 ds_build_pipeline()   { ds_get "$1" '.build.pipeline' ''; }
 ds_build_compress()   { ds_get "$1" '.build.compress' ''; }
@@ -109,7 +113,8 @@ ds_serve_kind()       { ds_get "$1" '.serveCurrent.kind' 'local'; }
 ds_serve_pipeline()   { ds_get "$1" '.serveCurrent.pipeline' ''; }
 ds_trans_kind()       { ds_get "$1" '.serveTransitional.kind' 'remote'; }
 ds_trans_pipeline()   { ds_get "$1" '.serveTransitional.pipeline' ''; }
-ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.name])[]' "$MANIFEST"; }
+# Freshness inputs default to the CDN source key (which defaults to the name).
+ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.source // .name])[]' "$MANIFEST"; }
 
 # Substitutes {CDN} and {LOCAL} placeholders in a pipeline string.
 subst() {
@@ -258,7 +263,10 @@ download_local_files() {
 
 		kind="$(ds_build_kind "$name")"
 		if [ "$kind" = "mirror" ]; then
-			local url="$CDN_BASE_URL/$file"
+			# Download the CDN source object (may be named differently than the
+			# served dataset) into the local <name>.versatiles file.
+			local url
+			url="$CDN_BASE_URL/$(ds_source "$name").versatiles"
 			echo " - Downloading $file from $url ..."
 			aria2c \
 				--dir="$TILES_FOLDER" \
@@ -370,7 +378,7 @@ generate_versatiles_yaml() {
 				wanted_vpls+=("$name.transitional")
 				src[$name]="$SERVER_CONF_DIR/$name.transitional.vpl"
 			else
-				src[$name]="$CDN_BASE_URL/$name.versatiles"
+				src[$name]="$CDN_BASE_URL/$(ds_source "$name").versatiles"
 			fi
 		fi
 	done

@@ -27,7 +27,7 @@ The inputs are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (ea
 **Derived datasets** (configured in [`download/sources.json`](download/sources.json), see [`download/README.md`](download/README.md)):
 
 - `/tiles/satellite/` — too large to mirror in full (~2 TB), so only z0–15 is kept locally (~700 GB) and z16+ is served straight from the CDN, stacked via a VPL pipeline.
-- `/tiles/osm/` — built by **merging** `osm` + `landcover-vectors` into one container (`from_merged_vector`) with combined attribution (`meta_update`). `landcover-vectors` is **not** served on its own.
+- `/tiles/osm/` — served from the prebuilt **`osm-landcover.versatiles`** on the CDN (osm + landcover merged upstream, attribution baked in). It's a plain mirror under a remapped name; `landcover-vectors` is **not** served on its own.
 
 ## Volume Directories
 
@@ -109,7 +109,7 @@ To get the server live in minutes without waiting for the (large) tile download:
 ./bin/deploy/setup.sh --fast
 ```
 
-This sets up everything as above but writes a **transient config** that serves every dataset straight from the CDN (no tile download, no tile disk used). The server is immediately available — just slower per tile (and `osm` is merged live from the CDN). When ready, run `./bin/update.sh` to download the data and switch to local-disk serving **with no downtime**.
+This sets up everything as above but writes a **transient config** that serves every dataset straight from the CDN (no tile download, no tile disk used). The server is immediately available — just slower per tile. When ready, run `./bin/update.sh` to download the data and switch to local-disk serving **with no downtime**.
 
 ## Configuration
 
@@ -158,7 +158,7 @@ docker compose up --detach versatiles
 ```
 VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from cdn.versatiles.cloud — slower, but no downtime. Old local files can now be safely deleted.
 
-**5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (satellite, osm) are rebuilt with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
+**5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (e.g. satellite) are built with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
 
 **6. Restart tile server — local files**
 ```bash
@@ -217,7 +217,7 @@ Manually flip where the tile server reads its data, without downloading, buildin
 ./bin/serve-mode.sh local       # serve datasets present on local disk from disk
 ```
 
-- **`transient`** — serve all datasets straight from the CDN (`osm` is merged live). Local tile files are left untouched, just not used. Useful to free the tile server from local data before moving/repairing the `volumes/tiles` volume, or to keep serving while local data is incomplete.
+- **`transient`** — serve all datasets straight from the CDN. Local tile files are left untouched, just not used. Useful to free the tile server from local data before moving/repairing the `volumes/tiles` volume, or to keep serving while local data is incomplete.
 - **`local`** — serve each dataset whose local file exists from disk; any missing dataset falls back to the CDN. This is presence-based (it serves whatever is on disk), not a freshness check.
 
 To actually **download or refresh** local data (and switch back to local serving as part of it), use `./bin/update.sh` — that's the full two-phase, no-downtime path. `serve-mode.sh` is only for flipping the active source.

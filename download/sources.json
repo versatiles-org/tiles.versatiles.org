@@ -24,22 +24,14 @@
 
   {
     "//": [
-      "Served osm is osm + landcover-vectors merged into one container",
-      "(from_merged_vector), with combined attribution (meta_update). landcover-vectors",
-      "is therefore NOT served on its own.",
-      "versionInputs: rebuild whenever EITHER osm or landcover-vectors changes upstream.",
-      "build: merge both CDN sources into a brotli local file (attribution baked in).",
-      "serveTransitional: kind vpl with no pipeline ⇒ reuse build.pipeline, i.e. merge",
-      "both CDN sources live (with attribution) while the local file is being rebuilt.",
-      "serveCurrent defaults to local (the baked, merged file)."
+      "Served as 'osm' (/tiles/osm/, local osm.versatiles) but sourced from the",
+      "prebuilt 'osm-landcover.versatiles' on the CDN — osm + landcover merged",
+      "upstream with the combined attribution already baked in. Plain mirror:",
+      "download the CDN file to local disk; serveTransitional defaults to remote",
+      "(the CDN osm-landcover file while the local copy is downloading).",
+      "landcover-vectors is NOT served on its own."
     ],
     "name": "osm",
-    "versionInputs": ["osm", "landcover-vectors"],
-    "build": {
-      "kind": "vpl",
-      "compress": "brotli",
-      "pipeline": "from_merged_vector [ from_container filename=\"{CDN}/osm.versatiles\", from_container filename=\"{CDN}/landcover-vectors.versatiles\" ] | meta_update attribution='© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap contributors</a>, <a href=\"https://versatiles.org/sources/\">VersaTiles sources</a>'"
-    },
-    "serveTransitional": { "kind": "vpl" }
+    "source": "osm-landcover"
   }
 ]

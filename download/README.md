@@ -34,23 +34,24 @@ so a plain mirrored dataset is a one-liner:
     "serveCurrent": { "kind": "vpl",
                       "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=15, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=16 ]" } },
 
-  { "name": "osm",                               // merge osm + landcover into one attributed file
-    "versionInputs": ["osm", "landcover-vectors"],
-    "build":             { "kind": "vpl", "compress": "brotli",
-                           "pipeline": "from_merged_vector [ from_container filename=\"{CDN}/osm.versatiles\", from_container filename=\"{CDN}/landcover-vectors.versatiles\" ] | meta_update attribution='…'" },
-    "serveTransitional": { "kind": "vpl" } }     // omit pipeline ⇒ reuse build.pipeline (live merge from CDN)
+  { "name": "osm", "source": "osm-landcover" }   // serve as 'osm', mirror the prebuilt osm-landcover.versatiles
 ]
 ```
+
+(An earlier revision built `osm` in-process by merging `osm` + `landcover-vectors` with
+`from_merged_vector | meta_update`; that VPL build is now done upstream and published as
+`osm-landcover.versatiles`, so here it is just a remapped mirror.)
 
 ### Fields
 
 | Field               | Default            | Meaning                                                                                  |
 | ------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
 | `name`              | —                  | Served tile name and local file `<name>.versatiles`.                                      |
-| `build`             | `{kind:"mirror"}`  | `mirror` = download `<name>` as-is (aria2c, inline MD5). `vpl` = run `pipeline` through `versatiles convert` (`compress` optional, e.g. `brotli`). |
+| `source`            | `name`             | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the served name differs from the CDN file name (e.g. served `osm` from `osm-landcover`). |
+| `build`             | `{kind:"mirror"}`  | `mirror` = download the CDN `source` as-is (aria2c, inline MD5). `vpl` = run `pipeline` through `versatiles convert` (`compress` optional, e.g. `brotli`). |
 | `serveCurrent`      | `{kind:"local"}`   | How to serve once fresh. `local` = the built file. `vpl` = serve `pipeline` (e.g. a local low-zoom subset stacked over the CDN). |
 | `serveTransitional` | `{kind:"remote"}`  | How to serve while (re)building. `remote` = the CDN file. `vpl` = serve `pipeline` (omit ⇒ reuse `build.pipeline`). |
-| `versionInputs`     | `[name]`           | CDN keys whose MD5s form the freshness marker; multiple inputs rebuild when **any** changes. |
+| `versionInputs`     | `[source]`         | CDN keys whose MD5s form the freshness marker (defaults to the `source`); multiple inputs rebuild when **any** changes. |
 
 Pipelines may use the placeholders **`{CDN}`** (the CDN base URL) and **`{LOCAL}`** (the tile
 server's local tiles dir, `/data/tiles`). `vpl` serve/transitional pipelines are written to
