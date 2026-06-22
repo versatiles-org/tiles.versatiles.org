@@ -236,6 +236,18 @@ docker compose logs -f           # All services
 docker compose logs -f nginx     # Nginx only
 ```
 
+### Referer statistics
+
+nginx records a per-request referer log (`volumes/nginx-log/referer_stats*.tsv.gz`). Summarise it by referer domain — total transmitted data (MB) and number of tile requests — as an aligned table sorted by data descending:
+
+```bash
+./bin/log/referer_stats.sh                # current month (default)
+./bin/log/referer_stats.sh --month all    # all months (live log + rotated files)
+./bin/log/referer_stats.sh --month 2026-05  # a specific rotated month
+```
+
+The logs rotate monthly, so the timespan is selected by `--month` (`current`, `all`, or `YYYY-MM`). Explicit `*.tsv.gz` file arguments override `--month`.
+
 ## Development
 
 This repository is shell scripts (`bin/`, `download/update-tiles.sh`), a Docker
