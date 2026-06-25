@@ -32,6 +32,6 @@
       "landcover-vectors is NOT served on its own."
     ],
     "name": "osm",
-    "source": "osm-landcover"
+    "source": "osm"
   }
 ]
