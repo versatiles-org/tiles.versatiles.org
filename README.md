@@ -152,19 +152,19 @@ The script runs a safe two-phase update that keeps the tile server available thr
 
 **3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`: current datasets stay on local disk, stale/missing ones point at the CDN so they keep serving during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if everything is already current (in which case steps 4–7 are skipped). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
 
-**4. *(only if prepare exited 0)* Restart tile server — cdn.versatiles.cloud fallback**
+**4. *(only if prepare exited 0)* Reload tile server — CDN fallback config**
 ```bash
-docker compose up --detach versatiles
+up_with_config_fallback versatiles sighup   # docker compose up; SIGHUP if unchanged
 ```
-VersaTiles reloads `versatiles.yaml`. Datasets that need updating are now served from cdn.versatiles.cloud — slower, but no downtime. Old local files can now be safely deleted.
+VersaTiles reloads `versatiles.yaml` on SIGHUP with no downtime (it's recreated only if the compose state changed, e.g. a new image). Datasets that need updating are now served from the CDN — slower, but available. Old local files can now be safely deleted.
 
 **5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (e.g. satellite) are built with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
 
-**6. Restart tile server — local files**
+**6. Reload tile server — local files**
 ```bash
-docker compose up --detach versatiles
+up_with_config_fallback versatiles sighup
 ```
-VersaTiles reloads `versatiles.yaml`. Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
+VersaTiles reloads `versatiles.yaml` on SIGHUP (no downtime). Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
 
 **7. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
@@ -194,11 +194,12 @@ Both `bin/deploy/setup.sh` and `bin/update.sh` call this automatically.
 > server stays available throughout — see [Update After Code Changes](#update-after-code-changes).
 >
 > `bin/download-updater/update.sh` below is a simpler single-shot path intended
-> for manual/dev use. It downloads in `finalize` mode and then restarts the tile
-> server, so there is a **brief non-graceful window**: changed datasets are
-> downloaded directly over the local files (atomic temp→rename, so reads never
-> see a partial file) and the restart drops in-flight connections momentarily.
-> Acceptable for a quick refresh, but not zero-downtime.
+> for manual/dev use. It runs `finalize` and reloads the tile server via SIGHUP
+> (no dropped connections). It skips the two-phase CDN fallback, though: a
+> **derived** dataset (satellite, osm) is briefly unavailable while it is rebuilt
+> in place, since there is no transitional switch to the CDN. Plain datasets are
+> seamless (atomic temp→rename). Fine for a quick refresh; use `./bin/update.sh`
+> when you need every dataset to stay available throughout.
 
 When new `.versatiles` files have been published to the CDN:
 
@@ -206,11 +207,11 @@ When new `.versatiles` files have been published to the CDN:
 ./bin/download-updater/update.sh
 ```
 
-This builds the updater image, runs it once (finalize) to sync changed files into `volumes/tiles/` and regenerate `versatiles.yaml`, and restarts the tile server. For what the sync actually does, see [`download/README.md`](download/README.md).
+This builds the updater image, runs it once (finalize) to sync changed files into `volumes/tiles/` and regenerate `versatiles.yaml`, and reloads the tile server (SIGHUP). For what the sync actually does, see [`download/README.md`](download/README.md).
 
 ### Switching serving mode (transient ↔ local)
 
-Manually flip where the tile server reads its data, without downloading, building, or deleting anything. This only rewrites `versatiles.yaml` and restarts the tile server, so it is fast and reversible:
+Manually flip where the tile server reads its data, without downloading, building, or deleting anything. This only rewrites `versatiles.yaml` and reloads the tile server (SIGHUP, no downtime), so it is fast and reversible:
 
 ```bash
 ./bin/serve-mode.sh transient   # serve every dataset from the CDN

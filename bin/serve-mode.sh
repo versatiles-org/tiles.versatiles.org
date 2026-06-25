@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Manually switch how the tile server sources its data, then restart it.
-# This only rewrites versatiles.yaml and restarts the tile server — it does not
-# download, build, or delete any tile data, so it is fast and reversible.
+# Manually switch how the tile server sources its data, then reload it.
+# This only rewrites versatiles.yaml and reloads the tile server (SIGHUP, no
+# downtime) — it does not download, build, or delete any tile data, so it is
+# fast and reversible.
 #
 # Usage: serve-mode.sh transient|local
 #
@@ -30,9 +31,9 @@ esac
 echo "Switching tile serving to '$MODE' mode..."
 docker compose run --rm download-updater "--mode=$MODE"
 
-# Re-read the new versatiles.yaml (restart unless compose state changed).
-echo "Restarting tile server..."
-up_with_config_fallback versatiles restart
+# Re-read the new versatiles.yaml (SIGHUP reload unless compose state changed).
+echo "Reloading tile server..."
+up_with_config_fallback versatiles sighup
 wait_for_healthy versatiles
 
 # Drop cached tiles so clients don't get responses from the previous mode.

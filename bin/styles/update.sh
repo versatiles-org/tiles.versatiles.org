@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Exit codes:
 #   0  → styles already up to date (no download)
-#   10 → styles were downloaded/updated (the caller must restart versatiles and
+#   10 → styles were downloaded/updated (the caller must reload versatiles and
 #        clear the nginx cache, otherwise the old styles keep being served)
 
 # Navigate to the project's root directory relative to this script.
@@ -38,5 +38,5 @@ curl -fLs "https://github.com/versatiles-org/versatiles-style/releases/download/
 echo "$LATEST_TAG" >"$TAG_FILE"
 echo "Styles updated to $LATEST_TAG"
 
-# Signal to the caller that the styles changed and a restart + cache clear is needed.
+# Signal to the caller that the styles changed and a reload + cache clear is needed.
 exit 10

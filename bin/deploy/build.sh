@@ -11,10 +11,10 @@ set -euo pipefail
 # Exit codes:
 #   0  → success, no frontend/styles change
 #   10 → success, frontend and/or styles were updated. These assets are served
-#        by the versatiles container from a tar it loads at startup and are
-#        cached by nginx, so the caller must restart versatiles and clear the
-#        cache for the new assets to actually reach clients. update.sh relies on
-#        this signal to do that even when no tile data changed.
+#        by the versatiles container from a tar and cached by nginx, so the
+#        caller must reload versatiles (SIGHUP swaps the static sources) and
+#        clear the cache for the new assets to actually reach clients. update.sh
+#        relies on this signal to do that even when no tile data changed.
 #   other non-zero → a build step failed (propagated as-is).
 
 cd "$(dirname "$0")/../.."
@@ -56,8 +56,8 @@ docker compose pull
 echo "Building Docker images..."
 docker compose build download-updater
 
-# Propagate the asset-changed signal so the caller can restart + clear cache.
+# Propagate the asset-changed signal so the caller can reload + clear cache.
 if [ "$ASSETS_CHANGED" = "true" ]; then
-	echo "Frontend and/or styles changed — caller must restart versatiles and clear the cache."
+	echo "Frontend and/or styles changed — caller must reload versatiles and clear the cache."
 	exit 10
 fi

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# update.sh — pull latest code, rebuild, refresh tile data, rolling restart.
+# update.sh — pull latest code, rebuild, refresh tile data, rolling reload.
 # =============================================================================
 #
 # Usage:
@@ -38,10 +38,10 @@ set -euo pipefail
 #          1 → pipeline error (abort)
 #          2 → nothing to update (skip intermediate restart)
 #
-#   4. (only if step 3 returned 0) restart versatiles
+#   4. (only if step 3 returned 0) reload versatiles
 #        Tile server picks up the transitional config and serves stale
-#        tilesets from cdn.versatiles.cloud so it stays available
-#        while step 5 downloads the new files.
+#        tilesets from the CDN so it stays available while step 5 downloads
+#        the new files. Reload is a no-downtime SIGHUP (see step 6).
 #
 #   5. download-updater --mode=finalize  (Phase 2)
 #        Deletes stale local files and (re)builds missing/changed datasets —
@@ -49,11 +49,12 @@ set -euo pipefail
 #        versatiles convert (see download/sources.json). Then rewrites
 #        versatiles.yaml to serve everything via each dataset's serveCurrent.
 #
-#   6. restart versatiles (config-aware)
+#   6. reload versatiles (config-aware)
 #        Tile server picks up the final local-disk config. Recreates the
 #        container only when compose-level state changed (new image, env,
-#        mounts); otherwise issues a lighter `docker compose restart` so
-#        the existing container re-reads the new versatiles.yaml.
+#        mounts); otherwise sends SIGHUP so the running container reloads the
+#        new versatiles.yaml with no downtime (tile sources updated
+#        incrementally, in-flight requests complete).
 #
 #   7. reload nginx (config-aware)
 #        Re-resolves the versatiles upstream in case the tile server container
@@ -74,9 +75,9 @@ set -euo pipefail
 #
 #   Path A — files changed (prepare exits 0):
 #     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
-#     The tile server is restarted twice (transitional config, then final).
-#     During the gap between restarts, stale tilesets are served from
-#     cdn.versatiles.cloud so there is no outage.
+#     The tile server is reloaded twice (transitional config, then final).
+#     During the gap, stale tilesets are served from the CDN so there is no
+#     outage; the SIGHUP reloads themselves are also downtime-free.
 #
 #   Path B — nothing changed (prepare exits 2):
 #     1 → 2 → 3 → 9
@@ -195,13 +196,14 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   # restarts.
   #
   # BUT: build.sh may still have pulled a new frontend/styles bundle. Those are
-  # loaded by the versatiles container at startup and cached by nginx, so the
-  # download alone does nothing visible — without a restart and cache clear the
-  # old frontend keeps being served. So when assets changed we restart the tile
-  # server and clear the cache here even though no tile data moved.
+  # served by the versatiles container from a tar and cached by nginx, so the
+  # download alone does nothing visible — without a reload and cache clear the
+  # old frontend keeps being served. So when assets changed we reload the tile
+  # server (SIGHUP swaps the static sources) and clear the cache here even though
+  # no tile data moved.
   if [ "$ASSETS_CHANGED" = "true" ]; then
-    echo "Tile data unchanged, but frontend/styles changed — restarting tile server and clearing cache."
-    up_with_config_fallback versatiles restart
+    echo "Tile data unchanged, but frontend/styles changed — reloading tile server and clearing cache."
+    up_with_config_fallback versatiles sighup
     wait_for_healthy versatiles
     ./bin/ramdisk/clear.sh
   else
@@ -214,21 +216,21 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   exit 0
 fi
 
-# Files need updating — restart tile server so it picks up the transitional
-# config and serves stale tilesets from cdn.versatiles.cloud while we
-# download the new files. Use `restart` fallback so we only recreate the
-# container if compose state changed; otherwise just re-read the new yaml.
-echo "Restarting tile server with cdn.versatiles.cloud fallback..."
-up_with_config_fallback versatiles restart
+# Files need updating — have the tile server pick up the transitional config and
+# serve stale tilesets from the CDN while we download the new files. The `sighup`
+# fallback recreates the container only if compose state changed; otherwise it
+# sends SIGHUP so versatiles reloads the new yaml with no downtime.
+echo "Reloading tile server with CDN fallback config..."
+up_with_config_fallback versatiles sighup
 wait_for_healthy versatiles
 
 # Phase 2: delete stale files, download new ones, generate final configs
 echo "Running download pipeline (finalize)..."
 docker compose run --rm download-updater --mode=finalize
 
-# Tile server picks up the final local-disk config.
-echo "Restarting tile server with local files..."
-up_with_config_fallback versatiles restart
+# Tile server picks up the final local-disk config (SIGHUP reload, no downtime).
+echo "Reloading tile server with local files..."
+up_with_config_fallback versatiles sighup
 wait_for_healthy versatiles
 
 # Reload nginx so it re-resolves the versatiles upstream. If the tile server

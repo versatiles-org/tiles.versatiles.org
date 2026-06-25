@@ -32,9 +32,13 @@ wait_for_healthy() {
 #
 # Usage:
 #   up_with_config_fallback <service> <fallback>
-#   <fallback> ∈ { restart, reload }
-#     restart → `docker compose restart SERVICE`         (re-read mounted files)
+#   <fallback> ∈ { sighup, reload, restart }
+#     sighup  → `docker compose kill -s SIGHUP SERVICE` (versatiles reloads its
+#               -c config with no downtime: tile sources updated incrementally,
+#               in-flight requests complete against the version they started with)
 #     reload  → `docker compose exec SERVICE nginx -s reload` (graceful reload)
+#     restart → `docker compose restart SERVICE`         (full restart, drops
+#               in-flight connections — last resort)
 up_with_config_fallback() {
 	local service="$1"
 	local fallback="$2"
@@ -53,16 +57,20 @@ up_with_config_fallback() {
 	# Container was unchanged at the compose level; force it to pick up new
 	# file content from mounted volumes.
 	case "$fallback" in
-		restart)
-			echo "$service compose state unchanged — restarting to re-read config."
-			docker compose restart "$service"
+		sighup)
+			echo "$service compose state unchanged — sending SIGHUP to reload config."
+			docker compose kill -s SIGHUP "$service"
 			;;
 		reload)
 			echo "$service compose state unchanged — sending nginx reload signal."
 			docker compose exec -T "$service" nginx -s reload
 			;;
+		restart)
+			echo "$service compose state unchanged — restarting to re-read config."
+			docker compose restart "$service"
+			;;
 		*)
-			echo "Error: unknown fallback action '$fallback' (expected: restart|reload)"
+			echo "Error: unknown fallback action '$fallback' (expected: sighup|reload|restart)"
 			exit 1
 			;;
 	esac
