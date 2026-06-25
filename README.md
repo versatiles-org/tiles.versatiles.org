@@ -248,6 +248,14 @@ nginx records a per-request referer log (`volumes/nginx-log/referer_stats*.tsv.g
 
 The logs rotate monthly, so the timespan is selected by `--month` (`current`, `all`, or `YYYY-MM`). Explicit `*.tsv.gz` file arguments override `--month`.
 
+For a per-month overview — tile requests, tile data, and total data per month — use:
+
+```bash
+./bin/log/monthly_traffic.sh
+```
+
+It prints one row per month (`month`, `tiles`, `tile_MB`, `total_MB`), oldest first with the current month last. With no arguments it reads all `referer_stats*.tsv.gz`; pass specific files to scope it.
+
 ## Development
 
 This repository is shell scripts (`bin/`, `download/update-tiles.sh`), a Docker
