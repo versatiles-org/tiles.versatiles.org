@@ -5,20 +5,20 @@
 
   {
     "//": [
-      "Satellite imagery is ~2 TB in full — too large to mirror. Keep only z0-15",
-      "locally (~700 GB) and serve z16+ straight from the CDN, stacked via VPL.",
-      "build: convert only z0-15 from the CDN into the local subset.",
-      "serveCurrent: local subset for z0-15, CDN for z16+ (first-match + filters).",
+      "Satellite imagery is ~2 TB in full — too large to mirror. Keep only z0-16",
+      "locally (~700 GB) and serve z17+ straight from the CDN, stacked via VPL.",
+      "build: convert only z0-16 from the CDN into the local subset.",
+      "serveCurrent: local subset for z0-16, CDN for z17+ (first-match + filters).",
       "serveTransitional defaults to remote (whole dataset from the CDN while rebuilding)."
     ],
     "name": "satellite",
     "build": {
       "kind": "vpl",
-      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=15"
+      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=16"
     },
     "serveCurrent": {
       "kind": "vpl",
-      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=15, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=16 ]"
+      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]"
     }
   },
 
