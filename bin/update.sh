@@ -31,8 +31,11 @@ set -euo pipefail
 #   3. download-updater --mode=prepare   (Phase 1)
 #        Fetches each dataset's MD5 from the CDN, compares with local
 #        state. Writes a transitional versatiles.yaml:
-#          - local paths for current files
-#          - cdn.versatiles.cloud URLs for stale/missing files
+#          - local path for current datasets
+#          - local path (old file) for stale datasets that have a local file and
+#            an atomic build — they keep serving the old data during the rebuild
+#          - CDN URL only for datasets with no local file or a delete-old-first
+#            build (e.g. satellite)
 #        Does NOT download. Exit codes:
 #          0 → at least one file needs updating
 #          1 → pipeline error (abort)

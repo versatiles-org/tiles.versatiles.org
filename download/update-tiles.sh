@@ -113,6 +113,13 @@ ds_serve_kind()       { ds_get "$1" '.serveCurrent.kind' 'local'; }
 ds_serve_pipeline()   { ds_get "$1" '.serveCurrent.pipeline' ''; }
 ds_trans_kind()       { ds_get "$1" '.serveTransitional.kind' 'remote'; }
 ds_trans_pipeline()   { ds_get "$1" '.serveTransitional.pipeline' ''; }
+
+# True if a build preserves the old local file until the new one is ready, so a
+# stale dataset can keep serving its old local copy during the rebuild. Mirror
+# builds download to a temp file and atomically rename (old file stays valid).
+# vpl builds delete the old file first (disk can't hold two copies), so they are
+# NOT atomic and must fall back to the CDN while rebuilding.
+is_atomic_build()     { [ "$(ds_build_kind "$1")" = "mirror" ]; }
 # Freshness inputs default to the CDN source key (which defaults to the name).
 ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.source // .name])[]' "$MANIFEST"; }
 
@@ -192,8 +199,15 @@ resolve_datasets() {
 	done
 }
 
-# Marks each dataset fresh (IS_REMOTE=0) when its local file exists with a
-# matching marker, otherwise stale (IS_REMOTE=1). Sets NEEDS_UPDATE.
+# Decides how each dataset is served in the transitional (prepare) config and
+# whether anything needs rebuilding (NEEDS_UPDATE).
+#
+# IS_REMOTE=0 means "serve locally" (serveCurrent), IS_REMOTE=1 means "serve from
+# the CDN" (serveTransitional). A fresh dataset is always local. A STALE dataset
+# keeps serving its OLD local file (IS_REMOTE=0) when that file exists and its
+# build is atomic — so the rebuild happens behind it with no CDN fallback — and
+# only falls back to the CDN (IS_REMOTE=1) when there is no local file to serve
+# or the build deletes the old file before producing the new one.
 declare -A IS_REMOTE
 NEEDS_UPDATE=0
 check_local_files() {
@@ -202,10 +216,14 @@ check_local_files() {
 	for name in "${DATASETS[@]}"; do
 		path="$TILES_FOLDER/$name.versatiles"
 		if [ -f "$path" ] && [ "$(read_local_md5 "$path")" = "$(dataset_marker "$name")" ]; then
-			IS_REMOTE[$name]=0
+			IS_REMOTE[$name]=0          # fresh — serve local
 		else
-			IS_REMOTE[$name]=1
-			NEEDS_UPDATE=1
+			NEEDS_UPDATE=1              # stale — will be rebuilt in finalize
+			if [ -f "$path" ] && is_atomic_build "$name"; then
+				IS_REMOTE[$name]=0      # keep serving the old local file during the rebuild
+			else
+				IS_REMOTE[$name]=1      # no usable local file / delete-old-first — serve from CDN
+			fi
 		fi
 	done
 }

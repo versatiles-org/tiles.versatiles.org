@@ -150,13 +150,13 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - `docker compose pull` — pull latest Docker images
 - `docker compose build download-updater` — rebuild the download-updater image
 
-**3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`: current datasets stay on local disk, stale/missing ones point at the CDN so they keep serving during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if everything is already current (in which case steps 4–7 are skipped). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
+**3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`. A stale dataset keeps serving its **old local file** while it's rebuilt, as long as that file exists and the build is atomic (mirror: download to temp → rename); only datasets with no local file, or a delete-old-first build (e.g. satellite), point at the CDN during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if everything is already current (in which case steps 4–7 are skipped). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
 
 **4. *(only if prepare exited 0)* Reload tile server — CDN fallback config**
 ```bash
 up_with_config_fallback versatiles sighup   # docker compose up; SIGHUP if unchanged
 ```
-VersaTiles reloads `versatiles.yaml` on SIGHUP with no downtime (it's recreated only if the compose state changed, e.g. a new image). Datasets that need updating are now served from the CDN — slower, but available. Old local files can now be safely deleted.
+VersaTiles reloads `versatiles.yaml` on SIGHUP with no downtime (it's recreated only if the compose state changed, e.g. a new image). Stale datasets keep serving their old local data where possible; only those without a local file or with a delete-old-first build are served from the CDN (slower, but available) — those local files can now be safely replaced.
 
 **5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (e.g. satellite) are built with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
 

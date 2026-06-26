@@ -50,7 +50,7 @@ so a plain mirrored dataset is a one-liner:
 | `source`            | `name`             | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the served name differs from the CDN file name (e.g. served `osm` from `osm-landcover`). |
 | `build`             | `{kind:"mirror"}`  | `mirror` = download the CDN `source` as-is (aria2c, inline MD5). `vpl` = run `pipeline` through `versatiles convert` (`compress` optional, e.g. `brotli`). |
 | `serveCurrent`      | `{kind:"local"}`   | How to serve once fresh. `local` = the built file. `vpl` = serve `pipeline` (e.g. a local low-zoom subset stacked over the CDN). |
-| `serveTransitional` | `{kind:"remote"}`  | How to serve while (re)building. `remote` = the CDN file. `vpl` = serve `pipeline` (omit ⇒ reuse `build.pipeline`). |
+| `serveTransitional` | `{kind:"remote"}`  | How to serve while (re)building — used only when there is no local file or the build deletes the old file first (a stale dataset with an atomic build keeps serving its old local file instead). `remote` = the CDN file. `vpl` = serve `pipeline` (omit ⇒ reuse `build.pipeline`). |
 | `versionInputs`     | `[source]`         | CDN keys whose MD5s form the freshness marker (defaults to the `source`); multiple inputs rebuild when **any** changes. |
 
 Pipelines may use the placeholders **`{CDN}`** (the CDN base URL) and **`{LOCAL}`** (the tile
@@ -77,12 +77,12 @@ The script takes a single `--mode=` argument (default `finalize`):
 | Mode       | Builds? | Writes `versatiles.yaml`? | Purpose                                                            |
 | ---------- | ------- | ------------------------- | ----------------------------------------------------------------- |
 | `check`    | no      | no                        | Read-only — report whether anything needs updating.               |
-| `prepare`  | no      | yes (transitional)        | Stale datasets served via `serveTransitional`, fresh ones via `serveCurrent`. |
+| `prepare`  | no      | yes (transitional)        | Fresh datasets via `serveCurrent`; a stale dataset keeps serving its old local file when it has one and an atomic build, else falls back to `serveTransitional`. |
 | `finalize` | yes     | yes (final)               | Build/download stale datasets, delete unlisted ones, serve all via `serveCurrent`. |
 
-`prepare` lets the tile server keep serving (from the CDN, possibly via a live VPL) with no downtime
-while `finalize` rebuilds in the background. See `../bin/update.sh` for the full two-phase
-orchestration.
+`prepare` lets the tile server keep serving with no downtime while `finalize` rebuilds in the
+background — from the old local file where possible, otherwise from the CDN (possibly via a live VPL).
+See `../bin/update.sh` for the full two-phase orchestration.
 
 ## Exit codes
 
