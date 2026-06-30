@@ -17,6 +17,20 @@ map $status $successful {
    default 0;
 }
 
+# Browser cache policy. The tile backend sends `Cache-Control: max-age=2419200`
+# (28 days) with no validator (no ETag/Last-Modified) on every response, so once
+# a client has fetched a tile or style.json it will not contact the server again
+# for 28 days — server-side cache clears and reloads after a data update stay
+# invisible to it. We override the header per document type so only one value
+# reaches the client (the backend's is stripped via proxy_hide_header below):
+#   - control documents (style.json, TileJSON, catalogs, HTML, directory roots)
+#     revalidate on every load so clients pick up data/frontend updates promptly;
+#   - bulk data assets (tiles, fonts, sprites) stay cacheable but for only 6h,
+#     bounding how long stale data can linger in a browser after an update.
+map $uri $browser_cache_control {
+   default       "public, max-age=21600, no-transform";
+}
+
 upstream versatiles_backend {
    server versatiles:8080;
    keepalive 16;
@@ -72,6 +86,13 @@ server {
    add_header X-Content-Type-Options "nosniff" always;
    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+   # Per-document-type browser cache policy (see $browser_cache_control map).
+   # The backend's 28-day Cache-Control is stripped in `location /` below so
+   # only this value reaches clients. Keep this with the other server-level
+   # add_headers: adding an add_header inside any location would silently drop
+   # all of these inherited headers (HSTS, CORS, etc.) for that location.
+   add_header Cache-Control $browser_cache_control always;
+
    # CORS headers
    add_header 'Access-Control-Allow-Origin' '*' always;
    add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
@@ -118,6 +139,7 @@ server {
       proxy_set_header      Host $host;
       proxy_http_version    1.1;
       proxy_set_header      Connection "";
+      proxy_hide_header     Cache-Control;
       proxy_hide_header     Access-Control-Allow-Origin;
       proxy_hide_header     Access-Control-Allow-Methods;
       proxy_hide_header     Access-Control-Allow-Headers;
