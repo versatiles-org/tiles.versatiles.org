@@ -62,8 +62,17 @@ up_with_config_fallback() {
 			docker compose kill -s SIGHUP "$service"
 			;;
 		reload)
-			echo "$service compose state unchanged — sending nginx reload signal."
-			docker compose exec -T "$service" nginx -s reload
+			# nginx renders /etc/nginx/templates/*.template into /etc/nginx/conf.d
+			# only once, at container startup (entrypoint: 10-compute-cache-size
+			# sets CACHE_MAX_SIZE_MB, then the image's 20-envsubst renders). A plain
+			# `nginx -s reload` re-reads the already-rendered conf, so edits to the
+			# *template* stay invisible until the container is recreated. Since `up`
+			# above did not recreate it, re-run the render steps in place — sourcing
+			# the cache-size envsh first so CACHE_MAX_SIZE_MB is defined — then reload
+			# gracefully (zero downtime).
+			echo "$service compose state unchanged — re-rendering templates and reloading."
+			docker compose exec -T "$service" sh -c \
+				'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -s reload'
 			;;
 		restart)
 			echo "$service compose state unchanged — restarting to re-read config."
