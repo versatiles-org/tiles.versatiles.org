@@ -10,6 +10,10 @@ updates:
       all-github-actions:
         patterns:
           - "*"
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     # "/" covers the image tags in compose.yaml (nginx, certbot, versatiles);
@@ -23,5 +27,9 @@ updates:
       prefix: "chore(deps)"
     groups:
       all-docker:
+        patterns:
+          - "*"
+      security:
+        applies-to: security-updates
         patterns:
           - "*"
