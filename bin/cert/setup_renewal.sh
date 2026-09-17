@@ -10,9 +10,10 @@ cd "$(dirname "$0")/../.."
 PROJECT_DIR="$(pwd)"
 CRON_CMD="0 3 * * 0 cd '${PROJECT_DIR}' && ./bin/cert/renew.sh >> /var/log/cert-renewal.log 2>&1"
 
-if ! crontab -l 2>/dev/null | grep -q "bin/cert/renew.sh"; then
-    (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
-    echo "Certificate renewal cron job added (weekly on Sundays at 3am)"
-else
+if crontab -l 2>/dev/null | grep -qxF "$CRON_CMD"; then
     echo "Certificate renewal cron job already configured"
+else
+    # Replace any existing renewal entry (e.g. one pointing to an old project path)
+    (crontab -l 2>/dev/null | grep -v "bin/cert/renew.sh" || true; echo "$CRON_CMD") | crontab -
+    echo "Certificate renewal cron job set (weekly on Sundays at 3am) for ${PROJECT_DIR}"
 fi
