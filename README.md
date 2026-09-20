@@ -223,6 +223,22 @@ Manually flip where the tile server reads its data, without downloading, buildin
 
 To actually **download or refresh** local data (and switch back to local serving as part of it), use `./bin/update.sh` — that's the full two-phase, no-downtime path. `serve-mode.sh` is only for flipping the active source.
 
+### Restarting with minimal downtime
+
+Restart what is already deployed — no pull, no build, no change to tile data or `versatiles.yaml`:
+
+```bash
+./bin/restart.sh                # recreate the tile server, reload nginx, clear the cache
+./bin/restart.sh --with-nginx   # additionally recreate the nginx container
+./bin/restart.sh --keep-cache   # leave cached responses in place
+```
+
+The default path keeps :80/:443 bound the whole time, so no client gets a refused connection. It recreates the tile server, reloads nginx **immediately** so it re-resolves the new container's IP (nginx resolves `server versatiles:8080` only at config-load time, and pointing it at the dead old address makes requests hang rather than fail fast), and only then waits for health and clears the cache — the cache is what keeps already-requested URLs answered across the few seconds of startup, via `proxy_cache_use_stale`.
+
+Use it when the tile server must re-read something it only reads at startup — above all the frontend/styles tars, which a SIGHUP reload cannot pick up because their `static:` paths never change.
+
+`--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound for a moment. It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:` — config, template and certificate changes are all applied by a graceful reload.
+
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:
