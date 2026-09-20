@@ -62,8 +62,10 @@ set -euo pipefail
 #   7. reload nginx (config-aware)
 #        Re-resolves the versatiles upstream in case the tile server container
 #        was recreated above (new IP); nginx caches upstream IPs from config
-#        load until reloaded. Recreates the nginx container only when its
-#        compose state changed; otherwise sends a graceful `nginx -s reload`.
+#        load until reloaded. Also the only step that applies nginx config
+#        changes pulled in step 1, since it re-renders the templates. Recreates
+#        the nginx container only when its compose state changed; otherwise
+#        sends a graceful `nginx -s reload`.
 #
 #   8. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
@@ -83,12 +85,14 @@ set -euo pipefail
 #     outage; the SIGHUP reloads themselves are also downtime-free.
 #
 #   Path B — nothing changed (prepare exits 2):
-#     1 → 2 → 3 → 9
-#     Steps 4–8 are skipped: tile data is already current and the existing
-#     healthy state and warm cache are preserved. Steps 1 and 2 still run
-#     so frontend / styles / Docker image updates are picked up even when
-#     no tile data needs refreshing. Verification (9) catches infra drift
-#     (expired certs, etc).
+#     1 → 2 → 3 → 7 → 9   (plus 6 and 8 when step 2 fetched new assets)
+#     Steps 4 and 5 are skipped: tile data is already current, so the existing
+#     healthy state is preserved. Steps 1 and 2 still run so frontend / styles
+#     / Docker image updates are picked up even when no tile data needs
+#     refreshing — and when they were, 6 reloads the tile server and 8 drops
+#     the now-stale assets from the cache. Step 7 always runs, because nginx
+#     config arrives with step 1 and nothing else would apply it. Verification
+#     (9) catches infra drift (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
 #     1 → 2 → 3 → abort. No restart, no config change.
@@ -205,13 +209,30 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   # server (SIGHUP swaps the static sources) and clear the cache here even though
   # no tile data moved.
   if [ "$ASSETS_CHANGED" = "true" ]; then
-    echo "Tile data unchanged, but frontend/styles changed — reloading tile server and clearing cache."
+    echo "Tile data unchanged, but frontend/styles changed — reloading tile server."
     up_with_config_fallback versatiles sighup
     wait_for_healthy versatiles
-    ./bin/ramdisk/clear.sh
   else
-    echo "Nothing to update — skipping finalize, restart, and cache clear."
+    echo "Nothing to update — skipping finalize and tile server restart."
   fi
+
+  # nginx is reloaded even when nothing above ran. Its config reaches the
+  # container only through this step, which re-renders nginx/templates/*.template
+  # — and those templates change with this repo's git HEAD, which neither
+  # $ASSETS_CHANGED nor the prepare exit code tracks. Without this, a config
+  # change pulled in step 1 (a new redirect, a cache rule) would sit dormant
+  # until the next run that happens to touch tile data. The reload is graceful
+  # and is a no-op for clients when the rendered config is unchanged.
+  echo "Reloading nginx..."
+  up_with_config_fallback nginx reload
+  wait_for_healthy nginx
+
+  # Only the assets are newly served, so only they can be stale in the cache.
+  if [ "$ASSETS_CHANGED" = "true" ]; then
+    echo "Clearing cache data..."
+    ./bin/ramdisk/clear.sh
+  fi
+
   echo ""
   echo "Running verification..."
   ./bin/verify.sh
