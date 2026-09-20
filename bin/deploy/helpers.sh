@@ -76,6 +76,18 @@ up_with_config_fallback() {
 	esac
 }
 
+# True when the named compose service has a running container.
+#
+# `docker compose ps -q` alone is not enough: across compose versions it has both
+# included and excluded stopped containers, so the container state is checked
+# explicitly.
+service_is_running() {
+	local cid
+	cid=$(docker compose ps -q "$1" 2>/dev/null || echo "")
+
+	[ -n "$cid" ] && [ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)" = "true" ]
+}
+
 # Re-render nginx's config templates inside the running container and reload.
 #
 # nginx renders /etc/nginx/templates/*.template into /etc/nginx/conf.d only once,
@@ -107,15 +119,28 @@ nginx_render_and_reload() {
 # run that goes through the full update path.
 #
 # If nginx is not running there is nothing to reload in place, so hand over to
-# up_with_config_fallback, which starts it.
+# up_with_config_fallback, which starts it — and, through compose's depends_on,
+# starts versatiles first if that is down too.
+#
+# If nginx is running but versatiles is not, the reload is skipped instead. nginx
+# resolves `server versatiles:8080` at config-load time, so with the container
+# gone the reload fails with `[emerg] host not found in upstream` and a non-zero
+# exit, which under `set -e` would abort the caller before it reaches its own
+# verification step. Nothing is lost by skipping: the running nginx keeps serving
+# its current config, and a config change cannot be applied while the upstream is
+# missing either way.
 reload_nginx_in_place() {
-	local cid
-	cid=$(docker compose ps -q nginx 2>/dev/null || echo "")
-
-	if [ -z "$cid" ] || [ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)" != "true" ]; then
+	if ! service_is_running nginx; then
 		echo "nginx is not running — bringing it up instead of reloading."
 		up_with_config_fallback nginx reload
 		return
+	fi
+
+	if ! service_is_running versatiles; then
+		echo "Warning: versatiles is not running — skipping the nginx reload."
+		echo "         nginx would fail to load a config naming an upstream it cannot"
+		echo "         resolve. The running nginx keeps serving its current config."
+		return 0
 	fi
 
 	echo "Re-rendering nginx templates and reloading in place."
