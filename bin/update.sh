@@ -58,6 +58,9 @@ set -euo pipefail
 #        mounts); otherwise sends SIGHUP so the running container reloads the
 #        new versatiles.yaml with no downtime (tile sources updated
 #        incrementally, in-flight requests complete).
+#        Exception: when step 2 refreshed the frontend/styles tars, the
+#        fallback is a full restart instead of SIGHUP — see $VERSATILES_FALLBACK
+#        below for why a reload cannot pick those up.
 #
 #   7. reload nginx (config-aware)
 #        Re-resolves the versatiles upstream in case the tile server container
@@ -186,6 +189,30 @@ else
   ASSETS_CHANGED=false
 fi
 
+# How to make the tile server pick up new config/assets when `docker compose up`
+# leaves the container untouched (see up_with_config_fallback in helpers.sh).
+#
+# SIGHUP is the cheap, downtime-free path and is enough for tile data: the
+# download pipeline rewrites each dataset's `src:` in versatiles.yaml, so the
+# reload sees a changed config and swaps the sources.
+#
+# It is NOT enough for the frontend/styles tars. Their `static:` entries name
+# fixed paths (/data/frontend/frontend.br.tar, styles.tar) that are identical
+# before and after a release, and versatiles' reload diffs the *config*, not the
+# file contents — apply_static_source_diff() returns early on an unchanged
+# static section. The tar is read into memory in full at load time, so the
+# container keeps serving the bytes it read at startup: a SIGHUP after a
+# frontend update is a silent no-op and the old frontend stays live.
+#
+# So when build.sh refreshed the assets, force a restart, which re-reads the
+# tars. `docker compose restart` reuses the container, so nginx's cached
+# upstream IP stays valid; it costs a few seconds of refused requests.
+if [ "$ASSETS_CHANGED" = "true" ]; then
+  VERSATILES_FALLBACK=restart
+else
+  VERSATILES_FALLBACK=sighup
+fi
+
 # Phase 1: check what needs updating; generate transitional configs
 echo "Running download pipeline (prepare)..."
 set +e
@@ -205,13 +232,14 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   #
   # BUT: build.sh may still have pulled a new frontend/styles bundle. Those are
   # served by the versatiles container from a tar and cached by nginx, so the
-  # download alone does nothing visible — without a reload and cache clear the
-  # old frontend keeps being served. So when assets changed we reload the tile
-  # server (SIGHUP swaps the static sources) and clear the cache here even though
-  # no tile data moved.
+  # download alone does nothing visible — without a restart and cache clear the
+  # old frontend keeps being served. So when assets changed we restart the tile
+  # server ($VERSATILES_FALLBACK is `restart` in that case, since a SIGHUP reload
+  # would not re-read the tars) and clear the cache here even though no tile data
+  # moved.
   if [ "$ASSETS_CHANGED" = "true" ]; then
-    echo "Tile data unchanged, but frontend/styles changed — reloading tile server."
-    up_with_config_fallback versatiles sighup
+    echo "Tile data unchanged, but frontend/styles changed — restarting tile server."
+    up_with_config_fallback versatiles "$VERSATILES_FALLBACK"
     wait_for_healthy versatiles
   else
     echo "Nothing to update — skipping finalize and tile server restart."
@@ -258,9 +286,11 @@ wait_for_healthy versatiles
 echo "Running download pipeline (finalize)..."
 docker compose run --rm download-updater --mode=finalize
 
-# Tile server picks up the final local-disk config (SIGHUP reload, no downtime).
+# Tile server picks up the final local-disk config. Normally a SIGHUP reload with
+# no downtime; a restart when the frontend/styles tars changed, which a reload
+# cannot pick up (see $VERSATILES_FALLBACK above).
 echo "Reloading tile server with local files..."
-up_with_config_fallback versatiles sighup
+up_with_config_fallback versatiles "$VERSATILES_FALLBACK"
 wait_for_healthy versatiles
 
 # Reload nginx so it re-resolves the versatiles upstream. If the tile server
