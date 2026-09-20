@@ -133,6 +133,41 @@ server {
 		return 301 /assets/sprites/sprites.json;
 	}
 
+	# versatiles-style v6 renamed four palettes and inverted the satellite/terrain
+	# overlay naming. v6 still ships the v5 names as aliases, so serving them would
+	# quietly hand clients a different-looking style; a 301 instead names the file
+	# that now holds what they asked for.
+	#
+	# Not redirected, deliberately:
+	#   - satellite/style.json, terrain/style.json — still valid v6 URLs, but their
+	#     contents changed (bare imagery; the OSM overlay moved to overlay.json).
+	#     Redirecting them would break the v6 meaning of a name that still exists.
+	#   - empty/style.json — changed (it now paints a background) but has no
+	#     successor name to point at.
+
+	location ~ ^/assets/styles/eclipse(-terrain)?/(.*)$ {
+		return 301 /assets/styles/colorful-dark$1/$2$is_args$args;
+	}
+
+	location ~ ^/assets/styles/graybeard(-terrain)?/(.*)$ {
+		return 301 /assets/styles/gray$1/$2$is_args$args;
+	}
+
+	location ~ ^/assets/styles/shadow(-terrain)?/(.*)$ {
+		return 301 /assets/styles/gray-dark$1/$2$is_args$args;
+	}
+
+	# neutrino has no exact successor — upstream maps it to `muted` as the closest
+	# match, which is a considerably fuller style than v5's neutrino.
+	location ~ ^/assets/styles/neutrino(-terrain)?/(.*)$ {
+		return 301 /assets/styles/muted$1/$2$is_args$args;
+	}
+
+	# v5 `nooverlay` (imagery only) is what v6 publishes as plain `style.json`.
+	location ~ ^/assets/styles/(satellite|terrain)/nooverlay\.json$ {
+		return 301 /assets/styles/$1/style.json$is_args$args;
+	}
+
    location / {
       limit_req zone=tiles burst=1000 nodelay;
       proxy_pass            http://versatiles_backend;
