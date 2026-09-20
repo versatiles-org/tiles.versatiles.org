@@ -62,17 +62,8 @@ up_with_config_fallback() {
 			docker compose kill -s SIGHUP "$service"
 			;;
 		reload)
-			# nginx renders /etc/nginx/templates/*.template into /etc/nginx/conf.d
-			# only once, at container startup (entrypoint: 10-compute-cache-size
-			# sets CACHE_MAX_SIZE_MB, then the image's 20-envsubst renders). A plain
-			# `nginx -s reload` re-reads the already-rendered conf, so edits to the
-			# *template* stay invisible until the container is recreated. Since `up`
-			# above did not recreate it, re-run the render steps in place — sourcing
-			# the cache-size envsh first so CACHE_MAX_SIZE_MB is defined — then reload
-			# gracefully (zero downtime).
 			echo "$service compose state unchanged — re-rendering templates and reloading."
-			docker compose exec -T "$service" sh -c \
-				'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -s reload'
+			nginx_render_and_reload
 			;;
 		restart)
 			echo "$service compose state unchanged — restarting to re-read config."
@@ -83,4 +74,50 @@ up_with_config_fallback() {
 			exit 1
 			;;
 	esac
+}
+
+# Re-render nginx's config templates inside the running container and reload.
+#
+# nginx renders /etc/nginx/templates/*.template into /etc/nginx/conf.d only once,
+# at container startup (entrypoint: 10-compute-cache-size sets CACHE_MAX_SIZE_MB,
+# then the image's 20-envsubst renders). A plain `nginx -s reload` re-reads the
+# already-rendered conf, so edits to the *template* stay invisible until the
+# container is recreated — hence re-running the render steps here, sourcing the
+# cache-size envsh first so CACHE_MAX_SIZE_MB is defined.
+#
+# The reload itself is graceful: the master keeps serving through old workers
+# until the new ones are up, so no connection is dropped. Requires a running
+# nginx container.
+nginx_render_and_reload() {
+	docker compose exec -T nginx sh -c \
+		'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -s reload'
+}
+
+# Apply nginx config changes without risking a container recreate.
+#
+# up_with_config_fallback() leads with `docker compose up --detach`, which
+# recreates the container whenever compose-level state changed — most often a
+# base image that `docker compose pull` just fetched. Recreating nginx unbinds
+# :80/:443 for a moment: in-flight connections are dropped and new ones refused
+# until the replacement is listening. That is an acceptable price on the tile
+# update path, which is already reloading services; it is not one to pay on a
+# run where nothing else happened and only the config needs applying.
+#
+# So reload in place instead. A pulled nginx image is simply left for the next
+# run that goes through the full update path.
+#
+# If nginx is not running there is nothing to reload in place, so hand over to
+# up_with_config_fallback, which starts it.
+reload_nginx_in_place() {
+	local cid
+	cid=$(docker compose ps -q nginx 2>/dev/null || echo "")
+
+	if [ -z "$cid" ] || [ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)" != "true" ]; then
+		echo "nginx is not running — bringing it up instead of reloading."
+		up_with_config_fallback nginx reload
+		return
+	fi
+
+	echo "Re-rendering nginx templates and reloading in place."
+	nginx_render_and_reload
 }

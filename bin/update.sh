@@ -91,8 +91,9 @@ set -euo pipefail
 #     / Docker image updates are picked up even when no tile data needs
 #     refreshing — and when they were, 6 reloads the tile server and 8 drops
 #     the now-stale assets from the cache. Step 7 always runs, because nginx
-#     config arrives with step 1 and nothing else would apply it. Verification
-#     (9) catches infra drift (expired certs, etc).
+#     config arrives with step 1 and nothing else would apply it; here it
+#     reloads in place, never recreating the container. Verification (9)
+#     catches infra drift (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
 #     1 → 2 → 3 → abort. No restart, no config change.
@@ -217,14 +218,19 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   fi
 
   # nginx is reloaded even when nothing above ran. Its config reaches the
-  # container only through this step, which re-renders nginx/templates/*.template
-  # — and those templates change with this repo's git HEAD, which neither
-  # $ASSETS_CHANGED nor the prepare exit code tracks. Without this, a config
-  # change pulled in step 1 (a new redirect, a cache rule) would sit dormant
-  # until the next run that happens to touch tile data. The reload is graceful
-  # and is a no-op for clients when the rendered config is unchanged.
+  # container only through a re-render of nginx/templates/*.template — and those
+  # templates change with this repo's git HEAD, which neither $ASSETS_CHANGED nor
+  # the prepare exit code tracks. Without this, a config change pulled in step 1
+  # (a new redirect, a cache rule) would sit dormant until the next run that
+  # happens to touch tile data.
+  #
+  # Unlike step 7 on the tile path, this reloads in place rather than going
+  # through `docker compose up`: on a run where nothing else changed, a base
+  # image pulled in step 2 is not worth a container recreate and the brief
+  # refused connections that come with it. That image lands on the next Path A
+  # run. Reloading in place is graceful and drops nothing.
   echo "Reloading nginx..."
-  up_with_config_fallback nginx reload
+  reload_nginx_in_place
   wait_for_healthy nginx
 
   # Only the assets are newly served, so only they can be stale in the cache.
