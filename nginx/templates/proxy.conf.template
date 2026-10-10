@@ -104,33 +104,58 @@ server {
    }
 
 	# redirect legacy paths
+	#
+	# Every target below must be a path the frontend actually serves — a redirect
+	# to a 404 is worse than a plain 404. Current layout of the frontend bundle:
+	#   /assets/lib/maplibre-gl/…   MapLibre GL JS
+	#   /assets/glyphs/…            fonts ({fontstack}/{range}.pbf, index.json)
+	#   /assets/sprites/…           sprite sheets (index.json lists them)
+	#   /assets/styles/…            styles
 
 	location /editor {
 		return 301 https://versatiles.org/editor;
 	}
 
 	location ~ ^/maplibre/(.*)$ {
-		return 301 /assets/maplibre-gl/$1;
+		return 301 /assets/lib/maplibre-gl/$1;
 	}
 
 	location ~ ^/assets/maplibre/(.*)$ {
-		return 301 /assets/maplibre-gl/$1;
+		return 301 /assets/lib/maplibre-gl/$1;
 	}
 
-	location ~ ^/(styles|fonts|sprites)/(.*)$ {
+	# The font list. Exact matches, so they win over the /assets/fonts/ regex below.
+	location = /fonts.json {
+		return 301 /assets/glyphs/index.json;
+	}
+
+	location = /assets/fonts.json {
+		return 301 /assets/glyphs/index.json;
+	}
+
+	location = /assets/fonts/fonts.json {
+		return 301 /assets/glyphs/index.json;
+	}
+
+	# Fonts moved from "fonts" to "glyphs".
+	location ~ ^/fonts/(.*)$ {
+		return 301 /assets/glyphs/$1;
+	}
+
+	location ~ ^/assets/fonts/(.*)$ {
+		return 301 /assets/glyphs/$1;
+	}
+
+	location = /sprites.json {
+		return 301 /assets/sprites/index.json;
+	}
+
+	# Only the missing /assets prefix is added here. The v5 sprite sheets
+	# (`basics`, `markers`) are deliberately not mapped to their v6 successors
+	# (`base`, `extras`, `icons`): icon ids were renamed, so a redirect would hand
+	# old styles a sheet in which some of their icons do not exist.
+	location ~ ^/(styles|sprites)/(.*)$ {
 		return 301 /assets/$1/$2;
-	}
-
-	location /fonts.json {
-		return 301 /assets/fonts/fonts.json;
-	}
-
-	location /assets/fonts.json {
-		return 301 /assets/fonts/fonts.json;
-	}
-
-	location /sprites.json {
-		return 301 /assets/sprites/sprites.json;
 	}
 
 	# versatiles-style v6 renamed four palettes and inverted the satellite/terrain
