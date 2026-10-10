@@ -131,9 +131,9 @@ No credentials are required — the tile data is fetched from the public CDN.
 
 ## Operations
 
-### Update After Code Changes
+### Update
 
-When the repository code has been updated (e.g., new features, bug fixes):
+One command updates everything — repository code, frontend, styles, Docker images and tile data — whether the repository changed, new `.versatiles` files were published to the CDN, or both:
 
 ```bash
 ./bin/update.sh
@@ -186,28 +186,6 @@ This is idempotent and safe to run repeatedly. It ensures:
 - Cron jobs (cert renewal, log rotation) are configured
 
 Both `bin/deploy/setup.sh` and `bin/update.sh` call this automatically.
-
-### Update Tile Data
-
-> **Prefer `./bin/update.sh` for production.** It runs the safe two-phase flow
-> (serve stale datasets from the CDN while the new files download) so the tile
-> server stays available throughout — see [Update After Code Changes](#update-after-code-changes).
->
-> `bin/download-updater/update.sh` below is a simpler single-shot path intended
-> for manual/dev use. It runs `finalize` and reloads the tile server via SIGHUP
-> (no dropped connections). It skips the two-phase CDN fallback, though: a
-> **derived** dataset (satellite, osm) is briefly unavailable while it is rebuilt
-> in place, since there is no transitional switch to the CDN. Plain datasets are
-> seamless (atomic temp→rename). Fine for a quick refresh; use `./bin/update.sh`
-> when you need every dataset to stay available throughout.
-
-When new `.versatiles` files have been published to the CDN:
-
-```bash
-./bin/download-updater/update.sh
-```
-
-This builds the updater image, runs it once (finalize) to sync changed files into `volumes/tiles/` and regenerate `versatiles.yaml`, and reloads the tile server (SIGHUP). For what the sync actually does, see [`download/README.md`](download/README.md).
 
 ### Switching serving mode (transient ↔ local)
 
