@@ -17,18 +17,28 @@ map $status $successful {
    default 0;
 }
 
-# Browser cache policy. The tile backend sends `Cache-Control: max-age=2419200`
-# (28 days) with no validator (no ETag/Last-Modified) on every response, so once
-# a client has fetched a tile or style.json it will not contact the server again
-# for 28 days — server-side cache clears and reloads after a data update stay
-# invisible to it. We override the header per document type so only one value
-# reaches the client (the backend's is stripped via proxy_hide_header below):
-#   - control documents (style.json, TileJSON, catalogs, HTML, directory roots)
-#     revalidate on every load so clients pick up data/frontend updates promptly;
-#   - bulk data assets (tiles, fonts, sprites) stay cacheable but for only 6h,
-#     bounding how long stale data can linger in a browser after an update.
-map $uri $browser_cache_control {
-   default       "public, max-age=21600, no-transform";
+# Browser cache policy, by response status.
+#
+# The tile backend sends `Cache-Control: max-age=2419200` (28 days) on every
+# successful response. That is far too long here: after a data or frontend update
+# a client would keep its old copy for weeks. So the backend's header is stripped
+# (proxy_hide_header in `location /`) and replaced by the value below — one
+# policy for everything, tiles and static files (HTML, JSON, fonts, sprites)
+# alike:
+#
+#   2xx, 3xx  6 hours. Bounds how long stale data can linger in a browser after
+#             an update.
+#   404       5 minutes. A missing tile is a normal answer — map clients ask for
+#             tiles beyond a dataset's coverage or zoom range all the time — so it
+#             is cacheable. But only briefly: while the tile server reloads its
+#             config, a changed tile source is gone for a moment and answers 404
+#             too, and that must not stick in browsers for hours.
+#   other     never. A 429, 500 or 502 describes a moment, not the resource; a
+#             cached error would outlive the problem that caused it.
+map $status $browser_cache_control {
+   ~^[23]  "public, max-age=21600, no-transform";
+   404     "public, max-age=300";
+   default "no-store";
 }
 
 upstream versatiles_backend {
@@ -86,7 +96,8 @@ server {
    add_header X-Content-Type-Options "nosniff" always;
    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-   # Per-document-type browser cache policy (see $browser_cache_control map).
+   # Browser cache policy by response status (see $browser_cache_control map).
+   # `always` is needed so that error responses get their explicit `no-store`.
    # The backend's 28-day Cache-Control is stripped in `location /` below so
    # only this value reaches clients. Keep this with the other server-level
    # add_headers: adding an add_header inside any location would silently drop
@@ -207,6 +218,9 @@ server {
       proxy_buffering       on;
       proxy_cache           STATIC;
       proxy_cache_valid     200 1d;
+      # Missing tiles are requested constantly; keep them off the tile server,
+      # but only briefly (same reasoning and lifetime as in the browser policy).
+      proxy_cache_valid     404 5m;
       proxy_cache_lock      on;
       proxy_cache_lock_timeout 5s;
       proxy_cache_use_stale error timeout invalid_header updating http_500 http_502 http_503 http_504;
