@@ -250,7 +250,7 @@ docker compose logs -f              # All services
 docker compose logs -f versatiles   # Tile server only
 ```
 
-**nginx log files** in `volumes/nginx-log/`, rotated on the 1st of each month by `bin/log/rotate.sh` (`<name>.<YYYY-MM>.…`):
+**nginx log files** in `volumes/nginx-log/`. `bin/log/rotate.sh` moves them into one archive per month (`<name>.<YYYY-MM>.…`) — all three on the 1st of each month, the error log every night. Archives of the access and error logs are deleted after 12 months; the referer statistics are kept.
 
 | File                   | Contains                                                                                   |
 |------------------------|--------------------------------------------------------------------------------------------|
@@ -263,7 +263,7 @@ What is stored about a client:
 - **Client address:** only anonymised — the last octet of an IPv4 address is zeroed, an IPv6 address is cut to its first two groups.
 - **Referer:** only `scheme://host`, never the path or query string of the referring page.
 - **Request:** the path without its query string; in `access.tsv.gz` also the user agent.
-- **Exception:** nginx writes `error.log` in a fixed format that includes the full client address and request line. It is anonymised in the same way when it is rotated, so only the current month's file contains full addresses.
+- **Exception:** nginx writes `error.log` in a fixed format that includes the full client address and request line. It is anonymised in the same way when it is rotated, which happens every night — so full addresses exist only in the live file, for a day at most.
 
 The two access logs are compressed while they are written and reach the file with up to a minute's delay.
 
