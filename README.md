@@ -316,3 +316,7 @@ Before submitting a PR, run the same checks as CI (`.github/workflows/ci.yml`):
 1. ShellCheck passes: `git ls-files -z '*.sh' '*.envsh' | xargs -0 shellcheck`
 2. Docker compose validates: `cp template.env .env && docker compose config --quiet`
 3. YAML lints cleanly: `yamllint compose.yaml`
+4. The nginx config loads: `./tests/nginx-config.sh` — renders the template and runs `nginx -t` in the pinned nginx image.
+5. The update pipeline generates the expected configuration: `./tests/pipeline.sh` — builds the updater image and compares the `versatiles.yaml` it writes with the files in `tests/expected/`. After an intended change to `download/sources.json` or the generator, update those files to match the diff the test prints.
+
+Tests 4 and 5 need Docker, start no server and download no tile data.

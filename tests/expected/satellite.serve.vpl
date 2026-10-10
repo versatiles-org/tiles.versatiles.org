@@ -1,0 +1,1 @@
+from_stacked [ from_container filename="/data/tiles/satellite.versatiles" | filter level_max=16, from_container filename="https://cdn.versatiles.cloud/satellite.versatiles" | filter level_min=17 ]

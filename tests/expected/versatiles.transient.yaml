@@ -1,0 +1,20 @@
+server:
+  ip: "0.0.0.0"
+  port: 8080
+
+static:
+  - src: /data/frontend/frontend.br.tar
+  - src: /data/frontend/styles.tar
+    prefix: /assets/styles
+
+tiles:
+  - name: elevation
+    src: https://cdn.versatiles.cloud/elevation.versatiles
+  - name: hillshade-vectors
+    src: https://cdn.versatiles.cloud/hillshade-vectors.versatiles
+  - name: bathymetry-vectors
+    src: https://cdn.versatiles.cloud/bathymetry-vectors.versatiles
+  - name: satellite
+    src: https://cdn.versatiles.cloud/satellite.versatiles
+  - name: osm
+    src: https://cdn.versatiles.cloud/osm-landcover.versatiles

@@ -30,6 +30,23 @@ jobs:
           cp template.env .env
           docker compose config --quiet
 
+  # The nginx template renders and loads in the pinned nginx image.
+  nginx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: nginx config test
+        run: ./tests/nginx-config.sh
+
+  # The updater image builds, and update-tiles.sh generates the expected
+  # tile server configuration from download/sources.json.
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Update pipeline test
+        run: ./tests/pipeline.sh
+
   yaml:
     runs-on: ubuntu-latest
     steps:
