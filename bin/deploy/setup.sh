@@ -13,7 +13,6 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 source bin/deploy/helpers.sh
-source .env
 
 # Argument parsing
 FAST=false
@@ -38,6 +37,14 @@ ERRORS=0
 fail() { echo -e "  \033[0;31m✗ $*\033[0m"; ERRORS=$((ERRORS + 1)); }
 pass() { echo -e "  \033[0;32m✓ $*\033[0m"; }
 
+# Root is needed for what the setup does to the host: an /etc/fstab entry and
+# the mount for the RAM disk, ownership of the tile directories, root's crontab.
+if [ "$(id -u)" -eq 0 ]; then
+	pass "Running as root"
+else
+	fail "Not running as root — run this script as root (or with sudo)"
+fi
+
 # Check Docker
 if command -v docker &>/dev/null; then
 	pass "Docker is installed"
@@ -52,7 +59,25 @@ else
 	fail "Docker Compose is not installed"
 fi
 
+# Other tools the scripts call on the host.
+MISSING_TOOLS=""
+for tool in curl gzip tar openssl python3 crontab; do
+	command -v "$tool" &>/dev/null || MISSING_TOOLS="$MISSING_TOOLS $tool"
+done
+if [ -z "$MISSING_TOOLS" ]; then
+	pass "Required tools are installed (curl, gzip, tar, openssl, python3, crontab)"
+else
+	fail "Missing tools:$MISSING_TOOLS — on Debian/Ubuntu: apt-get install curl gzip tar openssl python3 cron"
+fi
+
 # Check .env file and required variables
+if [ -f .env ]; then
+	pass ".env exists"
+	source .env
+else
+	fail ".env is missing — create it with: cp template.env .env   then edit it"
+fi
+
 REQUIRED_VARS="DOMAIN_NAME RAM_DISK_GB EMAIL"
 for var in $REQUIRED_VARS; do
 	if [ -n "${!var:-}" ]; then
@@ -61,6 +86,16 @@ for var in $REQUIRED_VARS; do
 		fail "$var is not set in .env"
 	fi
 done
+
+if [ -n "${RAM_DISK_GB:-}" ] && ! [[ "$RAM_DISK_GB" =~ ^[1-9][0-9]*$ ]]; then
+	fail "RAM_DISK_GB must be a positive whole number (is: \"$RAM_DISK_GB\")"
+fi
+
+# template.env ships a placeholder address; Let's Encrypt refuses to register
+# an account with an example.org address, which would fail late, at step 5.
+case "${EMAIL:-}" in
+	*@example.org|*@example.com) fail "EMAIL is still a placeholder ($EMAIL) — set a real address in .env" ;;
+esac
 
 # Check ports 80 and 443
 for port in 80 443; do
@@ -135,7 +170,7 @@ wait_for_healthy nginx
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 
-# 7. Verify deployment
+# 6. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh

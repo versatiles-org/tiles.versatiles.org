@@ -66,11 +66,13 @@ Run `./bin/verify.sh` to check all volume directories exist and have correct own
 
 ## Server Installation
 
+All commands below, and the scripts in `bin/`, are run as **root**: they write an `/etc/fstab` entry and mount the RAM disk, set the ownership of the tile directories, and install cron jobs in root's crontab.
+
 ### 1. Install Dependencies (Debian/Ubuntu)
 
 ```bash
 apt-get update && apt-get -y upgrade
-apt-get -y install git wget ca-certificates curl
+apt-get -y install git wget ca-certificates curl gzip tar openssl python3 cron
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
@@ -99,7 +101,7 @@ nano .env
 ./bin/deploy/setup.sh
 ```
 
-This runs preflight checks and then sets up everything: volumes, RAM disk, frontend, styles, Docker images, SSL certificates, and all services. It downloads the full tile data to local disk before starting, which can take a long time.
+This first runs preflight checks — root, Docker, the required tools, a complete `.env` with a real e-mail address, free ports 80 and 443 — and stops with a list of what to fix if any of them fails. Then it sets up everything: volumes, RAM disk, frontend, styles, Docker images, SSL certificates, and all services. It downloads the full tile data to local disk before starting, which can take a long time.
 
 #### Fast start
 
