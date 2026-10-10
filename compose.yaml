@@ -88,7 +88,9 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      # A local endpoint (see /healthz in proxy.conf.template): tells whether
+      # nginx itself is serving, independent of DNS and of the tile server.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -135,13 +135,25 @@ upstream versatiles_backend {
 }
 
 server {
-   listen 80;
-   listen [::]:80;
+   # default_server: the nginx image ships its own conf.d/default.conf, a
+   # "Welcome to nginx" server on port 80 that would otherwise answer every
+   # request whose Host is not the domain — a request by IP address, and the
+   # container healthcheck on 127.0.0.1. With this, such requests end up here.
+   listen 80 default_server;
+   listen [::]:80 default_server;
    server_name ${DOMAIN_NAME};
    server_tokens off;
 
    location /.well-known/acme-challenge/ {
       root /var/www/certbot;
+   }
+
+   # For the container healthcheck in compose.yaml: "is nginx itself up and
+   # serving?" — answered locally, without the redirect below, which would send
+   # the check out through public DNS and back in through the tile server.
+   location = /healthz {
+      access_log off;
+      return 204;
    }
 
    location / {
@@ -159,15 +171,14 @@ server {
 
    ssl_certificate /etc/nginx/ssl/live/${DOMAIN_NAME}/fullchain.pem;
    ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN_NAME}/privkey.pem;
-   ssl_trusted_certificate /etc/nginx/ssl/live/${DOMAIN_NAME}/chain.pem;
    ssl_protocols TLSv1.2 TLSv1.3;
-   ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM';
+   # For TLS 1.2 (TLS 1.3 has its own fixed set): forward-secret AEAD suites
+   # only. ChaCha20 is there for devices without AES hardware support.
+   ssl_ciphers 'EECDH+AESGCM:EECDH+CHACHA20';
    ssl_session_cache shared:SSL:10m;
-   # OCSP stapling removed: Let's Encrypt no longer includes an OCSP responder
-   # URL in issued certificates, so these directives were ignored and only
-   # produced "ssl_stapling ignored" warnings on every reload.
-   resolver 8.8.8.8 8.8.4.4 valid=300s;
-   resolver_timeout 5s;
+   # No OCSP stapling: Let's Encrypt no longer includes an OCSP responder URL in
+   # its certificates. The directives that only served stapling are gone with
+   # it — ssl_trusted_certificate (chain.pem) and a public DNS resolver.
 
    # One cache entry per URL and per encoding the client will get (see
    # $upstream_accept_encoding above).
