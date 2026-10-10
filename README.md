@@ -230,16 +230,37 @@ Certificates are renewed automatically via weekly cron job. Manual renewal:
 ./bin/cert/renew.sh
 ```
 
-### View Logs
+### Logs
+
+There are two kinds of logs.
+
+**Container output** — what the tile server and nginx print (startup messages, tile server errors). Docker keeps at most 3 × 10 MB per container:
 
 ```bash
-docker compose logs -f           # All services
-docker compose logs -f nginx     # Nginx only
+docker compose logs -f              # All services
+docker compose logs -f versatiles   # Tile server only
 ```
+
+**nginx log files** in `volumes/nginx-log/`, rotated on the 1st of each month by `bin/log/rotate.sh` (`<name>.<YYYY-MM>.…`):
+
+| File                   | Contains                                                                                   |
+|------------------------|--------------------------------------------------------------------------------------------|
+| `access.tsv.gz`        | Requests that went wrong (4xx/5xx, redirects) — for finding problems. Not logged: 2xx, 304, client aborts, and 404 for tiles outside a dataset's coverage. |
+| `referer_stats.tsv.gz` | Requests that were served (2xx and 304) — for the usage statistics below.                  |
+| `error.log`            | nginx's own error log (upstream failures, rate limiting).                                  |
+
+What is stored about a client:
+
+- **Client address:** only anonymised — the last octet of an IPv4 address is zeroed, an IPv6 address is cut to its first two groups.
+- **Referer:** only `scheme://host`, never the path or query string of the referring page.
+- **Request:** the path without its query string; in `access.tsv.gz` also the user agent.
+- **Exception:** nginx writes `error.log` in a fixed format that includes the full client address and request line. It is anonymised in the same way when it is rotated, so only the current month's file contains full addresses.
+
+The two access logs are compressed while they are written and reach the file with up to a minute's delay.
 
 ### Referer statistics
 
-nginx records a per-request referer log (`volumes/nginx-log/referer_stats*.tsv.gz`). Summarise it by referer domain — total transmitted data (MB) and number of tile requests — as an aligned table sorted by data descending:
+nginx records a per-request referer log (`volumes/nginx-log/referer_stats*.tsv.gz`). A tile that a client revalidates (`304 Not Modified`) counts as a tile request with 0 bytes. Summarise the log by referer domain — total transmitted data (MB) and number of tile requests — as an aligned table sorted by data descending:
 
 ```bash
 ./bin/log/referer_stats.sh                # current month (default)

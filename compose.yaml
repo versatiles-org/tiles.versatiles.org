@@ -1,6 +1,18 @@
+# Size limit for what the long-running containers write to stdout/stderr
+# (`docker compose logs`). Docker's default keeps these files forever; the tile
+# server writes several lines for every failed request, so without a limit they
+# grow without bound. nginx's own access/error logs are separate files in
+# volumes/nginx-log, rotated by bin/log/rotate.sh.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   versatiles:
     container_name: versatiles
+    logging: *logging
     # Pinned on purpose: `bin/update.sh` runs `docker compose pull`, so a moving
     # tag would upgrade production unreviewed. This is the only place the
     # version is set — download-updater takes its versatiles binary from the
@@ -42,6 +54,7 @@ services:
 
   nginx:
     container_name: nginx
+    logging: *logging
     image: nginx:1.31-alpine
     restart: always
     depends_on:

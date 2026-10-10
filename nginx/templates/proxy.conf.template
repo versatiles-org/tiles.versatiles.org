@@ -6,16 +6,53 @@ map $http_accept_encoding $accept_encoding {
    "~*br" "${accept_encoding} br";
 }
 
-map $status $loggable {
-   ~^[2] 0;
-   499 0;
-   default 1;
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+# Two access logs, both gzip-compressed TSV:
+#   access.tsv.gz         requests that went wrong — for finding problems
+#   referer_stats.tsv.gz  requests that were served — for usage statistics
+# Neither stores a full client address or a full referer URL.
+
+# What counts as "went wrong". Not logged, because they are normal answers:
+#   2xx   served
+#   304   the client's cached copy is still current (ETag revalidation)
+#   499   the client closed the connection
+#   404 below /tiles/   a tile outside a dataset's coverage or zoom range
+map "$status:$uri" $loggable {
+   ~^2            0;
+   ~^304:         0;
+   ~^499:         0;
+   ~^404:/tiles/  0;
+   default        1;
 }
 
+# What counts as "served": 2xx, and 304 — a revalidated tile is a tile request
+# too (it is counted with 0 bytes).
 map $status $successful {
-   ~^[2] 1;
+   ~^[2]   1;
+   304     1;
    default 0;
 }
+
+# The referer reduced to scheme://host[:port]. The path and query string of the
+# referring page are nobody's business here and may contain personal data or
+# tokens; the statistics only use the host. Anything that is not a URL is
+# dropped. No referer is logged as "-", as nginx does for an unset variable.
+map $http_referer $referer_origin {
+   default "-";
+   "~^(?<ref_scheme>[a-zA-Z][a-zA-Z0-9+.-]*)://(?:[^/?#@]*@)?(?<ref_host>[^/?#]+)" "$ref_scheme://$ref_host";
+}
+
+# The formats live here, next to the access_log lines that use them (not in
+# nginx.conf), so a change is applied by a config reload like the rest of this
+# file. Columns of problems_tsv: time, anonymised client address, method, path
+# (no query string), status, bytes, referer origin, user agent.
+log_format problems_tsv '$time_iso8601\t$remote_addr_anon\t$request_method\t$uri\t$status\t$body_bytes_sent\t$referer_origin\t$http_user_agent';
+
+# Columns: referer origin, path, bytes, status. Read by bin/log/referer_stats.sh
+# and bin/log/monthly_traffic.sh.
+log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status';
 
 # Browser cache policy, by response status.
 #
@@ -93,8 +130,12 @@ server {
    proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
 
    etag off;
-   access_log /var/log/nginx/access.tsv.gz anonymized gzip if=$loggable;
-   access_log /var/log/nginx/referer_stats.tsv.gz referer_stats gzip if=$successful;
+   # flush=1m: gzip logging buffers in memory; without it entries can take hours
+   # to reach the file on a quiet day.
+   access_log /var/log/nginx/access.tsv.gz problems_tsv gzip flush=1m if=$loggable;
+   access_log /var/log/nginx/referer_stats.tsv.gz referer_tsv gzip flush=1m if=$successful;
+   # nginx's error log has a fixed format that includes the full client address
+   # and request line. bin/log/rotate.sh anonymises it when it rotates the file.
    error_log  /var/log/nginx/error.log;
 
    autoindex off;
