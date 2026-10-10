@@ -1,9 +1,42 @@
-proxy_cache_path /data/nginx/cache levels=1:2 keys_zone=STATIC:10m inactive=24h max_size=${CACHE_MAX_SIZE_MB}m;
+# The response cache, on the RAM disk.
+#   use_temp_path=off  write a response directly into the cache directory.
+#                      Otherwise nginx writes it to a temp directory on the
+#                      container's disk first and then copies it over to the
+#                      RAM disk — for every cached response.
+proxy_cache_path /data/nginx/cache levels=1:2 keys_zone=STATIC:10m inactive=24h max_size=${CACHE_MAX_SIZE_MB}m use_temp_path=off;
 
-map $http_accept_encoding $accept_encoding {
-   default "";
-   "~*gzip" "gzip";
-   "~*br" "${accept_encoding} br";
+# ---------------------------------------------------------------------------
+# Content encoding
+# ---------------------------------------------------------------------------
+# The tile server can answer in three ways: brotli, gzip, or uncompressed — it
+# prefers brotli, then gzip. Browsers describe what they accept in many
+# different ways ("gzip, deflate, br, zstd", "gzip, deflate, br", "br, gzip", …).
+# If the cache stored one copy per distinct Accept-Encoding string, the same
+# tile would sit in the RAM disk several times.
+#
+# So the client's header is reduced to the one encoding it will get — "br",
+# "gzip" or nothing — and that value is used twice: it is sent to the tile
+# server as Accept-Encoding, and it is part of the cache key (see
+# proxy_cache_key). Three copies of a tile at most, and every client gets an
+# encoding it asked for.
+#
+# An encoding listed with q=0 ("br;q=0") is explicitly NOT accepted.
+map $http_accept_encoding $accepts_br {
+   default 0;
+   "~*(^|[,\s])br\s*;\s*q=0(\.0*)?\s*(,|$)"  0;
+   "~*(^|[,\s])br\s*(;|,|$)"                 1;
+}
+
+map $http_accept_encoding $accepts_gzip {
+   default 0;
+   "~*(^|[,\s])gzip\s*;\s*q=0(\.0*)?\s*(,|$)"  0;
+   "~*(^|[,\s])gzip\s*(;|,|$)"                 1;
+}
+
+map "$accepts_br$accepts_gzip" $upstream_accept_encoding {
+   default "";      # neither: uncompressed
+   ~^1     "br";    # brotli accepted (with or without gzip)
+   01      "gzip";
 }
 
 # ---------------------------------------------------------------------------
@@ -136,7 +169,9 @@ server {
    resolver 8.8.8.8 8.8.4.4 valid=300s;
    resolver_timeout 5s;
 
-   proxy_cache_key "$uri,$is_args,$args,$accept_encoding";
+   # One cache entry per URL and per encoding the client will get (see
+   # $upstream_accept_encoding above).
+   proxy_cache_key "$uri,$is_args,$args,$upstream_accept_encoding";
 
    etag off;
    # flush=1m: gzip logging buffers in memory; without it entries can take hours
@@ -277,6 +312,9 @@ server {
       # over to the other address (or fails fast).
       proxy_connect_timeout 1s;
       proxy_set_header      Connection "";
+      # Ask the tile server for exactly the encoding this client will get (an
+      # empty value sends no header at all: uncompressed).
+      proxy_set_header      Accept-Encoding $upstream_accept_encoding;
       proxy_hide_header     Cache-Control;
       # Set by this server block already (add_header above); versatiles 5 sends
       # it too, which would put the header on every response twice.
@@ -287,6 +325,17 @@ server {
       proxy_hide_header     Access-Control-Expose-Headers;
       proxy_buffering       on;
       proxy_cache           STATIC;
+      # How long nginx keeps a response is decided here, not by the tile server:
+      #   Cache-Control, Expires  the tile server says 28 days; without ignoring
+      #            them, that would override the proxy_cache_valid times below.
+      #   Vary     the tile server sends `Vary: Accept-Encoding`, which would make
+      #            nginx keep one copy per distinct Accept-Encoding string. The
+      #            encoding is part of the cache key already, in normalised form.
+      #            The header itself still reaches the client.
+      proxy_ignore_headers  Cache-Control Expires Vary;
+      # A day is enough: the cache is cleared on every data or frontend update
+      # anyway, and an expired entry is refreshed with a cheap conditional
+      # request (proxy_cache_revalidate below), not fetched again.
       proxy_cache_valid     200 1d;
       # Missing tiles are requested constantly; keep them off the tile server,
       # but only briefly (same reasoning and lifetime as in the browser policy).
