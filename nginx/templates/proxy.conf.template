@@ -348,9 +348,11 @@ server {
       # anyway, and an expired entry is refreshed with a cheap conditional
       # request (proxy_cache_revalidate below), not fetched again.
       proxy_cache_valid     200 1d;
-      # Missing tiles are requested constantly; keep them off the tile server,
-      # but only briefly (same reasoning and lifetime as in the browser policy).
-      proxy_cache_valid     404 5m;
+      # Missing tiles are requested constantly; keep them off the tile server.
+      # Unlike in a browser (5 minutes, see $browser_cache_control), a 404 that
+      # was only true while the tile server reloaded does not stick here: the
+      # cache is cleared after the reload.
+      proxy_cache_valid     404 1d;
       # Refresh an expired cache entry with a conditional request (If-None-Match)
       # instead of fetching it again in full. Needs the ETag that versatiles
       # sends from 5.0 on; without one nginx simply fetches as before.
