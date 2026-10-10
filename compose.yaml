@@ -1,7 +1,11 @@
 services:
   versatiles:
     container_name: versatiles
-    image: versatiles/versatiles:latest
+    # Pinned on purpose: `bin/update.sh` runs `docker compose pull`, so a moving
+    # tag would upgrade production unreviewed. This is the only place the
+    # version is set — download-updater takes its versatiles binary from the
+    # same image via the anchor below, so the two can never drift apart.
+    image: &versatiles_image versatiles/versatiles:v4.15.0
     restart: always
     networks: [docker_network]
     expose: [8080]
@@ -24,6 +28,8 @@ services:
     build:
       context: ./download
       dockerfile: Dockerfile
+      args:
+        VERSATILES_IMAGE: *versatiles_image
     profiles: [donotstart]
     networks: [docker_network]
     environment:

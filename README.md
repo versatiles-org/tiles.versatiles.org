@@ -239,6 +239,12 @@ Use it when the tile server must re-read something it only reads at startup — 
 
 `--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound for a moment. It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:` — config, template and certificate changes are all applied by a graceful reload.
 
+### Upgrading versatiles
+
+The tile server version is pinned in `compose.yaml` (`image: … versatiles/versatiles:vX.Y.Z`). That one line also sets the version of the `versatiles` binary inside the `download-updater` image, so the server and the pipeline always run the same release. Because `bin/update.sh` pulls images, a moving tag such as `latest` would upgrade production without anyone deciding to — hence the pin.
+
+To upgrade, change the tag in `compose.yaml` (Dependabot opens a pull request for new releases) and run `./bin/update.sh`. Minor and patch releases can go straight in. For a new **major** release, read its "Upgrading" release notes and try it on a test server first: the server starts with the generated `versatiles.yaml`, a SIGHUP reload works (`./bin/serve-mode.sh`), tiles and the frontend are served, and the pipeline's `versatiles convert` build still produces the derived datasets.
+
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:

@@ -15,12 +15,31 @@ updates:
         patterns:
           - "*"
 
+  # Image tags in compose.yaml (versatiles, nginx, certbot). The versatiles pin
+  # there also sets the version used by the download-updater image.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      all-docker-compose:
+        patterns:
+          - "*"
+        # A new versatiles major gets a PR of its own: it needs the checks in
+        # the README ("Upgrading versatiles") before it may reach production.
+        update-types:
+          - minor
+          - patch
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Base image of the download-updater Dockerfile (alpine).
   - package-ecosystem: docker
-    # "/" covers the image tags in compose.yaml (nginx, certbot, versatiles);
-    # "/download" covers the download-updater Dockerfile.
-    directories:
-      - "/"
-      - "/download"
+    directory: /download
     schedule:
       interval: weekly
     commit-message:

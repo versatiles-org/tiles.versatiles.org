@@ -2,7 +2,14 @@
 # binary, so it runs as-is when copied into the Alpine stage below — no shared
 # libraries to carry over. Used by update-tiles.sh to build derived datasets
 # (zoom-limited subsets, merges, …) via `versatiles convert` + VPL.
-FROM versatiles/versatiles:latest AS versatiles
+#
+# The image (and so the version) is passed in by compose.yaml, which hands over
+# the very image the tile server runs — build through `docker compose build
+# download-updater`. There is deliberately no default: a plain `docker build`
+# without --build-arg VERSATILES_IMAGE=… fails instead of silently picking some
+# other version.
+ARG VERSATILES_IMAGE
+FROM ${VERSATILES_IMAGE} AS versatiles
 
 FROM alpine:3
 
