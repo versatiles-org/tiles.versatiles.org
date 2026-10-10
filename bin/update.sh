@@ -41,34 +41,35 @@ set -euo pipefail
 #          1 → pipeline error (abort)
 #          2 → nothing to update (skip intermediate restart)
 #
-#   4. (only if step 3 returned 0) reload versatiles
+#   4. (only if step 3 returned 0) reload the tile server
 #        Tile server picks up the transitional config and serves stale
 #        tilesets from the CDN so it stays available while step 5 downloads
-#        the new files. Reload is a no-downtime SIGHUP (see step 6).
+#        the new files. Same mechanism as step 6.
 #
 #   5. download-updater --mode=finalize  (Phase 2)
 #        Deletes stale local files and (re)builds missing/changed datasets —
-#        most are downloaded, derived datasets (satellite, osm) are rebuilt with
+#        most are downloaded, derived datasets (satellite) are rebuilt with
 #        versatiles convert (see download/sources.json). Then rewrites
 #        versatiles.yaml to serve everything via each dataset's serveCurrent.
 #
-#   6. reload versatiles (config-aware)
-#        Tile server picks up the final local-disk config. Recreates the
-#        container only when compose-level state changed (new image, env,
-#        mounts); otherwise sends SIGHUP so the running container reloads the
-#        new versatiles.yaml with no downtime (tile sources updated
-#        incrementally, in-flight requests complete).
-#        Exception: when step 2 refreshed the frontend/styles tars, the
-#        fallback is a full restart instead of SIGHUP — see $VERSATILES_FALLBACK
-#        below for why a reload cannot pick those up.
+#   6. reload the tile server (apply_tile_server in helpers.sh)
+#        Tile server picks up the final local-disk config. Normally a SIGHUP:
+#        the running container reloads the new versatiles.yaml in place (tile
+#        sources updated incrementally, in-flight requests complete).
+#        The container is replaced instead when it is out of date (new image
+#        pulled in step 2, changed definition in compose.yaml) or when step 2
+#        refreshed the frontend/styles tars, which a reload cannot pick up —
+#        see $TILE_SERVER_MODE below. Replacing is gap-free: the new container
+#        starts next to the old one, which is stopped once the new one is
+#        healthy.
 #
-#   7. reload nginx (config-aware)
-#        Re-resolves the versatiles upstream in case the tile server container
-#        was recreated above (new IP); nginx caches upstream IPs from config
-#        load until reloaded. Also the only step that applies nginx config
-#        changes pulled in step 1, since it re-renders the templates. Recreates
-#        the nginx container only when its compose state changed; otherwise
-#        sends a graceful `nginx -s reload`.
+#   7. reload nginx
+#        Applies nginx config changes pulled in step 1 by re-rendering the
+#        templates, then a graceful `nginx -s reload`. On Path A the nginx
+#        container is recreated if it is out of date (brief refused
+#        connections); on Path B it is only reported. nginx follows the tile
+#        server through Docker's DNS, so it needs no reload for a new tile
+#        server container.
 #
 #   8. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
@@ -84,19 +85,19 @@ set -euo pipefail
 #   Path A — files changed (prepare exits 0):
 #     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
 #     The tile server is reloaded twice (transitional config, then final).
-#     During the gap, stale tilesets are served from the CDN so there is no
-#     outage; the SIGHUP reloads themselves are also downtime-free.
+#     In between, stale tilesets are served from the CDN so there is no
+#     outage.
 #
-#   Path B — nothing changed (prepare exits 2):
-#     1 → 2 → 3 → 7 → 9   (plus 6 and 8 when step 2 fetched new assets)
-#     Steps 4 and 5 are skipped: tile data is already current, so the existing
-#     healthy state is preserved. Steps 1 and 2 still run so frontend / styles
-#     / Docker image updates are picked up even when no tile data needs
-#     refreshing — and when they were, 6 reloads the tile server and 8 drops
-#     the now-stale assets from the cache. Step 7 always runs, because nginx
-#     config arrives with step 1 and nothing else would apply it; here it
-#     reloads in place, never recreating the container. Verification (9)
-#     catches infra drift (expired certs, etc).
+#   Path B — no new tile data (prepare exits 2):
+#     1 → 2 → 3 → 7 → 9   (plus 6 and 8 when the tile server must be replaced)
+#     Steps 4 and 5 are skipped: tile data is already current. Step 7 always
+#     runs and comes first here, because nginx config arrives with step 1 and
+#     nothing else would apply it; it reloads in place and never recreates the
+#     nginx container (a pending nginx image is reported instead). The tile
+#     server container is replaced (6) when step 2 fetched a new frontend or
+#     styles bundle, or when the container is out of date — a new image or a
+#     changed compose.yaml — and the cache is cleared afterwards (8).
+#     Verification (9) catches infra drift (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
 #     1 → 2 → 3 → abort. No restart, no config change.
@@ -189,12 +190,12 @@ else
   ASSETS_CHANGED=false
 fi
 
-# How to make the tile server pick up new config/assets when `docker compose up`
-# leaves the container untouched (see up_with_config_fallback in helpers.sh).
+# How the tile server picks up what changed (see apply_tile_server in
+# helpers.sh).
 #
-# SIGHUP is the cheap, downtime-free path and is enough for tile data: the
-# download pipeline rewrites each dataset's `src:` in versatiles.yaml, so the
-# reload sees a changed config and swaps the sources.
+# SIGHUP is the cheapest path and is enough for tile data: the download pipeline
+# rewrites each dataset's `src:` in versatiles.yaml, so the reload sees a
+# changed config and swaps the sources.
 #
 # It is NOT enough for the frontend/styles tars. Their `static:` entries name
 # fixed paths (/data/frontend/frontend.br.tar, styles.tar) that are identical
@@ -204,13 +205,18 @@ fi
 # container keeps serving the bytes it read at startup: a SIGHUP after a
 # frontend update is a silent no-op and the old frontend stays live.
 #
-# So when build.sh refreshed the assets, force a restart, which re-reads the
-# tars. `docker compose restart` reuses the container, so nginx's cached
-# upstream IP stays valid; it costs a few seconds of refused requests.
+# So when build.sh refreshed the assets, the tile server container is replaced:
+# a new one is started next to the old one and reads the new tars, and the old
+# one is stopped once the new one is healthy — no gap.
+#
+# Independent of this choice, apply_tile_server replaces the container whenever
+# it is out of date (a new image pulled in step 2, or a changed definition in
+# compose.yaml), so a pending image is applied on every run, not only when tile
+# data happens to change.
 if [ "$ASSETS_CHANGED" = "true" ]; then
-  VERSATILES_FALLBACK=restart
+  TILE_SERVER_MODE=replace
 else
-  VERSATILES_FALLBACK=sighup
+  TILE_SERVER_MODE=sighup
 fi
 
 # Phase 1: check what needs updating; generate transitional configs
@@ -227,44 +233,55 @@ fi
 
 if [ $PREPARE_EXIT -eq 2 ]; then
   # Nothing in the tile data needs updating — local tiles are already current
-  # and configs already point to local disk. Skip finalize and the tile-driven
-  # restarts.
-  #
-  # BUT: build.sh may still have pulled a new frontend/styles bundle. Those are
-  # served by the versatiles container from a tar and cached by nginx, so the
-  # download alone does nothing visible — without a restart and cache clear the
-  # old frontend keeps being served. So when assets changed we restart the tile
-  # server ($VERSATILES_FALLBACK is `restart` in that case, since a SIGHUP reload
-  # would not re-read the tars) and clear the cache here even though no tile data
-  # moved.
-  if [ "$ASSETS_CHANGED" = "true" ]; then
-    echo "Tile data unchanged, but frontend/styles changed — restarting tile server."
-    up_with_config_fallback versatiles "$VERSATILES_FALLBACK"
-    wait_for_healthy versatiles
-  else
-    echo "Nothing to update — skipping finalize and tile server restart."
-  fi
+  # and versatiles.yaml already points to local disk. Skip finalize.
 
-  # nginx is reloaded even when nothing above ran. Its config reaches the
-  # container only through a re-render of nginx/templates/*.template — and those
-  # templates change with this repo's git HEAD, which neither $ASSETS_CHANGED nor
-  # the prepare exit code tracks. Without this, a config change pulled in step 1
-  # (a new redirect, a cache rule) would sit dormant until the next run that
-  # happens to touch tile data.
-  #
-  # Unlike step 7 on the tile path, this reloads in place rather than going
-  # through `docker compose up`: on a run where nothing else changed, a base
-  # image pulled in step 2 is not worth a container recreate and the brief
-  # refused connections that come with it. That image lands on the next Path A
-  # run. Reloading in place is graceful and drops nothing.
+  # nginx first, and always. Its config reaches the container only through a
+  # re-render of nginx/templates/*.template — and those templates change with
+  # this repo's git HEAD, which neither $ASSETS_CHANGED nor the prepare exit
+  # code tracks. Without this, a config change pulled in step 1 (a new redirect,
+  # a cache rule) would sit dormant until the next run that happens to touch
+  # tile data. Reloading in place is graceful and drops nothing.
   echo "Reloading nginx..."
   reload_nginx_in_place
   wait_for_healthy nginx
 
-  # Only the assets are newly served, so only they can be stale in the cache.
+  # The tile server. Even without new tile data there are two reasons to replace
+  # its container:
+  #   - build.sh downloaded a new frontend/styles bundle. Those are served from
+  #     a tar that versatiles reads only at startup (see $TILE_SERVER_MODE), so
+  #     the download alone changes nothing a client can see.
+  #   - the container is out of date: step 2 pulled a new image, or compose.yaml
+  #     changed (a new version pin, mounts, logging limits, …).
+  # Either way the replacement is gap-free (replace_tile_server), and the cache
+  # is cleared afterwards — what the new container serves may differ.
+  TILE_SERVER_REPLACED=false
   if [ "$ASSETS_CHANGED" = "true" ]; then
+    echo "Tile data unchanged, but frontend/styles changed — replacing the tile server container."
+    replace_tile_server
+    TILE_SERVER_REPLACED=true
+  elif service_has_pending_change versatiles; then
+    echo "Tile data unchanged, but the tile server container is out of date (new image or changed compose definition) — replacing it."
+    replace_tile_server
+    TILE_SERVER_REPLACED=true
+  else
+    echo "Nothing to update — tile data, frontend, styles and the tile server container are current."
+  fi
+
+  if [ "$TILE_SERVER_REPLACED" = "true" ]; then
     echo "Clearing cache data..."
     ./bin/ramdisk/clear.sh
+  fi
+
+  # The nginx container itself is not replaced here, only reported. Unlike the
+  # tile server it cannot be swapped without a gap: only one container can hold
+  # ports 80/443, so they are unbound for a moment and connections are refused.
+  # That is not worth it on a run where nothing else happened; the operator
+  # decides when.
+  if service_has_pending_change nginx; then
+    echo ""
+    echo "NOTE: the nginx container is out of date (new image or changed compose definition)."
+    echo "      It was NOT replaced, because that refuses connections for a moment."
+    echo "      Apply it when convenient with:  ./bin/restart.sh --with-nginx"
   fi
 
   echo ""
@@ -275,28 +292,31 @@ if [ $PREPARE_EXIT -eq 2 ]; then
 fi
 
 # Files need updating — have the tile server pick up the transitional config and
-# serve stale tilesets from the CDN while we download the new files. The `sighup`
-# fallback recreates the container only if compose state changed; otherwise it
-# sends SIGHUP so versatiles reloads the new yaml with no downtime.
+# serve stale tilesets from the CDN while we download the new files. Normally a
+# SIGHUP, so versatiles reloads the new yaml in place; if the container is out
+# of date (new image, changed compose definition) it is replaced without a gap
+# instead, and the new container reads the transitional yaml.
 echo "Reloading tile server with CDN fallback config..."
-up_with_config_fallback versatiles sighup
+apply_tile_server sighup
 wait_for_healthy versatiles
 
 # Phase 2: delete stale files, download new ones, generate final configs
 echo "Running download pipeline (finalize)..."
 docker compose run --rm download-updater --mode=finalize
 
-# Tile server picks up the final local-disk config. Normally a SIGHUP reload with
-# no downtime; a restart when the frontend/styles tars changed, which a reload
-# cannot pick up (see $VERSATILES_FALLBACK above).
+# Tile server picks up the final local-disk config. Normally a SIGHUP reload; a
+# gap-free container replacement when the frontend/styles tars changed, which a
+# reload cannot pick up (see $TILE_SERVER_MODE above).
 echo "Reloading tile server with local files..."
-up_with_config_fallback versatiles "$VERSATILES_FALLBACK"
+apply_tile_server "$TILE_SERVER_MODE"
 wait_for_healthy versatiles
 
-# Reload nginx so it re-resolves the versatiles upstream. If the tile server
-# container was recreated above (e.g. after an image update via `compose pull`),
-# its IP may have changed, and nginx caches upstream IPs from config-load time
-# until reloaded — without this it would keep proxying to the old IP (502s).
+# Apply the nginx config pulled in step 1 (re-render the templates, graceful
+# reload). On this path the nginx container is also recreated if it is out of
+# date (new base image, changed compose definition): a data update is a
+# maintenance moment anyway, and the recreate costs well under a second of
+# refused connections. nginx finds the tile server through Docker's DNS, so it
+# needs no reload just because the tile server container changed.
 echo "Reloading nginx..."
 up_with_config_fallback nginx reload
 wait_for_healthy nginx

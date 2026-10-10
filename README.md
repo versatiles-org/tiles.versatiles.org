@@ -150,27 +150,30 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - `docker compose pull` — pull latest Docker images
 - `docker compose build download-updater` — rebuild the download-updater image
 
-**3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`. A stale dataset keeps serving its **old local file** while it's rebuilt, as long as that file exists and the build is atomic (mirror: download to temp → rename); only datasets with no local file, or a delete-old-first build (e.g. satellite), point at the CDN during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if everything is already current (in which case steps 4–7 are skipped). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
+**3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`. A stale dataset keeps serving its **old local file** while it's rebuilt, as long as that file exists and the build is atomic (mirror: download to temp → rename); only datasets with no local file, or a delete-old-first build (e.g. satellite), point at the CDN during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if all tile data is already current (see "Without new tile data" below). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
 
-**4. *(only if prepare exited 0)* Reload tile server — CDN fallback config**
-```bash
-up_with_config_fallback versatiles sighup   # docker compose up; SIGHUP if unchanged
-```
-VersaTiles reloads `versatiles.yaml` on SIGHUP with no downtime (it's recreated only if the compose state changed, e.g. a new image). Stale datasets keep serving their old local data where possible; only those without a local file or with a delete-old-first build are served from the CDN (slower, but available) — those local files can now be safely replaced.
+**4. Reload tile server — CDN fallback config.** VersaTiles reloads `versatiles.yaml` on SIGHUP, in place. Stale datasets keep serving their old local data where possible; only those without a local file or with a delete-old-first build are served from the CDN (slower, but available) — those local files can now be safely replaced.
 
 **5. download-updater `--mode=finalize`** (Phase 2) — deletes datasets no longer listed and (re)builds new/changed ones: most are downloaded, derived datasets (e.g. satellite) are built with `versatiles convert`. Then writes the final `versatiles.yaml`. How builds and the generated config work: [`download/README.md`](download/README.md).
 
-**6. Reload tile server — local files**
-```bash
-up_with_config_fallback versatiles sighup
-```
-VersaTiles reloads `versatiles.yaml` on SIGHUP (no downtime). Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
+**6. Reload tile server — local files.** Again a SIGHUP. Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
 
-**7. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
+**7. Reload nginx** — re-render the config templates and reload gracefully, which applies nginx config changes from step 1. On this path the nginx container is also recreated if a new nginx image or a changed `compose.yaml` is pending (a moment of refused connections).
 
-**8. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
+**8. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
-The tile server is always serving valid data: between steps 3 and 4 stale datasets come from cdn.versatiles.cloud; between steps 5 and 6 each dataset comes from local disk (satellite additionally reads its high zoom levels from the CDN). There is no moment where a tile request can fail.
+**9. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
+
+**Without new tile data** (prepare exited 2), steps 4–6 are skipped. nginx is reloaded in place (7), and the tile server container is replaced if it needs to be — see below — followed by the cache clear (8) and the verification (9). A pending change to the nginx container is only reported in this case, with the command to apply it.
+
+**When the tile server container is replaced instead of reloaded.** A SIGHUP only re-reads `versatiles.yaml`. The container is replaced when
+
+- a new frontend or styles bundle was downloaded in step 2 (versatiles reads those tars only at startup), or
+- the container is out of date: a new image was pulled, or its definition in `compose.yaml` changed (version pin, mounts, logging, …).
+
+Replacing is done without a gap: a new container is started next to the running one, nginx starts using it as soon as it answers, and the old container is stopped only once the new one is healthy. If the new one never becomes healthy, it is removed and the old one keeps serving. In tests at about 100 requests per second, a replacement cost between zero and a handful of failed requests.
+
+The tile server is always serving valid data: between steps 4 and 6 stale datasets come from the CDN or from their old local file; afterwards each dataset comes from local disk (satellite additionally reads its high zoom levels from the CDN).
 
 ### Ensure Infrastructure Only
 
@@ -206,22 +209,24 @@ To actually **download or refresh** local data (and switch back to local serving
 Restart what is already deployed — no pull, no build, no change to tile data or `versatiles.yaml`:
 
 ```bash
-./bin/restart.sh                # recreate the tile server, reload nginx, clear the cache
+./bin/restart.sh                # replace the tile server container, clear the cache
 ./bin/restart.sh --with-nginx   # additionally recreate the nginx container
 ./bin/restart.sh --keep-cache   # leave cached responses in place
 ```
 
-The default path keeps :80/:443 bound the whole time, so no client gets a refused connection. It recreates the tile server, reloads nginx **immediately** so it re-resolves the new container's IP (nginx resolves `server versatiles:8080` only at config-load time, and pointing it at the dead old address makes requests hang rather than fail fast), and only then waits for health and clears the cache — the cache is what keeps already-requested URLs answered across the few seconds of startup, via `proxy_cache_use_stale`.
+The default path keeps :80/:443 bound the whole time, so no client gets a refused connection. It replaces the tile server container the gap-free way described under [Update](#update): the new container starts next to the old one, and the old one is stopped once the new one is healthy. nginx follows the tile server through Docker's DNS, so it needs no reload. The cache is cleared afterwards.
 
-Use it when the tile server must re-read something it only reads at startup — above all the frontend/styles tars, which a SIGHUP reload cannot pick up because their `static:` paths never change.
+Use it when the tile server must re-read something it only reads at startup. `./bin/update.sh` does this on its own when it is needed; `restart.sh` is for doing it by hand.
 
-`--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound for a moment. It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:` — config, template and certificate changes are all applied by a graceful reload.
+`--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound for a moment (well under a second in tests). It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:`/`logging:` — config, template and certificate changes are all applied by a graceful reload. `./bin/update.sh` tells you when such a change is pending.
+
+Because two tile server containers can exist for a moment, the tile server has no fixed container name. Address it by service: `docker compose exec versatiles versatiles --version`, `docker compose logs versatiles`.
 
 ### Upgrading versatiles
 
 The tile server version is pinned in `compose.yaml` (`image: … versatiles/versatiles:vX.Y.Z`). That one line also sets the version of the `versatiles` binary inside the `download-updater` image, so the server and the pipeline always run the same release. Because `bin/update.sh` pulls images, a moving tag such as `latest` would upgrade production without anyone deciding to — hence the pin.
 
-To upgrade, change the tag in `compose.yaml` (Dependabot opens a pull request for new releases) and run `./bin/update.sh`. Minor and patch releases can go straight in. For a new **major** release, read its "Upgrading" release notes and try it on a test server first: the server starts with the generated `versatiles.yaml`, a SIGHUP reload works (`./bin/serve-mode.sh`), tiles and the frontend are served, and the pipeline's `versatiles convert` build still produces the derived datasets.
+To upgrade, change the tag in `compose.yaml` (Dependabot opens a pull request for new releases) and run `./bin/update.sh`, which replaces the tile server container with the new version without a gap. Minor and patch releases can go straight in. For a new **major** release, read its "Upgrading" release notes and try it on a test server first: the server starts with the generated `versatiles.yaml`, a SIGHUP reload works (`./bin/serve-mode.sh`), tiles and the frontend are served, and the pipeline's `versatiles convert` build still produces the derived datasets.
 
 ### Certificate Renewal
 

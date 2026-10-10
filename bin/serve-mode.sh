@@ -31,9 +31,10 @@ esac
 echo "Switching tile serving to '$MODE' mode..."
 docker compose run --rm download-updater "--mode=$MODE"
 
-# Re-read the new versatiles.yaml (SIGHUP reload unless compose state changed).
+# Re-read the new versatiles.yaml: a SIGHUP reload, or a gap-free container
+# replacement if the container is out of date (see apply_tile_server).
 echo "Reloading tile server..."
-up_with_config_fallback versatiles sighup
+apply_tile_server sighup
 wait_for_healthy versatiles
 
 # Drop cached tiles so clients don't get responses from the previous mode.

@@ -11,7 +11,10 @@ x-logging: &logging
 
 services:
   versatiles:
-    container_name: versatiles
+    # No container_name on purpose: to replace the tile server without a gap,
+    # a second container of this service runs next to the first for a moment
+    # (replace_tile_server in bin/deploy/helpers.sh), and a fixed name would
+    # forbid that. Address it by service: `docker compose exec versatiles …`.
     logging: *logging
     # Pinned on purpose: `bin/update.sh` runs `docker compose pull`, so a moving
     # tag would upgrade production unreviewed. This is the only place the

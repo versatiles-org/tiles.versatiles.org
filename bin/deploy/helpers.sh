@@ -18,8 +18,154 @@ wait_for_healthy() {
 	exit 1
 }
 
+# True when the running container of a service no longer matches what
+# compose.yaml describes — a different image tag, changed mounts/env/logging, or
+# a newer image pulled under the same tag. Such a change only takes effect once
+# the container is replaced. False when the service has no container.
+service_has_pending_change() {
+	local service="$1" cid want_hash have_hash image want_image have_image
+	cid=$(docker compose ps -q "$service" 2>/dev/null | head -n 1)
+	[ -n "$cid" ] || return 1
+
+	# Compose definition: the hash compose stores on every container it creates.
+	want_hash=$(docker compose config --hash "$service" | awk '{print $2}')
+	have_hash=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.config-hash" }}' "$cid")
+	[ "$want_hash" = "$have_hash" ] || return 0
+
+	# Same definition, but `docker compose pull` may have fetched a newer image
+	# under the same tag.
+	image=$(docker inspect -f '{{.Config.Image}}' "$cid")
+	want_image=$(docker image inspect -f '{{.Id}}' "$image" 2>/dev/null || echo "")
+	have_image=$(docker inspect -f '{{.Image}}' "$cid")
+	[ -n "$want_image" ] && [ "$want_image" != "$have_image" ]
+}
+
+# Replace the tile server container with a fresh one, with (almost) no failed
+# requests: the new container is started next to the old one, and the old one is
+# only stopped once the new one is healthy.
+#
+# Why not `docker compose up --force-recreate`: that stops the old container
+# first, and the tile server needs a few seconds to load the frontend and open
+# its tile sources. Measured at ~100 req/s: about 4 seconds of 502 for every URL
+# that is not in the nginx cache, against 0–5 failed requests with this
+# procedure.
+#
+# It relies on two things in nginx/templates/proxy.conf.template:
+#   - the upstream follows Docker's DNS (`server versatiles:8080 resolve`), so
+#     nginx starts using the new container and drops the old one on its own —
+#     no reload needed;
+#   - `proxy_connect_timeout 1s`, so a request that still hits the old
+#     container's address the moment it disappears fails over quickly.
+#
+# A side benefit: if the new container never becomes healthy (broken image, bad
+# config), it is removed again and the old one keeps serving.
+#
+# The fresh container reads everything a tile server reads at startup: the
+# image, versatiles.yaml and the frontend/styles tars.
+replace_tile_server() {
+	local old new id count=0 elapsed=0 timeout=180 health
+
+	old=$(docker compose ps -q versatiles 2>/dev/null || echo "")
+	if [ -z "$old" ]; then
+		echo "Tile server is not running — starting it."
+		docker compose up --detach versatiles
+		wait_for_healthy versatiles
+		return 0
+	fi
+	for id in $old; do count=$((count + 1)); done
+
+	# The swap is only gap-free if nginx follows Docker's DNS. A running nginx
+	# that still has an older rendered config (upstream address fixed at config
+	# load) would keep sending requests to the old container's address after it
+	# is gone. Bring its config up to date first.
+	if service_is_running nginx && ! docker compose exec -T nginx grep -q 'server versatiles:8080 resolve' /etc/nginx/conf.d/proxy.conf; then
+		echo "nginx does not follow the tile server's address yet — applying the current nginx config first."
+		nginx_render_and_reload
+		sleep 2
+	fi
+
+	echo "Starting a new tile server container next to the running one..."
+	docker compose up --detach --no-deps --no-recreate --scale "versatiles=$((count + 1))" versatiles
+
+	new=""
+	for id in $(docker compose ps -q versatiles); do
+		case " $(echo "$old" | tr '\n' ' ') " in
+			*" $id "*) ;;
+			*) new="$id" ;;
+		esac
+	done
+	if [ -z "$new" ]; then
+		echo "Error: no new tile server container was created."
+		return 1
+	fi
+
+	echo "Waiting for the new tile server to be healthy..."
+	while [ "$elapsed" -lt "$timeout" ]; do
+		health=$(docker inspect -f '{{.State.Health.Status}}' "$new" 2>/dev/null || echo "gone")
+		[ "$health" = "healthy" ] && break
+		sleep 2
+		elapsed=$((elapsed + 2))
+	done
+	if [ "$health" != "healthy" ]; then
+		echo "Error: the new tile server did not become healthy within ${timeout}s (status: $health)."
+		echo "       Its last log lines:"
+		docker logs --tail 20 "$new" 2>&1 | sed 's/^/         /'
+		echo "       Removing it; the old tile server keeps serving."
+		docker rm --force "$new" >/dev/null
+		return 1
+	fi
+
+	# nginx marks an upstream address as failed for 10s (fail_timeout) after an
+	# error, and the new address may have been tried while it was still
+	# starting. Stopping the old container inside that window would leave nginx
+	# with no usable upstream for a moment.
+	echo "New tile server is healthy — waiting 12s before retiring the old one..."
+	sleep 12
+
+	for id in $old; do
+		docker stop "$id" >/dev/null
+		docker rm "$id" >/dev/null
+	done
+	echo "Tile server replaced."
+}
+
+# Make the tile server pick up a change, in the cheapest way that works.
+#
+# Usage: apply_tile_server <mode>
+#   sighup   The change is in versatiles.yaml only: SIGHUP makes versatiles
+#            reload it in place (tile sources updated incrementally, in-flight
+#            requests complete). But if the container itself is out of date
+#            (see service_has_pending_change), it is replaced instead — the new
+#            container reads the new versatiles.yaml as well.
+#   replace  Always replace the container. Needed for what versatiles reads only
+#            at startup, above all the frontend/styles tars: their `static:`
+#            paths are the same before and after a release, so a SIGHUP reload
+#            sees nothing to do.
+apply_tile_server() {
+	local mode="$1"
+	case "$mode" in
+		sighup|replace) ;;
+		*) echo "Error: unknown mode '$mode' (expected: sighup|replace)"; return 1 ;;
+	esac
+
+	if ! service_is_running versatiles; then
+		replace_tile_server   # starts it
+	elif [ "$mode" = "replace" ]; then
+		replace_tile_server
+	elif service_has_pending_change versatiles; then
+		echo "Tile server container is out of date (new image or changed compose definition)."
+		replace_tile_server
+	else
+		echo "Sending SIGHUP to the tile server to reload versatiles.yaml."
+		docker compose kill -s SIGHUP versatiles
+	fi
+}
+
 # Bring a service up so it reflects current compose state, then make sure it
 # re-reads any mounted config files even if compose state was unchanged.
+#
+# Used for nginx. The tile server goes through apply_tile_server() instead,
+# which replaces the container without a gap.
 #
 # `docker compose up --detach SERVICE` already recreates the container when
 # the image, environment, or mount definitions have changed. But the contents
@@ -100,9 +246,14 @@ service_is_running() {
 # The reload itself is graceful: the master keeps serving through old workers
 # until the new ones are up, so no connection is dropped. Requires a running
 # nginx container.
+#
+# `nginx -t` runs between rendering and reloading: `nginx -s reload` only signals
+# the master and exits 0 even when the new config is invalid (nginx then keeps
+# running the old one), so without the test a broken template would go unnoticed
+# here.
 nginx_render_and_reload() {
 	docker compose exec -T nginx sh -c \
-		'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -s reload'
+		'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t && nginx -s reload'
 }
 
 # Apply nginx config changes without risking a container recreate.
