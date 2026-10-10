@@ -11,14 +11,24 @@ cd "$(dirname "$0")/../.."
 
 # Load environment variables from the .env file
 source .env
+source bin/deploy/helpers.sh
 
 # Use provided domain or default to DOMAIN_NAME from .env
 DOMAIN="${1:-$DOMAIN_NAME}"
 
 echo "Creating valid certificate for ${DOMAIN}..."
 
-# Use Docker Compose to run certbot to obtain or renew a certificate
-docker compose run --rm certbot certonly --force-renewal --webroot --webroot-path=/var/www/certbot --email "${EMAIL}" --agree-tos --no-eff-email -d "${DOMAIN}"
+# certbot proves domain ownership through files that the running nginx serves
+# from the shared certbot-www volume.
+if ! service_is_running nginx; then
+	echo "Error: nginx is not running — cannot obtain a certificate." >&2
+	exit 1
+fi
+
+# Use Docker Compose to run certbot to obtain or renew a certificate.
+# --no-deps: do not let compose recreate nginx or the tile server as a side
+# effect (see bin/cert/renew.sh).
+docker compose run --rm --no-deps certbot certonly --force-renewal --webroot --webroot-path=/var/www/certbot --email "${EMAIL}" --agree-tos --no-eff-email -d "${DOMAIN}"
 
 # Ensure the directories exist and copy the newly acquired or renewed certificate to the nginx directory
 mkdir -p ./volumes/nginx-cert/live/"${DOMAIN}"

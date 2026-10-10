@@ -9,9 +9,23 @@ cd "$(dirname "$0")/../.."
 
 # Load environment variables from the .env file
 source .env
+source bin/deploy/helpers.sh
 
-# Use Docker Compose to execute the Certbot 'renew' command in the 'certbot' service container
-docker compose run --rm certbot renew
+# certbot proves domain ownership through files that the running nginx serves
+# from the shared certbot-www volume. Without nginx a renewal cannot succeed.
+if ! service_is_running nginx; then
+    echo "Error: nginx is not running — cannot renew certificates." >&2
+    exit 1
+fi
+
+# Run certbot's 'renew' in a one-off container.
+# --no-deps: do not let compose touch nginx or the tile server. Without it,
+# `compose run` first brings the services certbot depends on in line with
+# compose.yaml, recreating any whose image or config changed since it was
+# started. This script runs unattended from cron, and that would roll out a
+# pending image or config change at 3 a.m. — with the brief outage a recreate
+# costs and without the cache clear and verification of ./bin/update.sh.
+docker compose run --rm --no-deps certbot renew
 
 # Copy the newly renewed certificate to the nginx directory
 if [ -d "./volumes/certbot-cert/live/${DOMAIN_NAME}" ]; then
