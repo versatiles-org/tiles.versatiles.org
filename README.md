@@ -125,6 +125,10 @@ Edit `.env` to configure:
 
 No credentials are required — the tile data is fetched from the public CDN.
 
+### Changing the cache size
+
+The nginx cache lives on a RAM disk mounted at `volumes/cache`; nginx uses up to 90% of it. To change its size, set `RAM_DISK_GB` in `.env` and run `./bin/update.sh`. That resizes the mounted RAM disk in place (the cached files stay), updates its entry in `/etc/fstab`, and recreates the nginx container so it picks up the new limit. When making it smaller, the RAM disk must not hold more data than the new size — if the resize is refused, empty the cache with `./bin/ramdisk/clear.sh` and run the update again.
+
 ### Relocating tile storage
 
 `volumes/tiles/` holds the `.versatiles` files and is by far the largest volume (hundreds of GB). To put it on another filesystem, set `TILES_DIR` in `.env` to an absolute path **before** running `bin/deploy/setup.sh` (or run `bin/deploy/ensure.sh` after changing it — it creates the directory and sets ownership to `1001:1001`). The container-internal paths are unchanged, so nothing else needs adjusting. To migrate an existing install: stop the stack, move the files to the new location, set `TILES_DIR`, then `./bin/deploy/ensure.sh` and restart.
