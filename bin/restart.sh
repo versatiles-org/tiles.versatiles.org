@@ -62,6 +62,9 @@ for arg in "$@"; do
 	esac
 done
 
+# Only one update/restart/serve-mode run at a time.
+acquire_deploy_lock
+
 # 1. Fresh tile server container, started before the old one is stopped.
 replace_tile_server
 

@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 # Shared helper functions for deploy scripts. Source this file, don't execute it.
 
+# Make sure only one of update.sh / restart.sh / serve-mode.sh runs at a time.
+# They all rewrite versatiles.yaml, replace containers and clear the cache; two
+# of them interleaving (a second terminal, a cron job) leaves the server in a
+# state neither intended.
+#
+# The lock is an flock on a file, held through file descriptor 9 for as long as
+# the calling script runs. It is released by the kernel when the script exits —
+# however it exits — so there is no stale lock to clean up.
+#
+# Call it from the repository root, before doing anything that changes state.
+acquire_deploy_lock() {
+	local lock_file="volumes/.deploy.lock"
+	if ! command -v flock >/dev/null 2>&1; then
+		# Not on the server (flock is part of util-linux there) — e.g. a
+		# developer's macOS machine. Nothing to protect.
+		return 0
+	fi
+	mkdir -p volumes
+	exec 9>"$lock_file"
+	if ! flock --nonblock 9; then
+		echo "Error: another update, restart or serve-mode run is in progress (lock: $lock_file)." >&2
+		echo "       Wait for it to finish, then try again." >&2
+		exit 1
+	fi
+}
+
 wait_for_healthy() {
 	local service="$1"
 	local timeout="${2:-120}"

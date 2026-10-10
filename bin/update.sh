@@ -15,7 +15,10 @@ set -euo pipefail
 # Steps (top to bottom in this script):
 #
 #   1. git pull
-#        Pull the latest code from the repository.
+#        Pull the latest code from the repository. If that brought new
+#        commits, the script starts itself again so that the new version runs
+#        from here on. A lock keeps a second update, restart or serve-mode run
+#        from starting meanwhile.
 #
 #   2. ./bin/deploy/build.sh
 #        - ensure infrastructure (volumes, RAM disk, cron jobs)
@@ -156,9 +159,30 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
+# Only one update/restart/serve-mode run at a time (not needed for --dry-run
+# above, which changes nothing).
+acquire_deploy_lock
+
 # 1. Pull latest code from the repository.
 echo "Updating repository from Git..."
+HEAD_BEFORE=$(git rev-parse HEAD)
 git pull
+HEAD_AFTER=$(git rev-parse HEAD)
+
+# If the pull brought new commits, start over with the new version of this
+# script. bash has already read this file and helpers.sh, so without this the
+# *old* update.sh would carry on — calling the *new* build.sh, verify.sh and
+# friends, and using old helper functions. Whatever a commit changes across
+# those files would then be half applied on exactly the run that delivers it.
+#
+# `exec` replaces this process, so nothing below runs twice. The second pass
+# pulls again, finds nothing new and continues; UPDATE_REEXECUTED guards
+# against ever looping. The lock is taken again by the new process.
+if [ "$HEAD_BEFORE" != "$HEAD_AFTER" ] && [ -z "${UPDATE_REEXECUTED:-}" ]; then
+  echo "Repository updated (${HEAD_BEFORE:0:7} → ${HEAD_AFTER:0:7}) — restarting update.sh with the new version."
+  echo ""
+  UPDATE_REEXECUTED=1 exec "$PWD/bin/update.sh" "$@"
+fi
 
 # 2. Always run build.sh. Each of its steps is independently idempotent and
 #    cheap when nothing has changed:

@@ -141,7 +141,7 @@ One command updates everything — repository code, frontend, styles, Docker ima
 
 The script runs a safe two-phase update that keeps the tile server available throughout. Here are all the steps in order:
 
-**1. `git pull`** — pull the latest code.
+**1. `git pull`** — pull the latest code. If that brought new commits, the script starts itself again, so the new version of all scripts runs from here on. A lock makes sure only one of `update.sh`, `restart.sh` and `serve-mode.sh` runs at a time; a second one stops with a message.
 
 **2. `bin/deploy/build.sh`**
 - `bin/deploy/ensure.sh` — create volume directories, fix ownership, init RAM disk, configure cron jobs

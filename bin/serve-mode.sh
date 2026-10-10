@@ -28,6 +28,9 @@ case "$MODE" in
 	*) echo "Usage: $0 transient|local" >&2; exit 1 ;;
 esac
 
+# Only one update/restart/serve-mode run at a time.
+acquire_deploy_lock
+
 echo "Switching tile serving to '$MODE' mode..."
 docker compose run --rm download-updater "--mode=$MODE"
 
