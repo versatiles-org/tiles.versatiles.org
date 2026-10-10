@@ -1,3 +1,7 @@
+# check=skip=InvalidDefaultArgInFrom
+# ^ Build-check directive (must stay on the first line): VERSATILES_IMAGE has no
+#   default on purpose, see below; this silences the warning about that.
+
 # Source the versatiles binary from the official image. It is a static musl
 # binary, so it runs as-is when copied into the Alpine stage below — no shared
 # libraries to carry over. Used by update-tiles.sh to build derived datasets
