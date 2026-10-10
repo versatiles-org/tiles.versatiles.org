@@ -158,7 +158,7 @@ The script runs a safe two-phase update that keeps the tile server available thr
 
 **6. Reload tile server — local files.** Again a SIGHUP. Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
 
-**7. Reload nginx** — re-render the config templates and reload gracefully, which applies nginx config changes from step 1. If the nginx container itself is out of date — a new nginx image was pulled, or its definition in `compose.yaml` changed — it is recreated instead. That is the one step that cannot be done without a gap: only one container can hold ports 80/443, so new connections are refused until the replacement listens — about 3 seconds.
+**7. Reload nginx** — re-render the config templates, test the result with `nginx -t` and reload gracefully. This applies nginx config changes from step 1, both `nginx/nginx.conf` and the templates; an invalid config stops the update before it is loaded. If the nginx container itself is out of date — a new nginx image was pulled, or its definition in `compose.yaml` changed — it is recreated instead. That is the one step that cannot be done without a gap: only one container can hold ports 80/443, so new connections are refused until the replacement listens — about 3 seconds.
 
 **8. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 

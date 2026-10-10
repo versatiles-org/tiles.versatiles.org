@@ -279,9 +279,19 @@ service_is_running() {
 # the master and exits 0 even when the new config is invalid (nginx then keeps
 # running the old one), so without the test a broken template would go unnoticed
 # here.
+#
+# The reload also applies changes to nginx/nginx.conf: the container reads it
+# through the directory mount at /etc/nginx/repo (see nginx/nginx.stub.conf).
+# The cache-size script is sourced from that directory mount as well, because
+# its copy in /docker-entrypoint.d is a single-file mount that still shows the
+# file as it was when the container started. A container created before that
+# directory mount existed only has the copy in /docker-entrypoint.d.
 nginx_render_and_reload() {
-	docker compose exec -T nginx sh -c \
-		'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t && nginx -s reload'
+	docker compose exec -T nginx sh -c '
+		envsh=/etc/nginx/repo/docker-entrypoint.d/10-compute-cache-size.envsh
+		[ -f "$envsh" ] || envsh=/docker-entrypoint.d/10-compute-cache-size.envsh
+		. "$envsh"
+		/docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t && nginx -s reload'
 }
 
 # Recreate the nginx container from the image and definition in compose.yaml.

@@ -328,7 +328,10 @@ fi
 # -----------------------------------------------------------------------------
 echo ""
 echo "12. Checking nginx rate limit configuration..."
-RATE_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'rate=[0-9]*r/s' /etc/nginx/nginx.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+# `nginx -T` prints the whole configuration as nginx reads it, wherever the
+# individual files live.
+NGINX_CONFIG=$(docker compose exec -T nginx nginx -T 2>/dev/null || echo "")
+RATE_VALUE=$(echo "$NGINX_CONFIG" | grep -o 'rate=[0-9]*r/s' | head -n 1 | grep -o '[0-9]*' || echo "")
 if [ -n "$RATE_VALUE" ]; then
     if [ "$RATE_VALUE" -ge 50 ]; then
         pass "Rate limit: ${RATE_VALUE}r/s"
@@ -339,7 +342,7 @@ else
     warn "Could not read rate limit from nginx config"
 fi
 
-BURST_VALUE=$(docker compose exec -T nginx sh -c "grep -o 'burst=[0-9]*' /etc/nginx/conf.d/proxy.conf" 2>/dev/null | grep -o '[0-9]*' || echo "")
+BURST_VALUE=$(echo "$NGINX_CONFIG" | grep -o 'burst=[0-9]*' | head -n 1 | grep -o '[0-9]*' || echo "")
 if [ -n "$BURST_VALUE" ]; then
     if [ "$BURST_VALUE" -ge 200 ]; then
         pass "Burst limit: ${BURST_VALUE}"

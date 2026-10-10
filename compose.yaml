@@ -71,12 +71,19 @@ services:
     networks: [docker_network]
     ports: [80:80, 443:443]
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # nginx.conf reaches the container through the directory mount below, not
+      # as a single file: a single-file mount keeps showing the old content
+      # after `git pull` replaces the file. See nginx/nginx.stub.conf.
+      - ./nginx/nginx.stub.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/:/etc/nginx/repo/:ro
       - ./nginx/templates/:/etc/nginx/templates/:ro
       - ./volumes/cache/:/data/nginx/cache/:rw
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
+      # Run by the image's entrypoint at container start, which only looks in
+      # /docker-entrypoint.d — hence a single-file mount. A reload sources the
+      # current copy from /etc/nginx/repo instead (nginx_render_and_reload).
       - ./nginx/docker-entrypoint.d/10-compute-cache-size.envsh:/docker-entrypoint.d/10-compute-cache-size.envsh:ro
     security_opt:
       - no-new-privileges:true

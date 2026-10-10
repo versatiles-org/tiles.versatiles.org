@@ -67,8 +67,9 @@ set -euo pipefail
 #        healthy.
 #
 #   7. reload nginx
-#        Applies nginx config changes pulled in step 1 by re-rendering the
-#        templates, then a graceful `nginx -s reload`. If the nginx container
+#        Applies nginx config changes pulled in step 1 — nginx/nginx.conf and
+#        the templates — by re-rendering the templates, testing the result
+#        with `nginx -t` and then a graceful `nginx -s reload`. If the nginx container
 #        itself is out of date (new image, changed definition in compose.yaml)
 #        it is recreated instead, on both paths — the one step that refuses
 #        connections for a moment. nginx follows the tile server through
