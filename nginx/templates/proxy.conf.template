@@ -41,6 +41,15 @@ map $status $browser_cache_control {
    default "no-store";
 }
 
+# Rate-limited requests (429, see limit_req below) tell the client when to come
+# back. The limit is per second, so one second is enough for the bucket to drain
+# a good part of its burst. Empty for every other status — nginx sends no header
+# for an empty value.
+map $status $retry_after {
+   429     1;
+   default "";
+}
+
 upstream versatiles_backend {
    server versatiles:8080;
    keepalive 16;
@@ -104,11 +113,14 @@ server {
    # all of these inherited headers (HSTS, CORS, etc.) for that location.
    add_header Cache-Control $browser_cache_control always;
 
+   # Only set on 429 responses (see $retry_after map).
+   add_header Retry-After $retry_after always;
+
    # CORS headers
    add_header 'Access-Control-Allow-Origin' '*' always;
    add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
    add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-None-Match,If-Modified-Since,Cache-Control,Content-Type,Range,Accept-Encoding' always;
-   add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range,Etag,Last-Modified,Content-Encoding' always;
+   add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range,Etag,Last-Modified,Content-Encoding,Retry-After' always;
 
    location /.well-known/acme-challenge/ {
       root /var/www/certbot;
