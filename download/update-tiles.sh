@@ -233,10 +233,14 @@ check_local_files() {
 # ---------------------------------------------------------------------------
 
 # Removes leftover temp/control files from interrupted downloads (aria2c) and
-# VPL builds (versatiles convert writes <file>.tmp.versatiles).
+# VPL builds. A build is asked to write <name>.tmp.versatiles; versatiles 5
+# itself writes to a hidden .<output>.tmp beside the output first and renames it
+# when complete, so an interrupted build leaves that hidden file behind — for
+# satellite that is hundreds of GB on a disk that cannot hold two copies. The
+# hidden pattern needs its own glob: `*` does not match names starting with a dot.
 cleanup_temp_files() {
 	local entry
-	for entry in "$TILES_FOLDER"/*.download "$TILES_FOLDER"/*.aria2 "$TILES_FOLDER"/*.tmp.versatiles; do
+	for entry in "$TILES_FOLDER"/*.download "$TILES_FOLDER"/*.aria2 "$TILES_FOLDER"/*.tmp.versatiles "$TILES_FOLDER"/.*.tmp; do
 		[ -e "$entry" ] || continue
 		echo " - Cleaning up temp file: $(basename "$entry")"
 		rm -f "$entry"
