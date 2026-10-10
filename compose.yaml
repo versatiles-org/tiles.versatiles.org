@@ -42,7 +42,7 @@ services:
 
   nginx:
     container_name: nginx
-    image: nginx:1.28-alpine
+    image: nginx:1.31-alpine
     restart: always
     depends_on:
       versatiles:
