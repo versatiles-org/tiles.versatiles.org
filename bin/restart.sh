@@ -35,9 +35,10 @@ set -euo pipefail
 #        Needed solely for a new base image or changed ports/volumes/env/logging
 #        — a reload already applies config, template and certificate changes.
 #        This is the one step with unavoidable downtime: only one container can
-#        hold the published ports, so :80/:443 are unbound for a moment (well
-#        under a second in tests) and connections are refused until the
-#        replacement listens. It runs last, so that is the only such window.
+#        hold the published ports, so :80/:443 are unbound and new connections
+#        are refused until the replacement listens — about 3 seconds (see
+#        recreate_nginx in helpers.sh). It runs last, so that is the only such
+#        window.
 # =============================================================================
 
 cd "$(dirname "$0")/.."
@@ -75,9 +76,7 @@ fi
 # 3. Optional nginx container replacement. A recreate re-renders the templates
 #    at entrypoint, so it needs no reload afterwards.
 if [ "$WITH_NGINX" = "true" ]; then
-	echo "Recreating the nginx container (ports briefly unavailable)..."
-	docker compose up --detach --force-recreate nginx
-	wait_for_healthy nginx
+	recreate_nginx
 fi
 
 echo ""

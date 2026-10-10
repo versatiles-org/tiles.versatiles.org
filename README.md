@@ -158,13 +158,13 @@ The script runs a safe two-phase update that keeps the tile server available thr
 
 **6. Reload tile server — local files.** Again a SIGHUP. Datasets are now served from local disk at full speed (satellite still reads its high zoom levels from the CDN).
 
-**7. Reload nginx** — re-render the config templates and reload gracefully, which applies nginx config changes from step 1. On this path the nginx container is also recreated if a new nginx image or a changed `compose.yaml` is pending (a moment of refused connections).
+**7. Reload nginx** — re-render the config templates and reload gracefully, which applies nginx config changes from step 1. If the nginx container itself is out of date — a new nginx image was pulled, or its definition in `compose.yaml` changed — it is recreated instead. That is the one step that cannot be done without a gap: only one container can hold ports 80/443, so new connections are refused until the replacement listens — about 3 seconds.
 
 **8. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
 **9. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
 
-**Without new tile data** (prepare exited 2), steps 4–6 are skipped. nginx is reloaded in place (7), and the tile server container is replaced if it needs to be — see below — followed by the cache clear (8) and the verification (9). A pending change to the nginx container is only reported in this case, with the command to apply it.
+**Without new tile data** (prepare exited 2), steps 4–6 are skipped. nginx is reloaded or recreated as in step 7, and the tile server container is replaced if it needs to be — see below — followed by the cache clear (8) and the verification (9).
 
 **When the tile server container is replaced instead of reloaded.** A SIGHUP only re-reads `versatiles.yaml`. The container is replaced when
 
@@ -218,7 +218,7 @@ The default path keeps :80/:443 bound the whole time, so no client gets a refuse
 
 Use it when the tile server must re-read something it only reads at startup. `./bin/update.sh` does this on its own when it is needed; `restart.sh` is for doing it by hand.
 
-`--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound for a moment (well under a second in tests). It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:`/`logging:` — config, template and certificate changes are all applied by a graceful reload. `./bin/update.sh` tells you when such a change is pending.
+`--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound until the replacement listens (about 3 seconds). It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:`/`logging:` — config, template and certificate changes are all applied by a graceful reload. `./bin/update.sh` recreates the nginx container on its own when it is out of date, so this option is for doing it by hand.
 
 Because two tile server containers can exist for a moment, the tile server has no fixed container name. Address it by service: `docker compose exec versatiles versatiles --version`, `docker compose logs versatiles`.
 

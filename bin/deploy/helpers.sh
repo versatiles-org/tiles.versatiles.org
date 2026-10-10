@@ -191,7 +191,9 @@ up_with_config_fallback() {
 
 	local before after
 	before=$(docker compose ps -q "$service" 2>/dev/null || echo "")
-	docker compose up --detach "$service"
+	# --timeout 3: if this recreates the container, do not wait Docker's default
+	# 10s for the old one to stop (see recreate_nginx).
+	docker compose up --detach --timeout 3 "$service"
 	after=$(docker compose ps -q "$service" 2>/dev/null || echo "")
 
 	if [ -z "$before" ] || [ "$before" != "$after" ]; then
@@ -254,6 +256,29 @@ service_is_running() {
 nginx_render_and_reload() {
 	docker compose exec -T nginx sh -c \
 		'. /docker-entrypoint.d/10-compute-cache-size.envsh; /docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t && nginx -s reload'
+}
+
+# Recreate the nginx container from the image and definition in compose.yaml.
+# Needed for a new nginx image or a changed definition (ports, mounts, env,
+# logging, …); a reload cannot apply those.
+#
+# This is the one operation that cannot be done without a gap: only one
+# container can hold the host's ports 80/443, and nginx stops accepting
+# connections the moment it is told to stop. New connections are refused until
+# the replacement listens — about 3 seconds.
+#
+#   --no-deps   do not let compose touch the tile server as nginx's dependency;
+#               it is replaced separately, without a gap (replace_tile_server).
+#   --force-recreate   the caller has decided; this also covers a newer image
+#               under an unchanged tag.
+#   --timeout 3   how long the *old* container may take to stop. Compose would
+#               otherwise use the timeout the old container was created with —
+#               not the stop_grace_period now in compose.yaml — which for a
+#               container from before that setting is Docker's default of 10s.
+recreate_nginx() {
+	echo "Recreating the nginx container — new connections are refused for a few seconds."
+	docker compose up --detach --no-deps --force-recreate --timeout 3 nginx
+	wait_for_healthy nginx
 }
 
 # Apply nginx config changes without risking a container recreate.

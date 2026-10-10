@@ -65,11 +65,11 @@ set -euo pipefail
 #
 #   7. reload nginx
 #        Applies nginx config changes pulled in step 1 by re-rendering the
-#        templates, then a graceful `nginx -s reload`. On Path A the nginx
-#        container is recreated if it is out of date (brief refused
-#        connections); on Path B it is only reported. nginx follows the tile
-#        server through Docker's DNS, so it needs no reload for a new tile
-#        server container.
+#        templates, then a graceful `nginx -s reload`. If the nginx container
+#        itself is out of date (new image, changed definition in compose.yaml)
+#        it is recreated instead, on both paths — the one step that refuses
+#        connections for a moment. nginx follows the tile server through
+#        Docker's DNS, so it needs no reload for a new tile server container.
 #
 #   8. ./bin/ramdisk/clear.sh
 #        Drops the tile cache so clients don't get cached responses for
@@ -92,8 +92,8 @@ set -euo pipefail
 #     1 → 2 → 3 → 7 → 9   (plus 6 and 8 when the tile server must be replaced)
 #     Steps 4 and 5 are skipped: tile data is already current. Step 7 always
 #     runs and comes first here, because nginx config arrives with step 1 and
-#     nothing else would apply it; it reloads in place and never recreates the
-#     nginx container (a pending nginx image is reported instead). The tile
+#     nothing else would apply it; it reloads in place, or recreates the nginx
+#     container if that is out of date. The tile
 #     server container is replaced (6) when step 2 fetched a new frontend or
 #     styles bundle, or when the container is out of date — a new image or a
 #     changed compose.yaml — and the cache is cleared afterwards (8).
@@ -240,10 +240,23 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   # this repo's git HEAD, which neither $ASSETS_CHANGED nor the prepare exit
   # code tracks. Without this, a config change pulled in step 1 (a new redirect,
   # a cache rule) would sit dormant until the next run that happens to touch
-  # tile data. Reloading in place is graceful and drops nothing.
-  echo "Reloading nginx..."
-  reload_nginx_in_place
-  wait_for_healthy nginx
+  # tile data.
+  #
+  # Normally that is a reload in place, which is graceful and drops nothing.
+  # If the nginx container itself is out of date — a new image pulled in step 2,
+  # or a changed definition in compose.yaml — it is recreated instead, which
+  # also renders the templates. Unlike the tile server it cannot be swapped
+  # without a gap: only one container can hold ports 80/443, so new connections
+  # are refused for about 3 seconds (see recreate_nginx in helpers.sh). That is
+  # accepted here so that a pending image never stays unapplied.
+  if service_is_running nginx && service_has_pending_change nginx; then
+    echo "The nginx container is out of date (new image or changed compose definition)."
+    recreate_nginx
+  else
+    echo "Reloading nginx..."
+    reload_nginx_in_place
+    wait_for_healthy nginx
+  fi
 
   # The tile server. Even without new tile data there are two reasons to replace
   # its container:
@@ -270,18 +283,6 @@ if [ $PREPARE_EXIT -eq 2 ]; then
   if [ "$TILE_SERVER_REPLACED" = "true" ]; then
     echo "Clearing cache data..."
     ./bin/ramdisk/clear.sh
-  fi
-
-  # The nginx container itself is not replaced here, only reported. Unlike the
-  # tile server it cannot be swapped without a gap: only one container can hold
-  # ports 80/443, so they are unbound for a moment and connections are refused.
-  # That is not worth it on a run where nothing else happened; the operator
-  # decides when.
-  if service_has_pending_change nginx; then
-    echo ""
-    echo "NOTE: the nginx container is out of date (new image or changed compose definition)."
-    echo "      It was NOT replaced, because that refuses connections for a moment."
-    echo "      Apply it when convenient with:  ./bin/restart.sh --with-nginx"
   fi
 
   echo ""
@@ -314,7 +315,7 @@ wait_for_healthy versatiles
 # Apply the nginx config pulled in step 1 (re-render the templates, graceful
 # reload). On this path the nginx container is also recreated if it is out of
 # date (new base image, changed compose definition): a data update is a
-# maintenance moment anyway, and the recreate costs well under a second of
+# maintenance moment anyway, and the recreate costs about 3 seconds of
 # refused connections. nginx finds the tile server through Docker's DNS, so it
 # needs no reload just because the tile server container changed.
 echo "Reloading nginx..."

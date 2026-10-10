@@ -58,6 +58,11 @@ services:
   nginx:
     container_name: nginx
     logging: *logging
+    # nginx gets SIGQUIT (graceful) and stops accepting connections at once;
+    # nginx.conf's worker_shutdown_timeout (1s) makes it exit within about 2s.
+    # This is the backstop if it does not. Docker's default of 10s meant 11 seconds with
+    # nothing listening on 80/443 whenever the container was replaced.
+    stop_grace_period: 3s
     image: nginx:1.31-alpine
     restart: always
     depends_on:
