@@ -26,7 +26,7 @@ The inputs are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (ea
 
 **Derived datasets** (configured in [`download/sources.json`](download/sources.json), see [`download/README.md`](download/README.md)):
 
-- `/tiles/satellite/` — too large to mirror in full (~2 TB), so only z0–15 is kept locally (~700 GB) and z16+ is served straight from the CDN, stacked via a VPL pipeline.
+- `/tiles/satellite/` — too large to mirror in full (about 1.7 TB), so only zoom levels 0–16 are kept locally (several hundred GB) and levels 17 and up are served straight from the CDN, stacked via a VPL pipeline.
 - `/tiles/osm/` — served from the prebuilt **`osm-landcover.versatiles`** on the CDN (osm + landcover merged upstream, attribution baked in). It's a plain mirror under a remapped name; `landcover-vectors` is **not** served on its own.
 
 ## Volume Directories
@@ -37,7 +37,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 |--------------------------------|---------------------------------------|-------|-------------|------------------|-------------------|
 | `volumes/tiles/`               | Downloaded `.versatiles` tile files   | rw/ro | `1001:1001` | download-updater | versatiles        |
 | `volumes/versatiles_conf/`     | Generated `versatiles.yaml` (+ `.vpl`) | rw/ro | `1001:1001` | download-updater | versatiles        |
-| `volumes/frontend/`            | Built frontend assets (HTML, JS, CSS) | ro    | root        | Host scripts     | versatiles        |
+| `volumes/frontend/`            | Frontend and styles bundles (two tar files) | ro | root       | Host scripts     | versatiles        |
 | `volumes/cache/`               | Nginx tile cache (RAM disk / tmpfs)   | rw    | root        | nginx (UID 101)  | nginx             |
 | `volumes/certbot-cert/`        | Let's Encrypt certificates            | rw    | root        | certbot          | —                 |
 | `volumes/certbot-www/`         | ACME challenge files                  | rw/ro | root        | certbot          | nginx             |
@@ -122,7 +122,7 @@ Edit `.env` to configure:
 | `DOMAIN_NAME`  | Tiles domain                                      | tiles.versatiles.org         |
 | `RAM_DISK_GB`  | RAM disk size for caching                         | 4                            |
 | `EMAIL`        | Email for Let's Encrypt                           | mail@versatiles.org          |
-| `CDN_BASE_URL` | CDN hosting the tile data (optional, has default) | https://download.versatiles.org |
+| `CDN_BASE_URL` | Where the tile data comes from (optional, defaults to `https://cdn.versatiles.cloud`, the storage bucket itself) | https://cdn.versatiles.cloud |
 | `TILES_DIR`    | Tile data directory — relocate to another filesystem if needed (optional, defaults to `./volumes/tiles`) | /mnt/bigdisk/tiles |
 
 No credentials are required — the tile data is fetched from the public CDN.

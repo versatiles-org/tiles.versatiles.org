@@ -5,8 +5,9 @@ set -euo pipefail
 #
 # Exit codes:
 #   0  → frontend already up to date (no download)
-#   10 → frontend was downloaded/updated (the caller must reload versatiles and
-#        clear the nginx cache, otherwise the old frontend keeps being served)
+#   10 → frontend was downloaded/updated (the caller must replace the tile
+#        server container, which reads the tar only at startup, and clear the
+#        nginx cache — otherwise the old frontend keeps being served)
 
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
@@ -58,5 +59,6 @@ mv "$TMP_FILE" "$FRONTEND_FILE"
 echo "$LATEST_TAG" >"$TAG_FILE"
 echo "Frontend updated to $LATEST_TAG"
 
-# Signal to the caller that the frontend changed and a reload + cache clear is needed.
+# Signal to the caller that the frontend changed: the tile server container
+# must be replaced and the cache cleared.
 exit 10

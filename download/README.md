@@ -28,11 +28,11 @@ so a plain mirrored dataset is a one-liner:
 [
   { "name": "elevation" },                       // mirror → serve local file → CDN while updating
 
-  { "name": "satellite",                         // keep only z0–15 locally, stack the CDN on top
+  { "name": "satellite",                         // keep only z0–16 locally, stack the CDN on top
     "build":        { "kind": "vpl",
-                      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=15" },
+                      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=16" },
     "serveCurrent": { "kind": "vpl",
-                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=15, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=16 ]" } },
+                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]" } },
 
   { "name": "osm", "source": "osm-landcover" }   // serve as 'osm', mirror the prebuilt osm-landcover.versatiles
 ]

@@ -5,8 +5,9 @@ set -euo pipefail
 #
 # Exit codes:
 #   0  → styles already up to date (no download)
-#   10 → styles were downloaded/updated (the caller must reload versatiles and
-#        clear the nginx cache, otherwise the old styles keep being served)
+#   10 → styles were downloaded/updated (the caller must replace the tile
+#        server container, which reads the tar only at startup, and clear the
+#        nginx cache — otherwise the old styles keep being served)
 
 # Navigate to the project's root directory relative to this script.
 cd "$(dirname "$0")/../.."
@@ -58,5 +59,6 @@ mv "$TMP_FILE" "$STYLES_FILE"
 echo "$LATEST_TAG" >"$TAG_FILE"
 echo "Styles updated to $LATEST_TAG"
 
-# Signal to the caller that the styles changed and a reload + cache clear is needed.
+# Signal to the caller that the styles changed: the tile server container must
+# be replaced and the cache cleared.
 exit 10
