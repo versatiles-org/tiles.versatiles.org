@@ -297,6 +297,6 @@ docker compose run --rm download-updater --mode=check   # report only, no change
 
 Before submitting a PR, run the same checks as CI (`.github/workflows/ci.yml`):
 
-1. ShellCheck passes: `shellcheck bin/**/*.sh download/update-tiles.sh`
+1. ShellCheck passes: `git ls-files -z '*.sh' '*.envsh' | xargs -0 shellcheck`
 2. Docker compose validates: `cp template.env .env && docker compose config --quiet`
 3. YAML lints cleanly: `yamllint compose.yaml`

@@ -15,10 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: ShellCheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: ./bin
-          additional_files: update-tiles.sh
+        # Lints every tracked shell script, wherever it lives (bin/, download/,
+        # nginx/docker-entrypoint.d/). ShellCheck is preinstalled on the runner.
+        run: |
+          shellcheck --version
+          git ls-files -z '*.sh' '*.envsh' | xargs -0 shellcheck
 
   docker:
     runs-on: ubuntu-latest
