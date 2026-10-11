@@ -231,10 +231,6 @@ server {
 	#   /assets/sprites/…           sprite sheets (index.json lists them)
 	#   /assets/styles/…            styles
 
-	location /editor {
-		return 301 https://versatiles.org/editor;
-	}
-
 	location ~ ^/maplibre/(.*)$ {
 		return 301 /assets/lib/maplibre-gl/$1;
 	}
