@@ -43,6 +43,7 @@ All persistent data is stored under `./volumes/` and bind-mounted into Docker co
 | `volumes/certbot-www/`         | ACME challenge files                  | rw/ro | root        | certbot          | nginx             |
 | `volumes/nginx-cert/`          | SSL certs copied for nginx            | ro    | root        | Host scripts     | nginx             |
 | `volumes/nginx-log/`           | Nginx access/error logs               | rw    | root        | nginx (UID 101)  | Host scripts      |
+| `volumes/static/`              | `version.json`, served by nginx as `/version.json` | ro | root   | Host scripts     | nginx             |
 
 **Mode** shows container mount modes. `rw/ro` means the writer mounts read-write, readers mount read-only.
 
@@ -168,9 +169,11 @@ The script runs a safe two-phase update that keeps the tile server available thr
 
 **8. `bin/ramdisk/clear.sh`** — flush the nginx RAM disk cache so stale tiles are not served.
 
-**9. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
+**9. `bin/deploy/write_version.sh`** — write `volumes/static/version.json` with the versions now deployed (see [Which versions are running](#which-versions-are-running)).
 
-**Without new tile data** (prepare exited 2), steps 4–6 are skipped. nginx is reloaded or recreated as in step 7, and the tile server container is replaced if it needs to be — see below — followed by the cache clear (8) and the verification (9).
+**10. `bin/verify.sh`** — smoke-test the live endpoints to confirm the deployment succeeded.
+
+**Without new tile data** (prepare exited 2), steps 4–6 are skipped. nginx is reloaded or recreated as in step 7, and the tile server container is replaced if it needs to be — see below — followed by the cache clear (8), the version file (9) and the verification (10).
 
 **When the tile server container is replaced instead of reloaded.** A SIGHUP only re-reads `versatiles.yaml`. The container is replaced when
 
@@ -231,6 +234,21 @@ Because two tile server containers can exist for a moment, the tile server has n
 ### Upgrading versatiles
 
 The tile server follows the moving tag `versatiles/versatiles:latest` in `compose.yaml`. That one line also sets the version of the `versatiles` binary inside the `download-updater` image, so the server and the pipeline always run the same release. `bin/update.sh` pulls images on every run and replaces the tile server container without a gap whenever a new image arrived, so upgrades happen automatically — including major releases. Check the "Upgrading" notes of new major releases and, if something breaks, pin the tag in `compose.yaml` to the last known-good version (`versatiles/versatiles:vX.Y.Z`) and run `./bin/update.sh` to roll back.
+
+### Which versions are running
+
+`https://<domain>/version.json` tells which tile server, frontend and styles release a server runs, and when it was last updated:
+
+```json
+{
+  "versatiles": "5.1.0",
+  "frontend": "v3.16.1",
+  "styles": "v6.2.0",
+  "updated": "2026-10-19T08:00:00Z"
+}
+```
+
+The file is written by `bin/deploy/write_version.sh` at the end of `update.sh`, `setup.sh` and `restart.sh` and served by nginx straight from `volumes/static/` — not through the tile server or the proxy cache, and with `Cache-Control: no-cache`, so it is never stale. `"versatiles"` is `null` when no tile server container was running at the time.
 
 ### Certificate Renewal
 

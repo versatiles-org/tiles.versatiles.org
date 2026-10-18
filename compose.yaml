@@ -82,6 +82,9 @@ services:
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - ./volumes/nginx-cert/:/etc/nginx/ssl/:ro
       - ./volumes/nginx-log/:/var/log/nginx/:rw
+      # Small files nginx serves itself, bypassing the tile server and its
+      # cache: version.json, written by bin/deploy/write_version.sh.
+      - ./volumes/static/:/var/www/static/:ro
       # Run by the image's entrypoint at container start, which only looks in
       # /docker-entrypoint.d — hence a single-file mount. A reload sources the
       # current copy from /etc/nginx/repo instead (nginx_render_and_reload).

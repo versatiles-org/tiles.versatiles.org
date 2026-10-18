@@ -79,7 +79,11 @@ set -euo pipefail
 #        Drops the tile cache so clients don't get cached responses for
 #        tiles whose underlying file has just been replaced.
 #
-#   9. ./bin/verify.sh
+#   9. ./bin/deploy/write_version.sh
+#        Writes volumes/static/version.json (tile server, frontend and styles
+#        versions), which nginx serves as /version.json.
+#
+#  10. ./bin/verify.sh
 #        Post-deploy smoke test (HTTP/HTTPS endpoints, certs, configs).
 #
 # -----------------------------------------------------------------------------
@@ -87,13 +91,13 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 #
 #   Path A — files changed (prepare exits 0):
-#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+#     1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 #     The tile server is reloaded twice (transitional config, then final).
 #     In between, stale tilesets are served from the CDN so there is no
 #     outage.
 #
 #   Path B — no new tile data (prepare exits 2):
-#     1 → 2 → 3 → 7 → 9   (plus 6 and 8 when the tile server must be replaced)
+#     1 → 2 → 3 → 7 → 9 → 10   (plus 6 and 8 when the tile server must be replaced)
 #     Steps 4 and 5 are skipped: tile data is already current. Step 7 always
 #     runs and comes first here, because nginx config arrives with step 1 and
 #     nothing else would apply it; it reloads in place, or recreates the nginx
@@ -101,7 +105,7 @@ set -euo pipefail
 #     server container is replaced (6) when step 2 fetched a new frontend or
 #     styles bundle, or when the container is out of date — a new image or a
 #     changed compose.yaml — and the cache is cleared afterwards (8).
-#     Verification (9) catches infra drift (expired certs, etc).
+#     Verification (10) catches infra drift (expired certs, etc).
 #
 #   Path C — error during prepare (exit 1):
 #     1 → 2 → 3 → abort. No restart, no config change.
@@ -310,6 +314,8 @@ if [ $PREPARE_EXIT -eq 2 ]; then
     ./bin/ramdisk/clear.sh
   fi
 
+  ./bin/deploy/write_version.sh
+
   echo ""
   echo "Running verification..."
   ./bin/verify.sh
@@ -350,6 +356,9 @@ wait_for_healthy nginx
 # Clear cache data
 echo "Clearing cache data..."
 ./bin/ramdisk/clear.sh
+
+# Publish what is now deployed as /version.json
+./bin/deploy/write_version.sh
 
 # Verify deployment
 echo ""

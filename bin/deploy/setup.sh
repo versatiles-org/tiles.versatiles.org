@@ -170,7 +170,10 @@ wait_for_healthy nginx
 echo "Creating Let's Encrypt certificates..."
 ./bin/cert/create_valid.sh "$DOMAIN_NAME"
 
-# 6. Verify deployment
+# 6. Publish the deployed versions as /version.json
+./bin/deploy/write_version.sh
+
+# 7. Verify deployment
 echo ""
 echo "Running verification..."
 ./bin/verify.sh

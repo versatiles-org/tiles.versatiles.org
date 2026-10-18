@@ -308,6 +308,25 @@ server {
 		return 301 /assets/styles/$1/style.json$is_args$args;
 	}
 
+   # Which versions are deployed (tile server, frontend, styles). Written by
+   # bin/deploy/write_version.sh after every update, served straight from disk —
+   # not via the tile server, not via the proxy cache. `no-cache` makes browsers
+   # revalidate on every request (nginx answers 304 via Last-Modified while the
+   # file is unchanged — ETags are off server-wide), so the answer is never stale.
+   #
+   # An add_header here drops every server-level add_header for this location
+   # (nginx inherits them all or none), so the security and CORS headers from
+   # above are repeated.
+   location = /version.json {
+      root /var/www/static;
+      add_header Cache-Control "no-cache" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
+   }
+
    location / {
       limit_req zone=tiles burst=1000 nodelay;
       proxy_pass            http://versatiles_backend;

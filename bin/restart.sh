@@ -31,7 +31,10 @@ set -euo pipefail
 #   2. clear the cache (unless --keep-cache)
 #        After the swap, so clients get what the new tile server holds.
 #
-#   3. (--with-nginx only) recreate the nginx container
+#   3. rewrite volumes/static/version.json (bin/deploy/write_version.sh)
+#        So /version.json names the tile server version that is serving now.
+#
+#   4. (--with-nginx only) recreate the nginx container
 #        Needed solely for a new base image or changed ports/volumes/env/logging
 #        — a reload already applies config, template and certificate changes.
 #        This is the one step with unavoidable downtime: only one container can
@@ -76,7 +79,10 @@ else
 	./bin/ramdisk/clear.sh
 fi
 
-# 3. Optional nginx container replacement. A recreate re-renders the templates
+# 3. /version.json reflects the tile server that is serving now.
+./bin/deploy/write_version.sh
+
+# 4. Optional nginx container replacement. A recreate re-renders the templates
 #    at entrypoint, so it needs no reload afterwards.
 if [ "$WITH_NGINX" = "true" ]; then
 	recreate_nginx

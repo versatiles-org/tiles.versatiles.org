@@ -22,6 +22,7 @@ mkdir -p \
 	volumes/nginx-cert \
 	volumes/nginx-log \
 	volumes/frontend volumes/cache \
+	volumes/static \
 	volumes/versatiles_conf \
 	"$TILES_DIR"
 

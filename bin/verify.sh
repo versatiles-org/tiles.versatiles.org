@@ -189,6 +189,12 @@ expect_200 "MapLibre GL JS"  "/assets/lib/maplibre-gl/maplibre-gl.js"
 expect_200 "Font list"       "/assets/glyphs/index.json"
 expect_200 "Glyphs"          "/assets/glyphs/noto_sans_regular/0-255.pbf"
 expect_200 "Sprite sheet"    "/assets/sprites/base.json"
+VERSION_URL="${BASE}/version.json"
+if curl -s --max-time 30 ${CURL_TLS[@]+"${CURL_TLS[@]}"} "$VERSION_URL" 2>/dev/null | python3 -m json.tool >/dev/null 2>&1; then
+    pass "version.json is valid"
+else
+    fail "version.json is invalid or missing ($VERSION_URL)"
+fi
 
 # -----------------------------------------------------------------------------
 echo ""
