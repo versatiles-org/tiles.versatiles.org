@@ -24,8 +24,8 @@ set -euo pipefail
 #        - ensure infrastructure (volumes, RAM disk, cron jobs)
 #        - fetch latest versatiles-frontend release (HEAD-checked)
 #        - fetch latest versatiles-style release (HEAD-checked)
-#        - docker compose pull (versatiles, nginx base images)
-#        - docker compose build download-updater (uses layer cache)
+#        - docker compose --profile donotstart pull (versatiles, nginx, certbot)
+#        - docker compose build --pull download-updater (uses layer cache)
 #        Always runs: each sub-step has its own idempotent freshness check.
 #        We can't condition on "no new git commits" because frontend, styles,
 #        and the published Docker images all release independently of this
@@ -190,7 +190,7 @@ fi
 #      - bin/frontend/update.sh and bin/styles/update.sh check the latest
 #        GitHub release tag via a HEAD request and only download on a change
 #      - `docker compose pull` is a no-op when the registry hasn't moved
-#      - `docker compose build download-updater` uses the layer cache
+#      - `docker compose build --pull download-updater` uses the layer cache
 #    None of these track this repo's git HEAD, so we cannot use "no new
 #    commits" as a skip signal — that would miss external releases of
 #    versatiles-frontend, versatiles-style, the versatiles binary image,

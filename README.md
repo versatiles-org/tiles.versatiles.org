@@ -153,8 +153,8 @@ The script runs a safe two-phase update that keeps the tile server available thr
 - `bin/deploy/ensure.sh` — create volume directories, fix ownership, init RAM disk, configure cron jobs
 - `bin/frontend/update.sh` — fetch latest frontend assets
 - `bin/styles/update.sh` — fetch latest map styles
-- `docker compose pull` — pull latest Docker images
-- `docker compose build download-updater` — rebuild the download-updater image
+- `docker compose --profile donotstart pull` — pull the latest images for all services, including certbot (a plain `pull` skips profiled services)
+- `docker compose build --pull download-updater` — rebuild the download-updater image on fresh base images
 
 **3. download-updater `--mode=prepare`** (Phase 1) — compares each dataset against the CDN and writes a *transitional* `versatiles.yaml`. A stale dataset keeps serving its **old local file** while it's rebuilt, as long as that file exists and the build is atomic (mirror: download to temp → rename); only datasets with no local file, or a delete-old-first build (e.g. satellite), point at the CDN during the update. Downloads nothing. **Exits 0** if anything needs updating, or **exits 2** if all tile data is already current (see "Without new tile data" below). Mode, comparison, and exit-code details: [`download/README.md`](download/README.md).
 

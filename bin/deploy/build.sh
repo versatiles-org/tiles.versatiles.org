@@ -49,13 +49,17 @@ run_asset_update "frontend update" ./bin/frontend/update.sh
 echo "Fetching styles..."
 run_asset_update "styles update" ./bin/styles/update.sh
 
-# Pull Docker images
+# Pull Docker images. `--profile donotstart` includes certbot: without it,
+# compose only pulls the services it would start, so a pinned tag that moved
+# (or a bumped pin) would never reach the certbot container.
 echo "Pulling Docker images..."
-docker compose pull
+docker compose --profile donotstart pull
 
-# Build custom images
+# Build custom images. `--pull` refreshes the base images the Dockerfile names
+# (alpine:3 and the pinned versatiles image) instead of reusing whatever is
+# cached locally, so the updater does not fall behind the moving alpine tag.
 echo "Building Docker images..."
-docker compose build download-updater
+docker compose build --pull download-updater
 
 # Propagate the asset-changed signal so the caller can reload + clear cache.
 if [ "$ASSETS_CHANGED" = "true" ]; then
