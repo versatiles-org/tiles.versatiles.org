@@ -230,9 +230,7 @@ Because two tile server containers can exist for a moment, the tile server has n
 
 ### Upgrading versatiles
 
-The tile server version is pinned in `compose.yaml` (`image: … versatiles/versatiles:vX.Y.Z`). That one line also sets the version of the `versatiles` binary inside the `download-updater` image, so the server and the pipeline always run the same release. Because `bin/update.sh` pulls images, a moving tag such as `latest` would upgrade production without anyone deciding to — hence the pin.
-
-To upgrade, change the tag in `compose.yaml` (Dependabot opens a pull request for new releases) and run `./bin/update.sh`, which replaces the tile server container with the new version without a gap. Minor and patch releases can go straight in. For a new **major** release, read its "Upgrading" release notes and try it on a test server first: the server starts with the generated `versatiles.yaml`, a SIGHUP reload works (`./bin/serve-mode.sh`), tiles and the frontend are served, and the pipeline's `versatiles convert` build still produces the derived datasets.
+The tile server follows the moving tag `versatiles/versatiles:latest` in `compose.yaml`. That one line also sets the version of the `versatiles` binary inside the `download-updater` image, so the server and the pipeline always run the same release. `bin/update.sh` pulls images on every run and replaces the tile server container without a gap whenever a new image arrived, so upgrades happen automatically — including major releases. Check the "Upgrading" notes of new major releases and, if something breaks, pin the tag in `compose.yaml` to the last known-good version (`versatiles/versatiles:vX.Y.Z`) and run `./bin/update.sh` to roll back.
 
 ### Certificate Renewal
 

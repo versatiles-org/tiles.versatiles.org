@@ -16,11 +16,12 @@ services:
     # (replace_tile_server in bin/deploy/helpers.sh), and a fixed name would
     # forbid that. Address it by service: `docker compose exec versatiles …`.
     logging: *logging
-    # Pinned on purpose: `bin/update.sh` runs `docker compose pull`, so a moving
-    # tag would upgrade production unreviewed. This is the only place the
-    # version is set — download-updater takes its versatiles binary from the
-    # same image via the anchor below, so the two can never drift apart.
-    image: &versatiles_image versatiles/versatiles:v5.0.0
+    # Moving tag on purpose: `bin/update.sh` runs `docker compose pull`, so every
+    # update picks up the newest versatiles release and replaces the container.
+    # This is the only place the image is set — download-updater takes its
+    # versatiles binary from the same image via the anchor below, so the two
+    # can never drift apart.
+    image: &versatiles_image versatiles/versatiles:latest
     restart: always
     networks: [docker_network]
     expose: [8080]

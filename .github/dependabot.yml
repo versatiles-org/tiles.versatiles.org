@@ -15,11 +15,11 @@ updates:
         patterns:
           - "*"
 
-  # Image tags in compose.yaml (versatiles, nginx, certbot). The versatiles pin
-  # there also sets the version used by the download-updater image.
-  # Deliberately not grouped: these are three unrelated services with different
-  # risks, so each image gets a pull request of its own that can be tested,
-  # merged or left open independently (see "Upgrading versatiles" in the README).
+  # Image tags in compose.yaml (nginx, certbot). versatiles uses the moving
+  # `latest` tag and is not managed here (see "Upgrading versatiles" in the
+  # README). Deliberately not grouped: these are unrelated services with
+  # different risks, so each image gets a pull request of its own that can be
+  # tested, merged or left open independently.
   - package-ecosystem: docker-compose
     directory: /
     schedule:

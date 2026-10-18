@@ -56,7 +56,7 @@ echo "Pulling Docker images..."
 docker compose --profile donotstart pull
 
 # Build custom images. `--pull` refreshes the base images the Dockerfile names
-# (alpine:3 and the pinned versatiles image) instead of reusing whatever is
+# (alpine:3 and the versatiles image) instead of reusing whatever is
 # cached locally, so the updater does not fall behind the moving alpine tag.
 echo "Building Docker images..."
 docker compose build --pull download-updater
