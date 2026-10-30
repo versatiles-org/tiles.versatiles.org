@@ -298,6 +298,16 @@ else
     echo "     → Run: ./bin/log/setup_rotation.sh"
 fi
 
+# A configured cron job can still fail silently (e.g. pointing at an old checkout),
+# so check its result: last month must have been rotated into its own archive.
+LAST_MONTH=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m 2>/dev/null || date -v1d -v-1d +%Y-%m)
+if [ -e "volumes/nginx-log/referer_stats.${LAST_MONTH}.tsv.gz" ]; then
+    pass "Logs of ${LAST_MONTH} were rotated"
+else
+    warn "volumes/nginx-log/referer_stats.${LAST_MONTH}.tsv.gz is missing — the monthly log rotation did not run"
+    echo "     → Check /var/log/nginx-log-rotation.log"
+fi
+
 # -----------------------------------------------------------------------------
 echo ""
 echo "11. Checking volume directories..."
