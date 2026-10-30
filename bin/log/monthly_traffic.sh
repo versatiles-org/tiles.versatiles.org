@@ -18,6 +18,7 @@ set -euo pipefail
 # Output: an aligned table, one row per month (oldest first, current month last).
 
 cd "$(dirname "$0")/../.."
+source bin/log/helpers.sh
 
 LOG_DIR="volumes/nginx-log"
 
@@ -63,10 +64,9 @@ format() {
 
 {
 	printf 'month\ttiles\ttile_MB\ttotal_MB\n'
+	progress_init "${files[@]}"
 	for f in "${files[@]}"; do
-		# Best-effort decompress: the live log is still being written, so its gzip
-		# stream may end mid-record — ignore that rather than abort.
-		{ gzip -cd -- "$f" 2>/dev/null || true; } | awk -F'\t' -v month="$(month_of "$f")" '
+		read_log "$f" | awk -F'\t' -v month="$(month_of "$f")" '
 			{ total += $3; if ($2 ~ /^\/tiles\//) { tiles += 1; tile += $3 } }
 			END {
 				printf "%s\t%d\t%d\t%d\n", month, tiles + 0, \
@@ -74,4 +74,5 @@ format() {
 			}
 		'
 	done | sort -t"$(printf '\t')" -k1,1
+	progress_done
 } | format

@@ -27,6 +27,7 @@ set -euo pipefail
 # Output: an aligned table sorted by data descending: domain, MB, tiles.
 
 cd "$(dirname "$0")/../.."
+source bin/log/helpers.sh
 
 LOG_DIR="volumes/nginx-log"
 
@@ -70,13 +71,14 @@ if [ "${#present[@]}" -eq 0 ]; then
 fi
 files=("${present[@]}")
 
-# Decompress each file best-effort: the live log is still being written by nginx,
-# so its gzip stream may end mid-record — ignore that rather than abort.
+# Decompress all files into one stream (see read_log in helpers.sh).
 decompress() {
 	local f
+	progress_init "${files[@]}"
 	for f in "${files[@]}"; do
-		gzip -cd -- "$f" 2>/dev/null || true
+		read_log "$f"
 	done
+	progress_done
 }
 
 # Align output with column(1) when available, otherwise emit raw TSV.
