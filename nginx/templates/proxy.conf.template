@@ -83,9 +83,17 @@ map $http_referer $referer_origin {
 # (no query string), status, bytes, referer origin, user agent.
 log_format problems_tsv '$time_iso8601\t$remote_addr_anon\t$request_method\t$uri\t$status\t$body_bytes_sent\t$referer_origin\t$http_user_agent';
 
-# Columns: referer origin, path, bytes, status. Read by bin/log/referer_stats.sh
-# and bin/log/monthly_traffic.sh.
-log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status';
+# The time of a served request, cut down to the hour (YYYY-MM-DDTHH, UTC). These
+# logs are kept without limit: the hour is enough for statistics, while a finer
+# time could link a tile on a small site to one visitor.
+map $time_iso8601 $time_hour {
+   default "-";
+   "~^(?<log_hour>\d{4}-\d{2}-\d{2}T\d{2})" "$log_hour";
+}
+
+# Columns: referer origin, path, bytes, status, hour. Read by
+# bin/log/referer_stats.sh and bin/log/monthly_traffic.sh.
+log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_hour';
 
 # Browser cache policy, by response status.
 #

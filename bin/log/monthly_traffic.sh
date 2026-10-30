@@ -7,15 +7,16 @@ set -euo pipefail
 #   total_MB   transmitted data for ALL requests that month (rounded MB)
 #
 # Input is the gzipped TSV written by nginx (log_format referer_stats):
-#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status
-# The logs rotate monthly (bin/log/rotate.sh): the live referer_stats.tsv.gz is
-# the current month, and referer_stats.<YYYY-MM>.tsv.gz are past months — so the
-# month is taken from the file name and each file is summed separately.
+#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour
+# The month is taken from the hour column (YYYY-MM-DDTHH, UTC), so a late or missed
+# rotation does not mix up months. Older lines have no hour column: for those it
+# comes from the file name — referer_stats.<YYYY-MM>.tsv.gz is that month, and the
+# live referer_stats.tsv.gz is reported as "current".
 #
 # Usage: monthly_traffic.sh [FILE.tsv.gz ...]
 #   With no arguments, reads all referer_stats*.tsv.gz under volumes/nginx-log/.
 #
-# Output: an aligned table, one row per month (oldest first, current month last).
+# Output: an aligned table, one row per month (oldest first).
 
 cd "$(dirname "$0")/../.."
 source bin/log/helpers.sh
@@ -41,8 +42,8 @@ if [ "${#present[@]}" -eq 0 ]; then
 fi
 files=("${present[@]}")
 
-# Month label for a log file: "current" for the live log, "YYYY-MM" for a rotated
-# one, otherwise the bare file name.
+# Month label for lines without an hour column: "current" for the live log,
+# "YYYY-MM" for a rotated one, otherwise the bare file name.
 month_of() {
 	local b
 	b="$(basename "$1")"
@@ -67,12 +68,24 @@ format() {
 	progress_init "${files[@]}"
 	for f in "${files[@]}"; do
 		read_log "$f" | awk -F'\t' -v month="$(month_of "$f")" '
-			{ total += $3; if ($2 ~ /^\/tiles\//) { tiles += 1; tile += $3 } }
+			{
+				m = ($5 ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-/) ? substr($5, 1, 7) : month
+				seen[m] = 1
+				total[m] += $3
+				if ($2 ~ /^\/tiles\//) { tiles[m] += 1; tile[m] += $3 }
+			}
 			END {
-				printf "%s\t%d\t%d\t%d\n", month, tiles + 0, \
-					int(tile / 1048576 + 0.5), int(total / 1048576 + 0.5)
+				for (m in seen) printf "%s\t%d\t%.0f\t%.0f\n", m, tiles[m], tile[m], total[m]
 			}
 		'
-	done | sort -t"$(printf '\t')" -k1,1
+	done | awk -F'\t' '
+		# A month can span several files, e.g. lines that arrived just after a rotation.
+		{ seen[$1] = 1; tiles[$1] += $2; tile[$1] += $3; total[$1] += $4 }
+		END {
+			for (m in seen)
+				printf "%s\t%d\t%d\t%d\n", m, tiles[m], \
+					int(tile[m] / 1048576 + 0.5), int(total[m] / 1048576 + 0.5)
+		}
+	' | sort -t"$(printf '\t')" -k1,1
 	progress_done
 } | format

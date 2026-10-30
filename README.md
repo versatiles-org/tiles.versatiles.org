@@ -303,7 +303,7 @@ For a per-month overview — tile requests, tile data, and total data per month 
 ./bin/log/monthly_traffic.sh
 ```
 
-It prints one row per month (`month`, `tiles`, `tile_MB`, `total_MB`), oldest first with the current month last. With no arguments it reads all `referer_stats*.tsv.gz`; pass specific files to scope it.
+It prints one row per month (`month`, `tiles`, `tile_MB`, `total_MB`), oldest first. The month comes from each line's hour column (UTC); older lines without one use the file name, and those in the live log show as `current`. With no arguments it reads all `referer_stats*.tsv.gz`; pass specific files to scope it.
 
 ## Development
 

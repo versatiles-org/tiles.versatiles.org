@@ -5,7 +5,7 @@ set -euo pipefail
 # transmitted data (rounded MB, all requests) and the number of tile requests.
 #
 # Input is the gzipped TSV written by nginx (log_format referer_stats):
-#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status
+#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour (newer lines)
 # Only successful (2xx) responses are logged. Rows include both tile requests
 # (/tiles/…) and asset requests (/assets/…); the "tiles" count is restricted to
 # the former, while "MB" sums all transmitted bytes.
