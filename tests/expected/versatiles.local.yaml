@@ -14,7 +14,9 @@ tiles:
     src: /data/tiles/hillshade-vectors.versatiles
   - name: bathymetry-vectors
     src: /data/tiles/bathymetry-vectors.versatiles
-  - name: satellite
-    src: /config_dir/satellite.serve.vpl
+  - name: landcover-vectors
+    src: /data/tiles/landcover-vectors.versatiles
   - name: osm
     src: /data/tiles/osm.versatiles
+  - name: satellite
+    src: /config_dir/satellite.serve.vpl

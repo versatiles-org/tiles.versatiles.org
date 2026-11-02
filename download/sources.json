@@ -2,6 +2,8 @@
   { "name": "elevation" },
   { "name": "hillshade-vectors" },
   { "name": "bathymetry-vectors" },
+  { "name": "landcover-vectors" },
+  { "name": "osm" },
 
   {
     "//": [
@@ -20,18 +22,5 @@
       "kind": "vpl",
       "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]"
     }
-  },
-
-  {
-    "//": [
-      "Served as 'osm' (/tiles/osm/, local osm.versatiles) but sourced from the",
-      "prebuilt 'osm-landcover.versatiles' on the CDN — osm + landcover merged",
-      "upstream with the combined attribution already baked in. Plain mirror:",
-      "download the CDN file to local disk; serveTransitional defaults to remote",
-      "(the CDN osm-landcover file while the local copy is downloading).",
-      "landcover-vectors is NOT served on its own."
-    ],
-    "name": "osm",
-    "source": "osm-landcover"
   }
 ]

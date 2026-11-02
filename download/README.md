@@ -32,22 +32,16 @@ so a plain mirrored dataset is a one-liner:
     "build":        { "kind": "vpl",
                       "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=16" },
     "serveCurrent": { "kind": "vpl",
-                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]" } },
-
-  { "name": "osm", "source": "osm-landcover" }   // serve as 'osm', mirror the prebuilt osm-landcover.versatiles
+                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]" } }
 ]
 ```
-
-(An earlier revision built `osm` in-process by merging `osm` + `landcover-vectors` with
-`from_merged_vector | meta_update`; that VPL build is now done upstream and published as
-`osm-landcover.versatiles`, so here it is just a remapped mirror.)
 
 ### Fields
 
 | Field               | Default            | Meaning                                                                                  |
 | ------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
 | `name`              | —                  | Served tile name and local file `<name>.versatiles`.                                      |
-| `source`            | `name`             | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the served name differs from the CDN file name (e.g. served `osm` from `osm-landcover`). |
+| `source`            | `name`             | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the served name differs from the CDN file name. |
 | `build`             | `{kind:"mirror"}`  | `mirror` = download the CDN `source` as-is (aria2c, inline MD5). `vpl` = run `pipeline` through `versatiles convert` (`compress` optional, e.g. `brotli`). |
 | `serveCurrent`      | `{kind:"local"}`   | How to serve once fresh. `local` = the built file. `vpl` = serve `pipeline` (e.g. a local low-zoom subset stacked over the CDN). |
 | `serveTransitional` | `{kind:"remote"}`  | How to serve while (re)building — used only when there is no local file or the build deletes the old file first (a stale dataset with an atomic build keeps serving its old local file instead). `remote` = the CDN file. `vpl` = serve `pipeline` (omit ⇒ reuse `build.pipeline`). |
@@ -62,7 +56,7 @@ To **add or finetune a source** (zoom limit, merge, attribution via `meta_update
 `sources.json` — no changes to `update-tiles.sh`.
 
 JSON has no comments, so use a **`"//"` key** for notes (a string or array of strings). The engine
-only reads the fields above, so any extra key is ignored — see the `satellite` and `osm` entries.
+only reads the fields above, so any extra key is ignored — see the `satellite` entry.
 
 > **Freshness marker:** the `<slug>.versatiles.md5` sidecar stores the **marker**, not necessarily the
 > local file's own hash. For a single-input dataset it is the raw CDN MD5 (so mirror downloads can be

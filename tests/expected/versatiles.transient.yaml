@@ -14,7 +14,9 @@ tiles:
     src: https://cdn.versatiles.cloud/hillshade-vectors.versatiles
   - name: bathymetry-vectors
     src: https://cdn.versatiles.cloud/bathymetry-vectors.versatiles
+  - name: landcover-vectors
+    src: https://cdn.versatiles.cloud/landcover-vectors.versatiles
+  - name: osm
+    src: https://cdn.versatiles.cloud/osm.versatiles
   - name: satellite
     src: https://cdn.versatiles.cloud/satellite.versatiles
-  - name: osm
-    src: https://cdn.versatiles.cloud/osm-landcover.versatiles
