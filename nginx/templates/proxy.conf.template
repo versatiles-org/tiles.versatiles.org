@@ -91,9 +91,59 @@ map $time_iso8601 $time_hour {
    "~^(?<log_hour>\d{4}-\d{2}-\d{2}T\d{2})" "$log_hour";
 }
 
-# Columns: referer origin, path, bytes, status, hour. Read by
+# Requests that reach this server through a CDN, for measuring how much traffic
+# arrives that way. Only the name of the CDN is logged, not an address.
+#
+# Cloudflare's published ranges (https://www.cloudflare.com/ips-v4 and ips-v6).
+# They are checked against the TCP peer, which a client cannot fake.
+geo $cdn_ip {
+   default            "";
+   173.245.48.0/20    cloudflare;
+   103.21.244.0/22    cloudflare;
+   103.22.200.0/22    cloudflare;
+   103.31.4.0/22      cloudflare;
+   141.101.64.0/18    cloudflare;
+   108.162.192.0/18   cloudflare;
+   190.93.240.0/20    cloudflare;
+   188.114.96.0/20    cloudflare;
+   197.234.240.0/22   cloudflare;
+   198.41.128.0/17    cloudflare;
+   162.158.0.0/15     cloudflare;
+   104.16.0.0/13      cloudflare;
+   104.24.0.0/14      cloudflare;
+   172.64.0.0/13      cloudflare;
+   131.0.72.0/22      cloudflare;
+   2400:cb00::/32     cloudflare;
+   2606:4700::/32     cloudflare;
+   2803:f800::/32     cloudflare;
+   2405:b500::/32     cloudflare;
+   2405:8100::/32     cloudflare;
+   2a06:98c0::/29     cloudflare;
+   2c0f:f248::/32     cloudflare;
+}
+
+# The address first, then the headers each CDN adds. Any client can send those
+# headers, so a value from them is marked "-header": a CDN without a published
+# range here, or an address that is missing from the list above, or a fake.
+map "$cdn_ip|$http_cf_ray|$http_x_amz_cf_id|$http_fastly_client_ip|$http_akamai_origin_hop" $cdn {
+   default              "-";
+   "~^cloudflare\|"     cloudflare;
+   "~^\|[^|]+\|"        cloudflare-header;
+   "~^\|\|[^|]+\|"      cloudfront-header;
+   "~^\|\|\|[^|]+\|"    fastly-header;
+   "~^\|\|\|\|."        akamai-header;
+}
+
+# A Cloudflare Worker's requests name its Cloudflare zone in this header. Only
+# something shaped like a hostname is logged, as a client can send anything here.
+map $http_cf_worker $cdn_zone {
+   default "-";
+   "~^[a-zA-Z0-9.-]{1,253}$" "$http_cf_worker";
+}
+
+# Columns: referer origin, path, bytes, status, hour, CDN, Worker zone. Read by
 # bin/log/referer_stats.sh and bin/log/monthly_traffic.sh.
-log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_hour';
+log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_hour\t$cdn\t$cdn_zone';
 
 # Browser cache policy, by response status.
 #

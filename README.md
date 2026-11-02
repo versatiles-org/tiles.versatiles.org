@@ -282,6 +282,7 @@ What is stored about a client:
 - **Client address:** only anonymised — the last octet of an IPv4 address is zeroed, an IPv6 address is cut to its first two groups.
 - **Referer:** only `scheme://host`, never the path or query string of the referring page.
 - **Request:** the path without its query string; in `access.tsv.gz` also the user agent.
+- **CDN:** in `referer_stats.tsv.gz`, the name of the CDN a request came through (`cloudflare` when the address is in Cloudflare's published ranges, `<cdn>-header` when only a header says so, which a client can fake) and the Cloudflare zone of a Worker. The address itself is not stored.
 - **Exception:** nginx writes `error.log` in a fixed format that includes the full client address and request line. It is anonymised in the same way when it is rotated, which happens every night — so full addresses exist only in the live file, for a day at most.
 
 The two access logs are compressed while they are written and reach the file with up to a minute's delay.

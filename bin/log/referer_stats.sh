@@ -5,7 +5,8 @@ set -euo pipefail
 # transmitted data (rounded MB, all requests) and the number of tile requests.
 #
 # Input is the gzipped TSV written by nginx (log_format referer_stats):
-#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour (newer lines)
+#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour <TAB> cdn <TAB> zone
+# Older lines end after status (no hour) or after hour (no cdn, zone).
 # Only successful (2xx) responses are logged. Rows include both tile requests
 # (/tiles/…) and asset requests (/assets/…); the "tiles" count is restricted to
 # the former, while "MB" sums all transmitted bytes.
@@ -31,7 +32,7 @@ source bin/log/helpers.sh
 
 LOG_DIR="volumes/nginx-log"
 
-usage() { sed -n '21,25p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '22,26p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # --- Arguments ---
 MONTH="current"

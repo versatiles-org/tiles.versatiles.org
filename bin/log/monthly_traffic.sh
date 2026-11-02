@@ -7,7 +7,7 @@ set -euo pipefail
 #   total_MB   transmitted data for ALL requests that month (rounded MB)
 #
 # Input is the gzipped TSV written by nginx (log_format referer_stats):
-#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour
+#   referer <TAB> uri <TAB> body_bytes_sent <TAB> status <TAB> hour <TAB> cdn <TAB> zone
 # The month is taken from the hour column (YYYY-MM-DDTHH, UTC), so a late or missed
 # rotation does not mix up months. Older lines have no hour column: for those it
 # comes from the file name — referer_stats.<YYYY-MM>.tsv.gz is that month, and the
