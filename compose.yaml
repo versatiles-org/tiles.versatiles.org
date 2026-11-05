@@ -105,7 +105,7 @@ services:
 
   certbot:
     container_name: certbot
-    image: certbot/certbot:v5.8.0
+    image: certbot/certbot:v5.9.0
     # No depends_on on purpose: certbot needs the *running* nginx to serve its
     # challenge files, but `docker compose run` must not manage nginx for it —
     # that would recreate nginx (and the tile server) whenever their compose
