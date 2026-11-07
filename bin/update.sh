@@ -40,7 +40,8 @@ set -euo pipefail
 #          - CDN URL only for datasets with no local file or a delete-old-first
 #            build (e.g. satellite)
 #        Does NOT download. Exit codes:
-#          0 → at least one file needs updating
+#          0 → at least one file needs updating, or versatiles.yaml changed
+#              (e.g. a renamed dataset) so the tile server must reload it
 #          1 → pipeline error (abort)
 #          2 → nothing to update (skip intermediate restart)
 #

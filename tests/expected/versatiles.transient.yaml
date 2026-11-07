@@ -8,15 +8,21 @@ static:
     prefix: /assets/styles
 
 tiles:
-  - name: elevation
-    src: https://cdn.versatiles.cloud/elevation.versatiles
-  - name: hillshade-vectors
-    src: https://cdn.versatiles.cloud/hillshade-vectors.versatiles
-  - name: bathymetry-vectors
-    src: https://cdn.versatiles.cloud/bathymetry-vectors.versatiles
-  - name: landcover-vectors
-    src: https://cdn.versatiles.cloud/landcover-vectors.versatiles
-  - name: osm
-    src: https://cdn.versatiles.cloud/osm.versatiles
-  - name: satellite
-    src: https://cdn.versatiles.cloud/satellite.versatiles
+  - name: elevation-raster
+    src: https://cdn.versatiles.cloud/elevation-raster/elevation-raster.versatiles
+    aliases: ["elevation"]
+  - name: hillshade-vector
+    src: https://cdn.versatiles.cloud/hillshade-vector/hillshade-vector.versatiles
+    aliases: ["hillshade-vectors"]
+  - name: bathymetry-vector
+    src: https://cdn.versatiles.cloud/bathymetry-vector/bathymetry-vector.versatiles
+    aliases: ["bathymetry-vectors"]
+  - name: landcover-vector
+    src: https://cdn.versatiles.cloud/landcover-vector/landcover-vector.versatiles
+    aliases: ["landcover-vectors"]
+  - name: osm-vector
+    src: https://cdn.versatiles.cloud/osm-vector/osm-vector.versatiles
+    aliases: ["osm"]
+  - name: satellite-raster
+    src: https://cdn.versatiles.cloud/satellite-raster/satellite-raster.versatiles
+    aliases: ["satellite"]

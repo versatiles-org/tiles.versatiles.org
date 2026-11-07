@@ -22,13 +22,15 @@ This repository serves **tiles.versatiles.org** (tile serving). The file downloa
 - **nginx**: Reverse proxy in front of the tile server (TLS termination, caching, rate limiting)
 - **certbot**: SSL certificate management
 
-The inputs are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each is a stable `<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local copy so the tile server reads from fast local disk; while a dataset is updating, the tile server temporarily reads it from the CDN so there is no downtime. No credentials are involved — the CDN is public.
+The inputs are hosted on a Cloudflare bucket behind **cdn.versatiles.cloud** (each is a stable `<slug>/<slug>.versatiles` key with a `.md5` sidecar). The `download-updater` keeps a local copy so the tile server reads from fast local disk; while a dataset is updating, the tile server temporarily reads it from the CDN so there is no downtime. No credentials are involved — the CDN is public.
 
 **Derived dataset** (configured in [`download/sources.json`](download/sources.json), see [`download/README.md`](download/README.md)):
 
-- `/tiles/satellite/` — too large to mirror in full (about 1.7 TB), so only zoom levels 0–16 are kept locally (several hundred GB) and levels 17 and up are served straight from the CDN, stacked via a VPL pipeline.
+- `/tiles/satellite-raster/` — too large to mirror in full (about 1.7 TB), so only zoom levels 0–16 are kept locally (several hundred GB) and levels 17 and up are served straight from the CDN, stacked via a VPL pipeline.
 
-`/tiles/osm/` and `/tiles/landcover-vectors/` are plain mirrors of separate datasets. The land cover is not merged into OSM: a style draws it as a source of its own under OSM ([Using it with OSM](https://github.com/versatiles-org/landcover-vectors#using-it-with-osm)).
+`/tiles/osm-vector/` and `/tiles/landcover-vector/` are plain mirrors of separate datasets. The land cover is not merged into OSM: a style draws it as a source of its own under OSM ([Using it with OSM](https://github.com/versatiles-org/landcover-vectors#using-it-with-osm)).
+
+Each tileset name ends with its format (`<content>-<format>`). The old names (`/tiles/osm/`, `/tiles/satellite/`, `/tiles/landcover-vectors/`, …) still work as aliases: they serve the same tiles, and their `tiles.json` points to the new name.
 
 ## Volume Directories
 

@@ -14,8 +14,9 @@ set -euo pipefail
 # without the CDN —
 #   transient  every dataset served from the CDN
 #   local      every dataset served from local disk (placeholder files stand in
-#              for the tile data), which also writes satellite.serve.vpl
-# — against the files in tests/expected/. If you changed sources.json or the
+#              for the tile data), which also writes satellite-raster.serve.vpl
+# — against the files in tests/expected/. It also checks that local mode renames
+# files that still have an alias's name (a dataset renamed in sources.json). If you changed sources.json or the
 # generator on purpose, look at the diff this script prints, and update the
 # expected files to match.
 
@@ -39,6 +40,11 @@ in_updater() {
 # shellcheck disable=SC2016
 PLACEHOLDERS='mkdir -p /volumes/tiles && for n in $(jq -r ".[].name" /app/sources.json); do touch "/volumes/tiles/$n.versatiles"; done'
 
+# The same under each dataset's first alias, with an .md5 sidecar: tile data
+# left from before a rename.
+# shellcheck disable=SC2016
+ALIAS_PLACEHOLDERS='mkdir -p /volumes/tiles && for n in $(jq -r ".[].aliases[0] // empty" /app/sources.json); do touch "/volumes/tiles/$n.versatiles" "/volumes/tiles/$n.versatiles.md5"; done'
+
 FAILED=0
 
 # compare <what> <expected file> <command that prints the actual content>
@@ -59,8 +65,12 @@ compare "versatiles.yaml, transient mode" tests/expected/versatiles.transient.ya
     '/app/update-tiles.sh --mode=transient >/dev/null && cat /volumes/versatiles_conf/versatiles.yaml'
 compare "versatiles.yaml, local mode" tests/expected/versatiles.local.yaml \
     "$PLACEHOLDERS"' && /app/update-tiles.sh --mode=local >/dev/null && cat /volumes/versatiles_conf/versatiles.yaml'
-compare "satellite.serve.vpl, local mode" tests/expected/satellite.serve.vpl \
-    "$PLACEHOLDERS"' && /app/update-tiles.sh --mode=local >/dev/null && cat /volumes/versatiles_conf/satellite.serve.vpl'
+compare "satellite-raster.serve.vpl, local mode" tests/expected/satellite-raster.serve.vpl \
+    "$PLACEHOLDERS"' && /app/update-tiles.sh --mode=local >/dev/null && cat /volumes/versatiles_conf/satellite-raster.serve.vpl'
+compare "versatiles.yaml, local mode, files under alias names" tests/expected/versatiles.local.yaml \
+    "$ALIAS_PLACEHOLDERS"' && /app/update-tiles.sh --mode=local >/dev/null && cat /volumes/versatiles_conf/versatiles.yaml'
+compare "tile files, local mode, files under alias names" tests/expected/tiles.renamed.txt \
+    "$ALIAS_PLACEHOLDERS"' && /app/update-tiles.sh --mode=local >/dev/null && ls /volumes/tiles'
 
 if [ "$FAILED" -ne 0 ]; then
     echo "Pipeline test FAILED"

@@ -7,9 +7,16 @@ set -euo pipefail
 # =============================================================================
 #
 # Each dataset is described declaratively in sources.json. A dataset is defined
-# by up to four fields (all optional except `name`):
+# by these fields (all optional except `name`):
 #
 #   name               Served tile name and local file <name>.versatiles.
+#   aliases            Old names the tile server also answers to (needs
+#                      versatiles 5.8.0+). /tiles/<alias>/… serves the same
+#                      tiles; its tiles.json points to the URLs under `name`.
+#                      A local <alias>.versatiles is renamed to <name>.versatiles
+#                      instead of being downloaded again.
+#   source             CDN object key without .versatiles. Default:
+#                      <name>/<name>.
 #   build              How to produce the local artifact:
 #                        {kind:"mirror"}                 download <name> as-is
 #                                                        (aria2c, inline MD5).
@@ -29,13 +36,14 @@ set -euo pipefail
 #                                                reuse build.pipeline). Default:
 #                                                {kind:"remote"}.
 #   versionInputs      CDN keys whose MD5s compose the freshness marker.
-#                      Default: [name]. Multiple inputs (e.g. a merge) rebuild
+#                      Default: [source]. Multiple inputs (e.g. a merge) rebuild
 #                      when ANY input changes.
 #
 # Pipelines may use the placeholders {CDN} (the CDN base URL) and {LOCAL} (the
 # tile server's local tiles dir, /data/tiles). The .versatiles files live in a
 # public Cloudflare bucket (cdn.versatiles.cloud); each input is a stable
-# <slug>.versatiles key with a <slug>.versatiles.md5 sidecar. No credentials.
+# <slug>/<slug>.versatiles key with a <slug>/<slug>.versatiles.md5 sidecar.
+# No credentials.
 #
 # Usage: update-tiles.sh [--mode=check|prepare|finalize|transient|local]
 #                                                          (default: finalize)
@@ -57,7 +65,8 @@ set -euo pipefail
 #             dataset falls back to the CDN.
 #
 # Exit codes (consumed by bin/update.sh):
-#   0  at least one dataset needs updating (or finalize completed)
+#   0  at least one dataset needs updating, prepare changed versatiles.yaml,
+#      or finalize completed
 #   1  pipeline error (abort)
 #   2  nothing to update — only emitted in check/prepare
 # =============================================================================
@@ -103,9 +112,13 @@ ds_get() {
 	printf '%s' "${v:-$3}"
 }
 # CDN object key for mirror download / remote serving (without .versatiles).
-# Defaults to the dataset name; set `source` when the served name differs from
-# the CDN file name.
-ds_source()           { ds_get "$1" '.source' "$1"; }
+# Each dataset has its own folder on the CDN, so the default is <name>/<name>;
+# set `source` when the CDN file has another name.
+ds_source()           { ds_get "$1" '.source' "$1/$1"; }
+# Old names the tile server also answers to: one per line, and as a JSON array
+# for versatiles.yaml (empty if there are none).
+ds_aliases()          { jq -r --arg n "$1" '.[] | select(.name==$n) | (.aliases // [])[]' "$MANIFEST"; }
+ds_aliases_json()     { jq -c --arg n "$1" '.[] | select(.name==$n) | .aliases // empty | select(length > 0)' "$MANIFEST"; }
 ds_build_kind()       { ds_get "$1" '.build.kind' 'mirror'; }
 ds_build_pipeline()   { ds_get "$1" '.build.pipeline' ''; }
 ds_build_compress()   { ds_get "$1" '.build.compress' ''; }
@@ -121,7 +134,23 @@ ds_trans_pipeline()   { ds_get "$1" '.serveTransitional.pipeline' ''; }
 # NOT atomic and must fall back to the CDN while rebuilding.
 is_atomic_build()     { [ "$(ds_build_kind "$1")" = "mirror" ]; }
 # Freshness inputs default to the CDN source key (which defaults to the name).
-ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.source // .name])[]' "$MANIFEST"; }
+ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.source // "\(.name)/\(.name)"])[]' "$MANIFEST"; }
+
+# Older versatiles versions reject `aliases` in versatiles.yaml as an unknown
+# field, and the tile server would not load the config. This updater's binary
+# comes from the tile server's image (see Dockerfile), so its version is the
+# tile server's. Checked before anything is renamed or written.
+require_alias_support() {
+	jq -e 'any(.[]; (.aliases // []) | length > 0)' "$MANIFEST" >/dev/null || return 0
+	local version major minor
+	version="$(versatiles --version)"
+	version="${version##* }"
+	IFS=. read -r major minor _ <<<"$version"
+	if [ "$major" -lt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -lt 8 ]; }; then
+		echo "sources.json uses aliases, which need versatiles 5.8.0 or later (this is $version)" >&2
+		exit 1
+	fi
+}
 
 # Substitutes {CDN} and {LOCAL} placeholders in a pipeline string.
 subst() {
@@ -199,6 +228,29 @@ resolve_datasets() {
 	done
 }
 
+# Renames a local <alias>.versatiles (and its .md5) to <name>.versatiles when
+# <name>.versatiles is missing. After a rename in sources.json the old file still
+# holds the data; without this, finalize would delete it as unknown and download
+# or rebuild it again. The marker in the .md5 stays valid as long as the CDN file
+# under the new key is the same. The running tile server keeps reading the
+# renamed file through its open file handle until it loads the new config.
+adopt_alias_files() {
+	mkdir -p "$TILES_FOLDER"
+	local name path alias old
+	for name in "${DATASETS[@]}"; do
+		path="$TILES_FOLDER/$name.versatiles"
+		[ -e "$path" ] && continue
+		while read -r alias; do
+			old="$TILES_FOLDER/$alias.versatiles"
+			[ -f "$old" ] || continue
+			echo " - Renaming $alias.versatiles to $name.versatiles"
+			if [ -f "$old.md5" ]; then mv "$old.md5" "$path.md5"; fi
+			mv "$old" "$path"
+			break
+		done < <(ds_aliases "$name")
+	done
+}
+
 # Decides how each dataset is served in the transitional (prepare) config and
 # whether anything needs rebuilding (NEEDS_UPDATE).
 #
@@ -210,6 +262,9 @@ resolve_datasets() {
 # or the build deletes the old file before producing the new one.
 declare -A IS_REMOTE
 NEEDS_UPDATE=0
+# Set by generate_versatiles_yaml when the new versatiles.yaml differs from the
+# previous one.
+CONFIG_CHANGED=0
 check_local_files() {
 	mkdir -p "$TILES_FOLDER"
 	local name path
@@ -419,11 +474,15 @@ generate_versatiles_yaml() {
 
 			tiles:
 		YAML
+		local aliases
 		for name in "${DATASETS[@]}"; do
 			printf '  - name: %s\n    src: %s\n' "$name" "${src[$name]}"
+			aliases="$(ds_aliases_json "$name")"
+			if [ -n "$aliases" ]; then printf '    aliases: %s\n' "$aliases"; fi
 		done
 	} >"$tmp"
 
+	if ! cmp -s "$tmp" "$out"; then CONFIG_CHANGED=1; fi
 	mv "$tmp" "$out"
 	echo " - versatiles.yaml successfully written"
 }
@@ -432,8 +491,11 @@ generate_versatiles_yaml() {
 # Pipeline
 # ---------------------------------------------------------------------------
 
+require_alias_support
+
 # Manual serving-mode switches: just (re)write versatiles.yaml — no resolve, no
-# downloads, no changes to local files. See bin/serve-mode.sh.
+# downloads. Only `local` renames files of renamed datasets (adopt_alias_files).
+# See bin/serve-mode.sh.
 if [ "$MODE" = "transient" ]; then
 	# Serve every dataset from the CDN (serveTransitional), ignoring local files.
 	for name in "${DATASETS[@]}"; do IS_REMOTE[$name]=1; done
@@ -444,7 +506,7 @@ if [ "$MODE" = "local" ]; then
 	# Serve each dataset that is present on local disk from disk (serveCurrent);
 	# any missing dataset falls back to the CDN. Presence-based, not freshness —
 	# this is a serving switch, not an update.
-	mkdir -p "$TILES_FOLDER"
+	adopt_alias_files
 	for name in "${DATASETS[@]}"; do
 		if [ -f "$TILES_FOLDER/$name.versatiles" ]; then IS_REMOTE[$name]=0; else IS_REMOTE[$name]=1; fi
 	done
@@ -453,6 +515,12 @@ if [ "$MODE" = "local" ]; then
 fi
 
 resolve_datasets
+
+# check writes nothing, so it reports a renamed dataset as needing an update;
+# prepare then renames its file, and it turns out to be current.
+if [ "$MODE" != "check" ]; then
+	adopt_alias_files
+fi
 
 if [ "$MODE" = "finalize" ]; then
 	download_local_files
@@ -468,8 +536,11 @@ fi
 generate_versatiles_yaml
 
 # prepare signals "nothing to update" with exit 2 so update.sh can skip the
-# intermediate restart and the finalize phase.
-if [ "$MODE" = "prepare" ] && [ "$NEEDS_UPDATE" -eq 0 ]; then
+# intermediate restart and the finalize phase. Not when versatiles.yaml changed
+# although all tile data is current (a renamed dataset, a new alias, …): on that
+# path update.sh does not reload the tile server, which would keep serving the
+# old config.
+if [ "$MODE" = "prepare" ] && [ "$NEEDS_UPDATE" -eq 0 ] && [ "$CONFIG_CHANGED" -eq 0 ]; then
 	exit 2
 fi
 

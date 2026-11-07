@@ -1,0 +1,12 @@
+bathymetry-vector.versatiles
+bathymetry-vector.versatiles.md5
+elevation-raster.versatiles
+elevation-raster.versatiles.md5
+hillshade-vector.versatiles
+hillshade-vector.versatiles.md5
+landcover-vector.versatiles
+landcover-vector.versatiles.md5
+osm-vector.versatiles
+osm-vector.versatiles.md5
+satellite-raster.versatiles
+satellite-raster.versatiles.md5

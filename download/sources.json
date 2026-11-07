@@ -1,9 +1,9 @@
 [
-  { "name": "elevation" },
-  { "name": "hillshade-vectors" },
-  { "name": "bathymetry-vectors" },
-  { "name": "landcover-vectors" },
-  { "name": "osm" },
+  { "name": "elevation-raster", "aliases": ["elevation"] },
+  { "name": "hillshade-vector", "aliases": ["hillshade-vectors"] },
+  { "name": "bathymetry-vector", "aliases": ["bathymetry-vectors"] },
+  { "name": "landcover-vector", "aliases": ["landcover-vectors"] },
+  { "name": "osm-vector", "aliases": ["osm"] },
 
   {
     "//": [
@@ -13,14 +13,15 @@
       "serveCurrent: local subset for z0-16, CDN for z17+ (first-match + filters).",
       "serveTransitional defaults to remote (whole dataset from the CDN while rebuilding)."
     ],
-    "name": "satellite",
+    "name": "satellite-raster",
+    "aliases": ["satellite"],
     "build": {
       "kind": "vpl",
-      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=16"
+      "pipeline": "from_container filename=\"{CDN}/satellite-raster/satellite-raster.versatiles\" | filter level_max=16"
     },
     "serveCurrent": {
       "kind": "vpl",
-      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]"
+      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite-raster.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite-raster/satellite-raster.versatiles\" | filter level_min=17 ]"
     }
   }
 ]

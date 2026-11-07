@@ -11,8 +11,9 @@ datasets via [VPL](https://docs.versatiles.org)). It is invoked once per run via
 ## Source of truth
 
 The inputs are hosted on a public Cloudflare bucket, **`cdn.versatiles.cloud`** by default (override
-with `CDN_BASE_URL`). Each input is a stable object key `<slug>.versatiles` with a small
-`<slug>.versatiles.md5` checksum sidecar. No credentials are involved.
+with `CDN_BASE_URL`). Each dataset has its own folder: a stable object key
+`<slug>/<slug>.versatiles` with a small `<slug>/<slug>.versatiles.md5` checksum sidecar. No
+credentials are involved.
 
 The CDN exposes no listing, so the authoritative set of served datasets — and how each is produced —
 is **`sources.json`**. A dataset is **current** when its local `<slug>.versatiles` exists and its
@@ -26,13 +27,15 @@ so a plain mirrored dataset is a one-liner:
 
 ```jsonc
 [
-  { "name": "elevation" },                       // mirror → serve local file → CDN while updating
+  { "name": "elevation-raster",                  // mirror → serve local file → CDN while updating
+    "aliases": ["elevation"] },                  // also answer to the old name
 
-  { "name": "satellite",                         // keep only z0–16 locally, stack the CDN on top
+  { "name": "satellite-raster",                  // keep only z0–16 locally, stack the CDN on top
+    "aliases": ["satellite"],
     "build":        { "kind": "vpl",
-                      "pipeline": "from_container filename=\"{CDN}/satellite.versatiles\" | filter level_max=16" },
+                      "pipeline": "from_container filename=\"{CDN}/satellite-raster/satellite-raster.versatiles\" | filter level_max=16" },
     "serveCurrent": { "kind": "vpl",
-                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite.versatiles\" | filter level_min=17 ]" } }
+                      "pipeline": "from_stacked [ from_container filename=\"{LOCAL}/satellite-raster.versatiles\" | filter level_max=16, from_container filename=\"{CDN}/satellite-raster/satellite-raster.versatiles\" | filter level_min=17 ]" } }
 ]
 ```
 
@@ -41,7 +44,8 @@ so a plain mirrored dataset is a one-liner:
 | Field               | Default            | Meaning                                                                                  |
 | ------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
 | `name`              | —                  | Served tile name and local file `<name>.versatiles`.                                      |
-| `source`            | `name`             | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the served name differs from the CDN file name. |
+| `aliases`           | `[]`               | Old names the tile server also answers to (needs versatiles 5.8.0+). `/tiles/<alias>/…` serves the same tiles, and its `tiles.json` points to the URLs under `name`. See "Renaming a dataset" below. |
+| `source`            | `<name>/<name>`    | CDN object key (without `.versatiles`) to mirror / serve remotely. Set when the CDN file has another name. |
 | `build`             | `{kind:"mirror"}`  | `mirror` = download the CDN `source` as-is (aria2c, inline MD5). `vpl` = run `pipeline` through `versatiles convert` (`compress` optional, e.g. `brotli`). |
 | `serveCurrent`      | `{kind:"local"}`   | How to serve once fresh. `local` = the built file. `vpl` = serve `pipeline` (e.g. a local low-zoom subset stacked over the CDN). |
 | `serveTransitional` | `{kind:"remote"}`  | How to serve while (re)building — used only when there is no local file or the build deletes the old file first (a stale dataset with an atomic build keeps serving its old local file instead). `remote` = the CDN file. `vpl` = serve `pipeline` (omit ⇒ reuse `build.pipeline`). |
@@ -56,7 +60,20 @@ To **add or finetune a source** (zoom limit, merge, attribution via `meta_update
 `sources.json` — no changes to `update-tiles.sh`.
 
 JSON has no comments, so use a **`"//"` key** for notes (a string or array of strings). The engine
-only reads the fields above, so any extra key is ignored — see the `satellite` entry.
+only reads the fields above, so any extra key is ignored — see the `satellite-raster` entry.
+
+### Renaming a dataset
+
+Change `name` and add the old name to `aliases`, so old tile URLs keep working. In `prepare`,
+`finalize` and `local` mode, a local `<alias>.versatiles` (and its `.md5`) is renamed to
+`<name>.versatiles` when that file is missing, so the data is not downloaded or rebuilt again. That
+is only correct while the CDN file under the new key is the same as under the old one; otherwise the
+marker does not match and the dataset is rebuilt as usual. `check` writes nothing, so it reports a
+renamed dataset as needing an update until `prepare` has run.
+
+Aliases need versatiles 5.8.0 or later: older versions reject the field. The script exits with an
+error before it changes anything when `sources.json` has aliases and the `versatiles` binary is
+older.
 
 > **Freshness marker:** the `<slug>.versatiles.md5` sidecar stores the **marker**, not necessarily the
 > local file's own hash. For a single-input dataset it is the raw CDN MD5 (so mirror downloads can be
@@ -82,9 +99,9 @@ See `../bin/update.sh` for the full two-phase orchestration.
 
 | Code | Meaning                                                       |
 | ---- | ------------------------------------------------------------ |
-| `0`  | At least one dataset needs updating (or `finalize` completed). |
+| `0`  | At least one dataset needs updating, `prepare` changed `versatiles.yaml` (e.g. a renamed dataset), or `finalize` completed. |
 | `1`  | Pipeline error — abort.                                      |
-| `2`  | Nothing to update (only emitted in `check` / `prepare`).    |
+| `2`  | Nothing to update and `versatiles.yaml` unchanged (only emitted in `check` / `prepare`). |
 
 `bin/update.sh` uses exit `2` to skip the intermediate tile-server restart and the `finalize` phase.
 

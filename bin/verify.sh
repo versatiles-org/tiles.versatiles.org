@@ -169,11 +169,29 @@ for tileset in $TILESETS; do
     fi
 done
 
+# Old names of renamed tilesets (`aliases` in sources.json) must keep working:
+# the same tiles, and a TileJSON that points to the new name, so clients move
+# over to it.
+ALIASES=$(python3 -c 'import json; print("\n".join(d["name"] + " " + a for d in json.load(open("download/sources.json")) for a in d.get("aliases", [])))' 2>/dev/null || echo "")
+while read -r tileset alias; do
+    [ -n "$alias" ] || continue
+    TILE_CODE=$(http_status "${BASE}/tiles/${alias}/0/0/0")
+    TILE_URLS=$(curl -s --max-time 30 ${CURL_TLS[@]+"${CURL_TLS[@]}"} "${BASE}/tiles/${alias}/tiles.json" 2>/dev/null \
+        | python3 -c 'import json, sys; print(" ".join(json.load(sys.stdin)["tiles"]))' 2>/dev/null || true)
+    if [ "$TILE_CODE" != "200" ]; then
+        fail "${alias} (old name of ${tileset}): tile 0/0/0 returned $TILE_CODE (expected 200)"
+    elif [[ "$TILE_URLS" != *"/tiles/${tileset}/"* ]]; then
+        fail "${alias} (old name of ${tileset}): tiles.json does not point to /tiles/${tileset}/ (tiles: ${TILE_URLS:-none})"
+    else
+        pass "${alias} (old name of ${tileset}): tile served, TileJSON points to the new name"
+    fi
+done <<< "$ALIASES"
+
 # Satellite is the one tileset stacked from two sources: low zoom levels from
 # local disk, high zoom levels straight from the CDN. Tile 0/0/0 only proves
 # the first half.
 case " $TILESETS " in
-    *" satellite "*) expect_200 "satellite: high zoom level (read from the CDN)" "/tiles/satellite/17/70406/42987" ;;
+    *" satellite-raster "*) expect_200 "satellite-raster: high zoom level (read from the CDN)" "/tiles/satellite-raster/17/70406/42987" ;;
 esac
 
 # -----------------------------------------------------------------------------
@@ -203,7 +221,7 @@ echo "7. Checking CORS headers..."
 # 200 as well: nginx adds the CORS header to error responses too, so the header
 # alone proves nothing.
 CORS_PATHS=(
-    "/tiles/osm/0/0/0"
+    "/tiles/osm-vector/0/0/0"
     "/assets/styles/colorful/style.json"
     "/assets/sprites/base.json"
     "/assets/glyphs/index.json"
@@ -221,7 +239,7 @@ done
 # -----------------------------------------------------------------------------
 echo ""
 echo "8. Checking caching..."
-TILE_URL="${BASE}/tiles/osm/0/0/0"
+TILE_URL="${BASE}/tiles/osm-vector/0/0/0"
 HEADERS=$(http_headers "$TILE_URL")
 
 # One Cache-Control header, the 6-hour policy set in proxy.conf.template.
@@ -248,7 +266,7 @@ fi
 
 # Errors must not be cacheable for hours: a missing tile briefly, anything else
 # not at all.
-MISSING_CC=$(header_value "$(http_headers "${BASE}/tiles/osm/15/0/0")" cache-control)
+MISSING_CC=$(header_value "$(http_headers "${BASE}/tiles/osm-vector/15/0/0")" cache-control)
 if [ "$MISSING_CC" = "public, max-age=300" ]; then
     pass "A missing tile (404) is cacheable for 5 minutes only"
 else
