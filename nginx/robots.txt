@@ -1,0 +1,24 @@
+# Served by nginx (see templates/proxy.conf.template), not by the frontend: the
+# frontend's robots.txt blocks everything, because every VersaTiles server ships
+# it and most should not be indexed. This server's map and editor should be found.
+#
+# Google applies the longest matching rule, so each Allow wins over "Disallow: /".
+# Every URL but / and /editor/ is also sent with "X-Robots-Tag: noindex".
+
+User-agent: *
+
+# The map and the map editor (the editor's scripts are below /editor/ as well).
+Allow: /$
+Allow: /editor/
+
+# MapLibre and the other scripts, so the map page can be rendered, and the favicon
+# shown next to search results.
+Allow: /assets/lib/
+Allow: /assets/images/
+
+# Indexed while it was blocked here. It may be fetched now, so that its noindex is
+# seen and it drops out of the index.
+Allow: /tiles/index.json$
+
+# Tiles, styles, fonts and sprites: endless URLs that would only cost load.
+Disallow: /

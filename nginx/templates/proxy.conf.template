@@ -178,6 +178,18 @@ map $status $retry_after {
    default "";
 }
 
+# Search engines may index the two pages people should find: the map (/) and the
+# map editor (/editor/). Everything else is marked noindex — tiles, styles, JSON,
+# and maps shared from the editor (/editor/view/…), which are user content. An
+# empty value sends no header. Works with nginx/robots.txt: a URL blocked there
+# is never fetched, so its noindex is never seen; that is why robots.txt lets
+# /tiles/index.json through, which Google indexed while it was blocked.
+map $uri $x_robots_tag {
+   /         "";
+   /editor/  "";
+   default   "noindex";
+}
+
 # The tile server. `resolve` makes nginx follow Docker's DNS (127.0.0.11) instead
 # of looking the name up once at config load: when the tile server container is
 # replaced, nginx starts using the new container's address and drops the old one
@@ -269,6 +281,9 @@ server {
 
    # Only set on 429 responses (see $retry_after map).
    add_header Retry-After $retry_after always;
+
+   # noindex on everything but the map and the editor (see $x_robots_tag map).
+   add_header X-Robots-Tag $x_robots_tag always;
 
    # CORS headers
    add_header 'Access-Control-Allow-Origin' '*' always;
@@ -383,6 +398,15 @@ server {
       add_header Referrer-Policy "strict-origin-when-cross-origin" always;
       add_header 'Access-Control-Allow-Origin' '*' always;
       add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
+      add_header X-Robots-Tag "noindex" always;
+   }
+
+   # This server's own robots.txt (nginx/robots.txt explains its rules), instead
+   # of the frontend's, which blocks everything. Read from the repo mount, so a
+   # `git pull` changes it without a reload. No add_header here, so the
+   # server-level headers apply.
+   location = /robots.txt {
+      root /etc/nginx/repo;
    }
 
    location / {
