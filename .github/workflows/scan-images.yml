@@ -1,0 +1,129 @@
+name: Scan Images
+
+# -----------------------------------------------------------------------------
+# Weekly vulnerability scan of the images this server runs.
+#
+# The same file is in tiles.versatiles.org and photon-stack. The image list
+# comes from the compose file (with template.env), so a version bump there
+# needs no change here. Images the compose file builds itself are built first.
+# versatiles/* images are skipped: versatiles-docker scans them.
+#
+# Only CRITICAL and HIGH findings with an available fix fail a job. A failed
+# scheduled run sends GitHub's failure email; the findings are listed under
+# Security → Code scanning, one category per image (named without its tag, so
+# alerts close properly after a version bump). To accept a finding, add its
+# ID to a `.trivyignore` file in the repository root with a reason and an
+# expiry date (`CVE-… exp:YYYY-MM-DD`).
+#
+# Blind spot: the official nginx images install nginx from nginx.org, but
+# Trivy checks every Alpine package against Alpine's own security data, where
+# nginx is the older stable branch. A vulnerable nginx 1.31.8 then looks newer
+# than Alpine's fixed 1.30.7 and passes. Everything else in the image is
+# scanned correctly; nginx itself is not.
+# -----------------------------------------------------------------------------
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Every Monday at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scan-images
+  cancel-in-progress: true
+
+jobs:
+  images:
+    name: List images
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # One entry per distinct image: `ref` to scan, `service` if compose
+      # builds it (empty otherwise), and a tag-free `category` for the results.
+      - name: List the images in the compose file
+        id: list
+        run: |
+          images=$(docker compose --env-file template.env --profile '*' config --format json | jq -c '
+            .name as $project
+            | [ .services | to_entries[]
+                | if .value.build then
+                    {service: .key, ref: (.value.image // "\($project)-\(.key)"), name: .key}
+                  else
+                    {service: "", ref: .value.image, name: (.value.image | sub(":[^:/]+$"; ""))}
+                  end
+                | select(.ref | startswith("versatiles/") | not)
+                | .category = "trivy-image-" + (.name | gsub("[^A-Za-z0-9._-]"; "-")) ]
+            | unique_by(.ref)')
+          echo "images=$images" >>"$GITHUB_OUTPUT"
+          echo "Will scan: $images"
+
+  scan:
+    name: Scan ${{ matrix.ref }}
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.images.outputs.images) }}
+    steps:
+      # Needed by upload-sarif and the build, and lets Trivy read .trivyignore.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build ${{ matrix.service }}
+        if: matrix.service != ''
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: docker compose --env-file template.env --profile '*' build "$SERVICE"
+
+      # Pinned to a commit, not a tag: in March 2026 an attacker rewrote
+      # almost every trivy-action tag to point at malicious code.
+      - name: Scan image
+        id: scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.ref }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          # Without this the action drops the severity filter for SARIF
+          # output, and exit-code would fire on LOW findings too.
+          limit-severities-for-sarif: true
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '1'
+          timeout: 15m
+
+      - name: Upload results to GitHub Security
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: ${{ matrix.category }}
+
+      # SARIF isn't readable in the log, so on failure print the same findings
+      # as a table. Trivy is already installed and its database cached.
+      - name: List findings
+        if: always() && steps.scan.outcome == 'failure'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.ref }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: table
+          exit-code: '0'
+          timeout: 15m
+          skip-setup-trivy: true

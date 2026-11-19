@@ -253,6 +253,10 @@ The tile server follows the moving tag `versatiles/versatiles:latest` in `compos
 
 The file is written by `bin/deploy/write_version.sh` at the end of `update.sh`, `setup.sh` and `restart.sh` and served by nginx straight from `volumes/static/` — not through the tile server or the proxy cache, and with `Cache-Control: no-cache`, so it is never stale. `"versatiles"` is `null` when no tile server container was running at the time.
 
+### Security scan
+
+`.github/workflows/scan-images.yml` scans the images this server runs for known vulnerabilities every Monday: nginx, certbot and the `download-updater` image it builds. The tile server image is scanned in versatiles-docker. The list comes from `compose.yaml`, so a version bump there needs no change to the workflow. A run fails, and GitHub sends a failure email, when an image has a CRITICAL or HIGH vulnerability with a fix available; the findings are under Security → Code scanning. The scan checks the images in the registry, not the server: `./bin/update.sh` pulls the fixed images. Trivy can't check nginx itself in the official nginx image, only the other packages in it (the workflow explains why).
+
 ### Certificate Renewal
 
 Certificates are renewed automatically via weekly cron job. Manual renewal:
