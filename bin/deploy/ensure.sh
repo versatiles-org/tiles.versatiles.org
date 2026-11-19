@@ -39,5 +39,6 @@ echo "Ensuring RAM disk..."
 echo "Ensuring cron jobs..."
 ./bin/cert/setup_renewal.sh
 ./bin/log/setup_rotation.sh
+./bin/nginx/setup_auto_update.sh
 
 echo "Infrastructure prerequisites OK."

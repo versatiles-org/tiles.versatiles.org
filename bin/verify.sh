@@ -316,6 +316,13 @@ else
     echo "     → Run: ./bin/log/setup_rotation.sh"
 fi
 
+if crontab -l 2>/dev/null | grep -q "bin/nginx/update.sh"; then
+    pass "nginx update cron job is configured"
+else
+    warn "nginx update cron job not found"
+    echo "     → Run: ./bin/nginx/setup_auto_update.sh"
+fi
+
 # A configured cron job can still fail silently (e.g. pointing at an old checkout),
 # so check its result: last month must have been rotated into its own archive.
 LAST_MONTH=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m 2>/dev/null || date -v1d -v-1d +%Y-%m)

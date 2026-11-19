@@ -255,7 +255,7 @@ The file is written by `bin/deploy/write_version.sh` at the end of `update.sh`, 
 
 ### Security scan
 
-`.github/workflows/scan-images.yml` scans the images this server runs for known vulnerabilities every Monday: nginx, certbot and the `download-updater` image it builds. The tile server image is scanned in versatiles-docker. The list comes from `compose.yaml`, so a version bump there needs no change to the workflow. A run fails, and GitHub sends a failure email, when an image has a CRITICAL or HIGH vulnerability with a fix available; the findings are under Security → Code scanning. The scan checks the images in the registry, not the server: `./bin/update.sh` pulls the fixed images. Trivy can't check nginx itself in the official nginx image, only the other packages in it (the workflow explains why).
+`.github/workflows/scan-images.yml` scans the images this server runs for known vulnerabilities every Monday: nginx, certbot and the `download-updater` image it builds. The tile server image is scanned in versatiles-docker. The list comes from `compose.yaml`, so a version bump there needs no change to the workflow. A run fails, and GitHub sends a failure email, when an image has a CRITICAL or HIGH vulnerability with a fix available; the findings are under Security → Code scanning. The scan checks the images in the registry, not the server: a new nginx image is rolled out daily (see [nginx updates](#nginx-updates)), all others by `./bin/update.sh`. Trivy can't check nginx itself in the official nginx image, only the other packages in it (the workflow explains why).
 
 ### Certificate Renewal
 
@@ -263,6 +263,16 @@ Certificates are renewed automatically via weekly cron job. Manual renewal:
 ```bash
 ./bin/cert/renew.sh
 ```
+
+### nginx updates
+
+nginx faces the internet directly, and fixes for it reach the official image the day nginx releases them. So a daily cron job (4:30am, set up by `bin/deploy/ensure.sh`) rolls out a new nginx image without waiting for the next `./bin/update.sh`:
+
+```bash
+./bin/nginx/update.sh   # what the cron job runs; safe to run by hand
+```
+
+It pulls the nginx image and does nothing else unless a newer one arrived under the same tag. Then it checks that the nginx config loads in the new image (`tests/nginx-config.sh`), recreates the nginx container — about 3 seconds of refused connections — and runs `./bin/verify.sh`. If the config does not load, nginx keeps running the previous image; if the new container does not become healthy, nginx is recreated from the previous image. It never pulls code, touches tile data or clears the cache, and it skips the run when `compose.yaml` describes nginx differently from the running container: that change belongs to `./bin/update.sh`. Its output goes to `/var/log/nginx-update.log`; it exits 1 whenever something needs a look.
 
 ### Logs
 
