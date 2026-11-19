@@ -1,0 +1,18 @@
+# Findings accepted on purpose. Read by Trivy in scan-images.yml.
+# Give every entry a reason and an expiry date (exp:YYYY-MM-DD), so the scan
+# reports it again if the cause hasn't been fixed by then.
+
+# certbot/certbot: Python libraries in the upstream image, not fixed in any
+# certbot release yet (v5.10.0 of 2026-11-10 is the newest). Hardly reachable:
+# certbot only runs to renew certificates and only talks to Let's Encrypt.
+# Delete these once a certbot release fixes them and Dependabot has bumped it.
+#
+# urllib3: TLS interception through an HTTPS proxy (none is configured).
+CVE-2026-97687 exp:2026-12-31
+# urllib3: DoS via unbounded memory.
+CVE-2026-97689 exp:2026-12-31
+# msgpack: DoS and an out-of-bounds read when unpacking crafted data.
+CVE-2026-114613 exp:2026-12-31
+GHSA-6v7p-g79w-8964 exp:2026-12-31
+# setuptools: path traversal when installing packages, which never happens here.
+CVE-2025-47273 exp:2026-12-31
