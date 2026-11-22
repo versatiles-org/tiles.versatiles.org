@@ -285,7 +285,7 @@ docker compose logs -f              # All services
 docker compose logs -f versatiles   # Tile server only
 ```
 
-**nginx log files** in `volumes/nginx-log/`. `bin/log/rotate.sh` moves them into one archive per month (`<name>.<YYYY-MM>.…`) — all three on the 1st of each month, the error log every night. Archives of the access and error logs are deleted after 12 months; the referer statistics are kept.
+**nginx log files** in `volumes/nginx-log/`. `bin/log/rotate.sh` runs every night and moves the access and error logs into one archive per day (`<name>.<YYYY-MM-DD>.…`), which is deleted after 28 days. The referer statistics go into one archive per month (`referer_stats.<YYYY-MM>.tsv.gz`) on the 1st and are kept.
 
 | File                   | Contains                                                                                   |
 |------------------------|--------------------------------------------------------------------------------------------|
