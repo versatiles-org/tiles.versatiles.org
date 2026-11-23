@@ -285,6 +285,10 @@ server {
    # noindex on everything but the map and the editor (see $x_robots_tag map).
    add_header X-Robots-Tag $x_robots_tag always;
 
+   # Points developers who inspect a response to the terms of use (RFC 8288,
+   # registered relation "terms-of-service"). /terms below redirects there too.
+   add_header Link '<https://versatiles.org/terms/>; rel="terms-of-service"' always;
+
    # CORS headers
    add_header 'Access-Control-Allow-Origin' '*' always;
    add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
@@ -399,6 +403,12 @@ server {
       add_header 'Access-Control-Allow-Origin' '*' always;
       add_header 'Access-Control-Allow-Methods' 'GET, HEAD, OPTIONS' always;
       add_header X-Robots-Tag "noindex" always;
+      add_header Link '<https://versatiles.org/terms/>; rel="terms-of-service"' always;
+   }
+
+   # The terms of use live on versatiles.org.
+   location = /terms {
+      return 301 https://versatiles.org/terms/;
    }
 
    # This server's own robots.txt (nginx/robots.txt explains its rules), instead
