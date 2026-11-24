@@ -145,17 +145,22 @@ map $http_cf_worker $cdn_zone {
 # bin/log/referer_stats.sh and bin/log/monthly_traffic.sh.
 log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_hour\t$cdn\t$cdn_zone';
 
-# Browser cache policy, by response status.
+# Browser cache policy, by response status and path.
 #
-# The tile backend sends `Cache-Control: max-age=2419200` (28 days) on every
-# successful response. That is far too long here: after a data or frontend update
-# a client would keep its old copy for weeks. So the backend's header is stripped
-# (proxy_hide_header in `location /`) and replaced by the value below — one
-# policy for everything, tiles and static files (HTML, JSON, fonts, sprites)
-# alike:
+# The tile server's header is stripped (proxy_hide_header in `location /`) and
+# replaced by the value below:
 #
-#   2xx, 3xx  6 hours. Bounds how long stale data can linger in a browser after
-#             an update.
+#   2xx, 3xx under /tiles/
+#             6 hours. The tile server sends 28 days for tiles and tiles.json,
+#             far too long here: after a data update a client would keep its old
+#             tiles for weeks. 6 hours bounds how long they linger in a browser.
+#   2xx, 3xx elsewhere
+#             What the tile server sends. Since versatiles 5.14 that is
+#             `no-cache` for static files (HTML, JS, styles, fonts, sprites):
+#             their URLs stay the same when they change, so anything longer mixes
+#             a new index.html with old scripts after a frontend update
+#             (versatiles-org/versatiles-frontend#96). The browser revalidates,
+#             and nginx answers 304 from its cache while the ETag matches.
 #   404       5 minutes. A missing tile is a normal answer — map clients ask for
 #             tiles beyond a dataset's coverage or zoom range all the time — so it
 #             is cacheable. But only briefly: while the tile server reloads its
@@ -163,10 +168,22 @@ log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_
 #             too, and that must not stick in browsers for hours.
 #   other     never. A 429, 500 or 502 describes a moment, not the resource; a
 #             cached error would outlive the problem that caused it.
-map $status $browser_cache_control {
-   ~^[23]  "public, max-age=21600, no-transform";
-   404     "public, max-age=300";
-   default "no-store";
+#
+# Needs versatiles 5.14 or later: older versions send 28 days for static files
+# too, and this would pass that on.
+
+# The tile server's header for a static file. Empty where nginx answered
+# itself (a redirect): that gets `no-cache` too, never a long lifetime.
+map $upstream_http_cache_control $static_cache_control {
+   ""      "no-cache";
+   default $upstream_http_cache_control;
+}
+
+map "$status $uri" $browser_cache_control {
+   "~^[23]\d\d /tiles/"  "public, max-age=21600, no-transform";
+   "~^[23]"              $static_cache_control;
+   "~^404 "              "public, max-age=300";
+   default               "no-store";
 }
 
 # Rate-limited requests (429, see limit_req below) tell the client when to come
@@ -271,10 +288,11 @@ server {
    add_header X-Content-Type-Options "nosniff" always;
    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-   # Browser cache policy by response status (see $browser_cache_control map).
-   # `always` is needed so that error responses get their explicit `no-store`.
-   # The backend's 28-day Cache-Control is stripped in `location /` below so
-   # only this value reaches clients. Keep this with the other server-level
+   # Browser cache policy by response status and path (see the
+   # $browser_cache_control map). `always` is needed so that error responses get
+   # their explicit `no-store`. The backend's Cache-Control is stripped in
+   # `location /` below, so only this value reaches clients: for static files it
+   # is the backend's own, taken over through $static_cache_control. Keep this with the other server-level
    # add_headers: adding an add_header inside any location would silently drop
    # all of these inherited headers (HSTS, CORS, etc.) for that location.
    add_header Cache-Control $browser_cache_control always;
@@ -444,8 +462,11 @@ server {
       proxy_buffering       on;
       proxy_cache           STATIC;
       # How long nginx keeps a response is decided here, not by the tile server:
-      #   Cache-Control, Expires  the tile server says 28 days; without ignoring
-      #            them, that would override the proxy_cache_valid times below.
+      #   Cache-Control, Expires  the tile server says 28 days for tiles and
+      #            `no-cache` for static files; without ignoring them, that
+      #            would override the proxy_cache_valid times below, and static
+      #            files would not be cached here at all. Browsers still get the
+      #            static files' header, see $browser_cache_control.
       #   Vary     the tile server sends `Vary: Accept-Encoding`, which would make
       #            nginx keep one copy per distinct Accept-Encoding string. The
       #            encoding is part of the cache key already, in normalised form.

@@ -264,6 +264,37 @@ else
     fail "Tiles carry no ETag"
 fi
 
+TILEJSON_CC=$(header_value "$(http_headers "${BASE}/tiles/osm-vector/tiles.json")" cache-control)
+if [ "$TILEJSON_CC" = "public, max-age=21600, no-transform" ]; then
+    pass "tiles.json is cacheable for 6 hours, like the tiles"
+else
+    fail "Unexpected Cache-Control on tiles.json (${TILEJSON_CC:-none})"
+fi
+
+# Static files keep the tile server's `no-cache` (versatiles 5.14 and later):
+# their URLs stay the same when a frontend update changes them, so a browser
+# has to ask every time. An unchanged file costs an empty 304.
+STATIC_PATHS=(
+    "/"
+    "/assets/lib/maplibre-gl/maplibre-gl.js"
+    "/assets/styles/colorful/style.json"
+)
+for path in "${STATIC_PATHS[@]}"; do
+    STATIC_CC=$(header_value "$(http_headers "${BASE}${path}")" cache-control)
+    if [ "$STATIC_CC" = "no-cache" ]; then
+        pass "${path} is revalidated on every request (no-cache)"
+    else
+        fail "Unexpected Cache-Control on ${path} (${STATIC_CC:-none}; versatiles older than 5.14?)"
+    fi
+done
+STATIC_URL="${BASE}/assets/lib/maplibre-gl/maplibre-gl.js"
+STATIC_ETAG=$(header_value "$(http_headers "$STATIC_URL")" etag)
+if [ -n "$STATIC_ETAG" ] && [ "$(http_status "$STATIC_URL" -H "If-None-Match: $STATIC_ETAG")" = "304" ]; then
+    pass "Static files revalidate with 304"
+else
+    fail "A static file did not revalidate with 304 (ETag: ${STATIC_ETAG:-none})"
+fi
+
 # Errors must not be cacheable for hours: a missing tile briefly, anything else
 # not at all.
 MISSING_CC=$(header_value "$(http_headers "${BASE}/tiles/osm-vector/15/0/0")" cache-control)
