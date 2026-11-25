@@ -295,6 +295,20 @@ else
     fail "A static file did not revalidate with 304 (ETag: ${STATIC_ETAG:-none})"
 fi
 
+# The versioned library folders the page loads (frontend 3.20 and later) are kept
+# for a year: `immutable` in versatiles.yaml, versatiles 5.15 and later.
+VERSIONED_LIB=$(curl -s --max-time 30 ${CURL_TLS[@]+"${CURL_TLS[@]}"} "${BASE}/" | grep -o '/assets/lib/maplibre-gl@[^"/]*/maplibre-gl\.js' | head -n 1 || true)
+if [ -z "$VERSIONED_LIB" ]; then
+    fail "The page loads no versioned maplibre-gl (frontend older than 3.20?)"
+else
+    VERSIONED_CC=$(header_value "$(http_headers "${BASE}${VERSIONED_LIB}")" cache-control)
+    if [ "$VERSIONED_CC" = "public, max-age=31536000, immutable" ]; then
+        pass "Versioned libraries are cached for a year (${VERSIONED_LIB})"
+    else
+        fail "Unexpected Cache-Control on ${VERSIONED_LIB} (${VERSIONED_CC:-none}; versatiles older than 5.15?)"
+    fi
+fi
+
 # Errors must not be cacheable for hours: a missing tile briefly, anything else
 # not at all.
 MISSING_CC=$(header_value "$(http_headers "${BASE}/tiles/osm-vector/15/0/0")" cache-control)

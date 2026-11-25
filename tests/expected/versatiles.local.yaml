@@ -4,6 +4,7 @@ server:
 
 static:
   - src: /data/frontend/frontend.br.tar
+    immutable: ['assets/lib/*@*/**']
   - src: /data/frontend/styles.tar
     prefix: /assets/styles
 

@@ -136,18 +136,28 @@ is_atomic_build()     { [ "$(ds_build_kind "$1")" = "mirror" ]; }
 # Freshness inputs default to the CDN source key (which defaults to the name).
 ds_version_inputs()   { jq -r --arg n "$1" '.[] | select(.name==$n) | (.versionInputs // [.source // "\(.name)/\(.name)"])[]' "$MANIFEST"; }
 
+# The version of versatiles, e.g. `5.15.0`. This updater's binary comes from the
+# tile server's image (see Dockerfile), so its version is the tile server's.
+versatiles_version() {
+	local version
+	version="$(versatiles --version)"
+	printf '%s' "${version##* }"
+}
+
+# Whether versatiles is at least <major>.<minor>.
+versatiles_at_least() {
+	local major minor
+	IFS=. read -r major minor _ <<<"$(versatiles_version)"
+	[ "$major" -gt "$1" ] || { [ "$major" -eq "$1" ] && [ "$minor" -ge "$2" ]; }
+}
+
 # Older versatiles versions reject `aliases` in versatiles.yaml as an unknown
-# field, and the tile server would not load the config. This updater's binary
-# comes from the tile server's image (see Dockerfile), so its version is the
-# tile server's. Checked before anything is renamed or written.
+# field, and the tile server would not load the config. Checked before anything
+# is renamed or written.
 require_alias_support() {
 	jq -e 'any(.[]; (.aliases // []) | length > 0)' "$MANIFEST" >/dev/null || return 0
-	local version major minor
-	version="$(versatiles --version)"
-	version="${version##* }"
-	IFS=. read -r major minor _ <<<"$version"
-	if [ "$major" -lt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -lt 8 ]; }; then
-		echo "sources.json uses aliases, which need versatiles 5.8.0 or later (this is $version)" >&2
+	if ! versatiles_at_least 5 8; then
+		echo "sources.json uses aliases, which need versatiles 5.8.0 or later (this is $(versatiles_version))" >&2
 		exit 1
 	fi
 }
@@ -469,6 +479,15 @@ generate_versatiles_yaml() {
 
 			static:
 			  - src: /data/frontend/frontend.br.tar
+		YAML
+		# The frontend's versioned library folders (assets/lib/<name>@<version>/,
+		# frontend 3.20 and later) never change under their path, so browsers may
+		# keep them for a year. `immutable` came with versatiles 5.15; older versions
+		# refuse the config with it, so it is left out for them.
+		if versatiles_at_least 5 15; then
+			printf '%s\n' "    immutable: ['assets/lib/*@*/**']"
+		fi
+		cat <<-'YAML'
 			  - src: /data/frontend/styles.tar
 			    prefix: /assets/styles
 
