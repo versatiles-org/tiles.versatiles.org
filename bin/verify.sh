@@ -368,6 +368,22 @@ else
     echo "     → Run: ./bin/nginx/setup_auto_update.sh"
 fi
 
+# The cron jobs report each run to the private dashboard on
+# status.versatiles.org (bin/cron/run.sh). Without a token they still run, but
+# a failure, or a job that stopped running, goes unnoticed.
+if [ "$(crontab -l 2>/dev/null | grep -cE 'bin/cron/run\.sh .*bin/(cert/renew|log/rotate|nginx/update)\.sh')" = "3" ]; then
+    pass "Cron jobs run through bin/cron/run.sh"
+else
+    warn "Not every cron job runs through bin/cron/run.sh"
+    echo "     → Run: ./bin/deploy/ensure.sh"
+fi
+if [ -n "${REPORT_TOKEN:-}" ]; then
+    pass "Cron jobs report to the private dashboard (REPORT_TOKEN is set)"
+else
+    warn "REPORT_TOKEN is not set: cron jobs don't report to the private dashboard"
+    echo "     → Copy REPORT_TOKEN_TILES from status.versatiles.org's .env into .env as REPORT_TOKEN"
+fi
+
 # A configured cron job can still fail silently (e.g. pointing at an old checkout),
 # so check its result: last month must have been rotated into its own archive.
 LAST_MONTH=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m 2>/dev/null || date -v1d -v-1d +%Y-%m)

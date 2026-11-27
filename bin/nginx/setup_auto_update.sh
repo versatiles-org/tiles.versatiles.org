@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 PROJECT_DIR="$(pwd)"
-CRON_CMD="30 4 * * * cd '${PROJECT_DIR}' && ./bin/nginx/update.sh >> /var/log/nginx-update.log 2>&1"
+CRON_CMD="30 4 * * * cd '${PROJECT_DIR}' && ./bin/cron/run.sh nginx-update 86400 ./bin/nginx/update.sh >> /var/log/nginx-update.log 2>&1"
 
 if crontab -l 2>/dev/null | grep -qxF "$CRON_CMD"; then
     echo "nginx update cron job already configured"

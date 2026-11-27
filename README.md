@@ -274,6 +274,16 @@ nginx faces the internet directly, and fixes for it reach the official image the
 
 It pulls the nginx image and does nothing else unless a newer one arrived under the same tag. Then it checks that the nginx config loads in the new image (`tests/nginx-config.sh`), recreates the nginx container — about 3 seconds of refused connections — and runs `./bin/verify.sh`. If the config does not load, nginx keeps running the previous image; if the new container does not become healthy, nginx is recreated from the previous image. It never pulls code, touches tile data or clears the cache, and it skips the run when `compose.yaml` describes nginx differently from the running container: that change belongs to `./bin/update.sh`. Its output goes to `/var/log/nginx-update.log`; it exits 1 whenever something needs a look.
 
+### Cron job reports
+
+The cron jobs (certificate renewal, log rotation, nginx updates) run through `bin/cron/run.sh`, which reports each run to the private dashboard on status.versatiles.org: the exit code, the last line of output, and when the next run is due, so a job that stops running shows too. The job's output still goes to its log file, and a report that fails never fails the job. These reports stay private, because some of them concern security.
+
+To turn them on, copy `REPORT_TOKEN_TILES` from status.versatiles.org's `.env` into this server's `.env` as `REPORT_TOKEN`. `./bin/verify.sh` warns while it is missing. To check it by hand:
+
+```bash
+./bin/cron/run.sh nginx-update 86400 ./bin/nginx/update.sh   # runs the job and reports it, as cron does
+```
+
 ### Logs
 
 There are two kinds of logs.

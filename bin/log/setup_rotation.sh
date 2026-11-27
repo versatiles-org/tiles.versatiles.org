@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 
 PROJECT_DIR="$(pwd)"
 LOG_FILE="/var/log/nginx-log-rotation.log"
-CRON_NIGHTLY="10 0 * * * cd '${PROJECT_DIR}' && ./bin/log/rotate.sh >> ${LOG_FILE} 2>&1"
+CRON_NIGHTLY="10 0 * * * cd '${PROJECT_DIR}' && ./bin/cron/run.sh log-rotate 86400 ./bin/log/rotate.sh >> ${LOG_FILE} 2>&1"
 
 CURRENT=$(crontab -l 2>/dev/null || true)
 

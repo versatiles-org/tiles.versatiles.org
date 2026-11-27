@@ -47,6 +47,14 @@ jobs:
       - name: Update pipeline test
         run: ./tests/pipeline.sh
 
+  # bin/cron/run.sh runs a job, passes its exit code on and reports it.
+  cron-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cron job report test
+        run: ./tests/cron-run.sh
+
   yaml:
     runs-on: ubuntu-latest
     steps:
