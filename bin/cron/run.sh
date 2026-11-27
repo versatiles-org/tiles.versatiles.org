@@ -22,7 +22,8 @@ set -uo pipefail
 # date), so they go to the private dashboard only, never to a public page.
 #
 # REPORT_TOKEN and REPORT_URL in the environment take precedence over .env;
-# tests/cron-run.sh uses that.
+# tests/cron-run.sh uses that. The same script as bin/cron/run.sh in
+# photon-stack: keep both alike.
 
 cd "$(dirname "$0")/../.." || exit 1
 
