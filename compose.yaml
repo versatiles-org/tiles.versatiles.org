@@ -64,7 +64,10 @@ services:
     # This is the backstop if it does not. Docker's default of 10s meant 11 seconds with
     # nothing listening on 80/443 whenever the container was replaced.
     stop_grace_period: 3s
-    image: nginx:1.31-alpine
+    # The slim variant: the same nginx, without the optional modules (njs,
+    # xslt, image-filter, geoip, acme) and the libraries they pull in, such as
+    # libxml2. The config loads none of them.
+    image: nginx:1.31-alpine-slim
     restart: always
     depends_on:
       versatiles:
