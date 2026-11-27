@@ -55,6 +55,14 @@ jobs:
       - name: Cron job report test
         run: ./tests/cron-run.sh
 
+  # bin/nginx/check_version.sh tells whether nginx is behind nginx.org.
+  nginx-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: nginx version check test
+        run: ./tests/nginx-version.sh
+
   yaml:
     runs-on: ubuntu-latest
     steps:

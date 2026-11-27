@@ -274,6 +274,12 @@ nginx faces the internet directly, and fixes for it reach the official image the
 
 It pulls the nginx image and does nothing else unless a newer one arrived under the same tag. Then it checks that the nginx config loads in the new image (`tests/nginx-config.sh`), recreates the nginx container — about 3 seconds of refused connections — and runs `./bin/verify.sh`. If the config does not load, nginx keeps running the previous image; if the new container does not become healthy, nginx is recreated from the previous image. It never pulls code, touches tile data or clears the cache, and it skips the run when `compose.yaml` describes nginx differently from the running container: that change belongs to `./bin/update.sh`. Its output goes to `/var/log/nginx-update.log`; it exits 1 whenever something needs a look.
 
+The rollout only picks up new images under the tag `compose.yaml` names (`nginx:1.31-…`). Once nginx.org stops releasing fixes for 1.31, that tag gets no new images, and the rollout alone would say "up to date" every day. So after each run, `bin/nginx/check_version.sh` compares the running nginx with nginx's releases (GitHub's list for nginx/nginx) and exits 1 when a newer release of the same line has been out for more than 2 days, or when the line is no longer one of the two nginx.org maintains (mainline and stable). Then move the tag in `compose.yaml` to a maintained line and run `./bin/update.sh`. If the release list can't be read, that is only a warning. The running and the newest version go into the job's report for the private dashboard (see [Cron job reports](#cron-job-reports)).
+
+```bash
+./bin/nginx/check_version.sh 1.31.10   # check a version by hand
+```
+
 ### Cron job reports
 
 The cron jobs (certificate renewal, log rotation, nginx updates) run through `bin/cron/run.sh`, which reports each run to the private dashboard on status.versatiles.org: the exit code, the last line of output, and when the next run is due, so a job that stops running shows too. The job's output still goes to its log file, and a report that fails never fails the job. These reports stay private, because some of them concern security.

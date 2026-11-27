@@ -18,6 +18,9 @@ set -euo pipefail
 #   - The switch costs about 3 seconds of refused connections (recreate_nginx).
 #   - If the new container doesn't become healthy, nginx is recreated from the
 #     previous image.
+#   - Afterwards the running nginx must be the newest release of a line that
+#     nginx.org still maintains (bin/nginx/check_version.sh). That catches the
+#     tag in compose.yaml going stale, which the rollout alone can't see.
 #
 # Exits 0 when nginx is up to date or was updated, 1 when something needs a
 # look — see /var/log/nginx-update.log.
@@ -26,6 +29,13 @@ cd "$(dirname "$0")/../.."
 source bin/deploy/helpers.sh
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
+
+# Fails when the nginx that runs is behind nginx.org, see check_version.sh.
+check_version() {
+    local running
+    running=$(docker compose exec -T nginx nginx -v 2>&1 | sed -n 's#^nginx version: nginx/##p' || true)
+    ./bin/nginx/check_version.sh "$running"
+}
 
 acquire_deploy_lock
 
@@ -54,6 +64,7 @@ new_image=$(docker image inspect -f '{{.Id}}' "$image_ref")
 
 if [ "$new_image" = "$old_image" ]; then
     log "nginx is up to date ($image_ref)."
+    check_version || exit 1
     exit 0
 fi
 log "A new $image_ref arrived: ${old_image:7:12} → ${new_image:7:12}."
@@ -81,3 +92,4 @@ fi
 log "nginx now runs the new image. Verifying..."
 ./bin/verify.sh
 log "nginx update completed."
+check_version || exit 1
