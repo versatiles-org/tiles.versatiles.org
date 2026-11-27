@@ -123,3 +123,16 @@ services:
 networks:
   docker_network:
     driver: bridge
+    # Without IPv6 on the network, Docker forwards IPv6 connections to the
+    # published ports through its userland proxy, and nginx sees the bridge
+    # gateway (172.x.0.1) instead of the client: one rate-limit bucket for every
+    # IPv6 visitor, and no usable address in the logs. With it, Docker (27+)
+    # picks a unique local IPv6 subnet and publishes the ports with ip6tables
+    # NAT, which keeps the client address. nginx still reaches the tile server
+    # over IPv4 (`resolver … ipv6=off` in proxy.conf.template).
+    #
+    # A change here only takes effect when the network is recreated, which
+    # stops every container on it: run `docker compose up --detach` on the
+    # whole project. `restart.sh --with-nginx` is not enough — compose keeps the
+    # old network and only warns.
+    enable_ipv6: true

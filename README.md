@@ -232,6 +232,8 @@ Use it when the tile server must re-read something it only reads at startup. `./
 
 `--with-nginx` is the one option with real downtime: only one container can hold the published ports, so :80/:443 are unbound until the replacement listens (about 3 seconds). It is only needed for a new nginx base image or changed `ports:`/`volumes:`/`environment:`/`logging:` — config, template and certificate changes are all applied by a graceful reload. `./bin/update.sh` recreates the nginx container on its own when it is out of date, so this option is for doing it by hand.
 
+A change to `networks:` is the exception that neither option applies: compose keeps the old network and only prints a warning. Recreating the network stops every container on it, so run `docker compose up --detach` on the whole project at a quiet time. Both containers stop, and the site is down until the tile server is healthy again and nginx has started. Otherwise the next `./bin/update.sh` run that recreates nginx applies it unattended.
+
 Because two tile server containers can exist for a moment, the tile server has no fixed container name. Address it by service: `docker compose exec versatiles versatiles --version`, `docker compose logs versatiles`.
 
 ### Upgrading versatiles
