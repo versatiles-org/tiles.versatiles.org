@@ -24,7 +24,8 @@ set -euo pipefail
 # The releases come from GitHub's list for nginx/nginx, where nginx publishes
 # every release with its date. NGINX_RELEASES_URL and NOW (seconds since 1970)
 # replace the source and the current time for tests/nginx-version.sh. The same
-# script as bin/nginx/check_version.sh in photon-stack: keep both alike.
+# script as bin/nginx/check_version.sh in photon-stack and
+# status.versatiles.org: keep all three alike.
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 
